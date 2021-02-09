@@ -1,3 +1,13 @@
 *.code-workspace
 *.vtu
 *.out
+*.v
+*.fir
+*.idea
+*.bak
+*.json
+test_run_dir
+target
+quartus
+project/target
+
