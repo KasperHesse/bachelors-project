@@ -1002,9 +1002,9 @@ void generateMatrixDiagonal(
         getEdof(edof, i, j, k, ny, nz);
 
         const uint_fast32_t elementIndex =
-            i * gc.nely * gc.nelz + k * gc.nely + j;
+            i * gc.nely * gc.nelz + k * gc.nely + j; //Element number in global terms
         const MATRIXPRECISION elementScale =
-            gc.Emin + pow(x[elementIndex], gc.penal) * (gc.E0 - gc.Emin);
+            gc.Emin + pow(x[elementIndex], gc.penal) * (gc.E0 - gc.Emin); //x_e^p
 
         for (int ii = 0; ii < 24; ii++)
           diag[edof[ii]] += elementScale * ke[ii][ii];
@@ -1059,6 +1059,19 @@ void getComplianceAndSensetivity(const struct gridContext gc, DTYPE *x,
       }
 }
 
+/**
+ * @brief 
+ * 
+ * @param gc The grid context of the current problem
+ * @param x The current element densities
+ * @param nswp Number of iterations to run the preconditioner
+ * @param omega Damping factor for the preconditioner
+ * @param invD The inverted matrix diagonal of Ke
+ * @param u In: Current estimate to be preconditioned. Out: Result of preconditiong
+ * @param b Right-hand side of preconditiong problem
+ * @param tmp output: Temporary work buffer of size u,b
+ * 
+ */
 void preconditionDampedJacobi(
     const struct gridContext gc /* in */, DTYPE *x /* in: denseties */,
     const uint_fast32_t nswp /* in: number of iterations to run */,
@@ -1123,6 +1136,7 @@ void solveStateCG(
   applyStateOperator(gc, x, u, r);
   for (uint_fast32_t i = 0; i < ndof; i++)
     r[i] = b[i] - r[i];
+	 //r = b-(K*b)
 
   // setup inverse diagonal of system matrix
   generateMatrixDiagonal(gc, x, invD);
@@ -1146,8 +1160,7 @@ void solveStateCG(
     for (uint_fast32_t i = 0; i < ndof; i++)
       z[i] = 0.0;
     preconditionDampedJacobi(gc, x, nswp, omega, invD, z, r, tmp);
-    CGVECTORPRECISION
-    rho = innerProduct(r, z, ndof);
+    CGVECTORPRECISION rho = innerProduct(r, z, ndof);
 
     if (iter == 0)
       for (uint_fast32_t i = 0; i < ndof; i++)
@@ -1306,7 +1319,6 @@ void top3dcg(const uint_fast32_t nelx, const uint_fast32_t nely,
 }
 
 void main(void) {
-
     const uint_fast32_t nelx = 30;
     const uint_fast32_t nely = 15;
     const uint_fast32_t nelz = 15;

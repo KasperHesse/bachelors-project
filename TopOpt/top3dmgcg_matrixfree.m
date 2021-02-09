@@ -59,7 +59,7 @@ F = sparse(3*nodenrs(1:nely+1,1,nelx+1),1,-ones(nely+1,1),ndof(1),1); % constant
 
 U = zeros(ndof,1);
 
-%% PREPARE FILTER
+%% PREPARE FILTER. Corresponds to applyDensityFilterGradient
 iH = ones(nelx*nely*nelz*(2*(ceil(rmin)-1)+1)^3,1);
 jH = ones(size(iH));
 sH = zeros(size(iH));

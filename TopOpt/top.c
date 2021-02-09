@@ -118,8 +118,20 @@ void writeDensityVtkFile(const int nelx, const int nely, const int nelz,
   fclose(fid);
 }
 
+
 // this function acts as a matrix-free replacement for out = (H*rho(:))./Hs
 // note that rho and out cannot be the same pointer!
+/**
+ * @brief this function acts as a matrix-free replacement for out = (H*rho(:))./Hs
+ * note that rho and out cannot be the same pointer!
+ * In other words: Corresponds to eq. (5). Calculates the Hf-value for a neighbourhood,
+ * and uses this value to update estimate of dc/dx_e
+ * 
+ * @param gc The gridcontext of the current problem
+ * @param rmin Minimum radius in which to operate on the neighbourhood
+ * @param rho Current estimates of (x_e * dc/dx_e), stored in x-vector
+ * @param out Updated estimates after filtering
+ */
 void applyDensityFilter(const struct gridContext gc, const float rmin,
                         const float *rho, float *out) {
 
@@ -153,15 +165,15 @@ void applyDensityFilter(const struct gridContext gc, const float rmin,
 
             for (uint32_t j2 = j2min; j2 < j2max; j2++) {
 
-              const uint64_t e2 = i2 * nely * nelz + k2 * nely + j2;
+              const uint64_t e2 = i2 * nely * nelz + k2 * nely + j2; //Index of neighbouring element in global indices
 
-              const float filterWeight =
+              const float filterWeight = //Corresponds to Hf
                   MAX(0.0, rmin - sqrt((i1 - i2) * (i1 - i2) +
                                        (j1 - j2) * (j1 - j2) +
                                        (k1 - k2) * (k1 - k2)));
 
-              out[e1] += filterWeight * rho[e2];
-              unityScale += filterWeight;
+              out[e1] += filterWeight * rho[e2]; //rho=x-matrix, contains dc/dx_f
+              unityScale += filterWeight; //Sum values of Hf in neighbourhood
             }
           }
         }
@@ -170,8 +182,18 @@ void applyDensityFilter(const struct gridContext gc, const float rmin,
       }
 }
 
-// this function acts as a matrix-free replacement for v = H* (v(:)./Hs)
-// note that rho and out cannot be the same pointer!
+// 
+/**
+ * @brief this function acts as a matrix-free replacement for v = H* (v(:)./Hs)
+ * note that rho and out cannot be the same pointer!
+ * In other words: First performs an elementwise division over all values in v with Hs (Hf?),
+ * and then performs the matrix-vector product of H and the scaled vector
+ * I think this also corresponds to eq (5) in some way
+ * 
+ * @param gc The grid context of the current problem
+ * @param rmin The radius defining which neighbours to operate on
+ * @param v The vector of values to operate on
+ */
 void applyDensityFilterGradient(const struct gridContext gc, const float rmin,
                                 float *v) {
   const uint32_t nelx = gc.nelx;
@@ -184,38 +206,44 @@ void applyDensityFilterGradient(const struct gridContext gc, const float rmin,
     for (unsigned int k1 = 0; k1 < nelz; k1++)
       for (unsigned int j1 = 0; j1 < nely; j1++) {
 
-        const uint64_t e1 = i1 * nely * nelz + k1 * nely + j1;
+        const uint64_t e1 = i1 * nely * nelz + k1 * nely + j1; //global index in our vector, indicating the object we will be operating on
 
-        float unityScale = 0.0;
+        float unityScale = 0.0; //Corresponds to sum(H_f)
 
         // loop over neighbourhood
-        const uint32_t i2max = MIN(i1 + (ceil(rmin) + 1), nelx);
-        const uint32_t i2min = MAX(i1 - (ceil(rmin) - 1), 0);
+        const uint32_t i2max = MIN(i1 + (ceil(rmin) + 1), nelx); //Uses MIN to make sure we don't check cells that are out of bounds
+        const uint32_t i2min = MAX(i1 - (ceil(rmin) - 1), 0); //Uses MAX to make sure we don't check cells out of bounds
 
         for (uint32_t i2 = i2min; i2 < i2max; i2++) {
 
+			 //Like above
           const uint32_t k2max = MIN(k1 + (ceil(rmin) + 1), nelz);
           const uint32_t k2min = MAX(k1 - (ceil(rmin) - 1), 0);
 
           for (uint32_t k2 = k2min; k2 < k2max; k2++) {
 
+				//Like above
             const uint32_t j2max = MIN(j1 + (ceil(rmin) + 1), nely);
             const uint32_t j2min = MAX(j1 - (ceil(rmin) - 1), 0);
 
             for (uint32_t j2 = j2min; j2 < j2max; j2++) {
 
+				  //Element index 2. The global index of the neighbourhood element we're inspecting
               const uint64_t e2 = i2 * nely * nelz + k2 * nely + j2;
 
-              const float filterWeight =
+					//For each element, add Hf=rmin-dist(e,f)
+              const float filterWeight = //Corresponds to Hf
                   MAX(0.0, rmin - sqrt((i1 - i2) * (i1 - i2) +
                                        (j1 - j2) * (j1 - j2) +
                                        (k1 - k2) * (k1 - k2)));
 
-              unityScale += filterWeight;
+              unityScale += filterWeight; //Sum values of Hf in neighbourhood
             }
           }
         }
 
+			//unityScale = sum(Hf)
+			//v[e1] may be the value dc/dx
         tmp[e1] = v[e1] / unityScale;
       }
 
@@ -565,9 +593,19 @@ struct FixedDofs getFixedDof(int nelx, int nely, int nelz) {
 }
 
 // compute the indices assosiated with state of element (i,j,k)
-void getEdof(uint_fast32_t edof[24] /* out */
-, const int i, const int j, const int k,
-             const int ny, const int nz) {
+/**
+ * @brief Compute the indices of the of the 24 degrees of freedom associated with the 8 corners of the element at (i,j,k) in the grid
+ * 
+ * @param edof output where the indices are stored. edof[0-2] are (x,y,z) degrees for first corner, edof[3-5] for second corner etc
+ * @param i Current iteration/coordinate in the x-direction
+ * @param j Current iteration/coordinate in the y-direction
+ * @param k Current iteration/coordinate in the z-direction
+ * @param ny Number of nodes in the y-direction of the grid
+ * @param nx Number of nodes in the x-direction of the grid
+ */
+void getEdof(uint_fast32_t edof[24] /* out */, 
+	const int i, const int j, const int k,
+	const int ny, const int nz) {
 
   const int nx_1 = i;
   const int nx_2 = i + 1;
@@ -576,6 +614,11 @@ void getEdof(uint_fast32_t edof[24] /* out */
   const int ny_1 = j;
   const int ny_2 = j + 1;
 
+	//nIndex1 is the index for first corner, nIndex2 is the index of second corner, etc?
+	//for each index, we extract 3 values (dof in x,y,z direction)
+	//For the below, assuming a 3x3x3 element grid and i,j,k=0,0,0
+	//index1=0+0+1=1,		index2=16+0+1=17,		index3=16+0+0=16,		index4=0+0+0=0,
+	//index5=0+4+1=5,		index6=16+4+1=21,		index7=16+4+0=20,		index8=0+4+0=4		
   const uint_fast32_t nIndex1 = nx_1 * ny * nz + nz_1 * ny + ny_2;
   const uint_fast32_t nIndex2 = nx_2 * ny * nz + nz_1 * ny + ny_2;
   const uint_fast32_t nIndex3 = nx_2 * ny * nz + nz_1 * ny + ny_1;
@@ -663,6 +706,10 @@ void applyStateOperator(const struct gridContext gc /* in */, float *x /* in: el
   free(fd.idx);
 }
 
+/**
+ * @brief Gets the matrix diagonal of the KE matrix
+ * 
+ */
 void generateMatrixDiagonal(const struct gridContext gc /* in */, DTYPE *x /* in: element denseties */,
                             MATRIXPRECISION *diag /* in/out: preallocated array for output/diagonal of matrix */) {
 
@@ -704,48 +751,78 @@ void generateMatrixDiagonal(const struct gridContext gc /* in */, DTYPE *x /* in
   free(fd.idx);
 }
 
+/**
+ * @brief Performs the calculations for c(x) (eq. (1).1) and dc/dx_e (eq (4)) for every element in the grid
+ * 
+ * @param gc In: The grid context of the current problem
+ * @param x In: The current design variables
+ * @param u In: The global displacement vector
+ * @param c Output: The total change in design variables over all elements
+ * @param dcdx Output: The value of dc/dx_e for all elements in the grid
+ */
 void getComplianceAndSensetivity(const struct gridContext gc , DTYPE *x,
                                  MATRIXPRECISION *u, DTYPE *c, DTYPE *dcdx) {
 
   uint_fast32_t edof[24];
   MATRIXPRECISION ke[24][24];
-  MATRIXPRECISION u_local[24];
+  MATRIXPRECISION u_local[24]; //corresponds to u_e
   MATRIXPRECISION tmp[24];
-  getKE(ke, gc.nu, gc.elementSizeX, gc.elementSizeY, gc.elementSizeZ);
+  getKE(ke, gc.nu, gc.elementSizeX, gc.elementSizeY, gc.elementSizeZ); //get k_e aka. k_0, which is constant
 
   const int ny = gc.nely + 1;
-  const int nz = gc.nelz + 1;
+  const int nz = gc.nelz + 1; //?Why only in y and z direction?
 
   (*c) = 0.0;
   MATRIXPRECISION clocal;
 
+  //Loop over entire grid
   for (int32_t i = 0; i < gc.nelx; i++)
     for (int32_t k = 0; k < gc.nelz; k++)
       for (int32_t j = 0; j < gc.nely; j++) {
 
         getEdof(edof, i, j, k, ny, nz);
         const uint_fast32_t elementIndex =
-            i * gc.nely * gc.nelz + k * gc.nely + j;
+            i * gc.nely * gc.nelz + k * gc.nely + j; //elements are accessed first on z-axis, then y-axis and finally x-axis
+				//eg (0,1,2,3) are the nodes associated with elements (0,0,0), (0,1,0), (0,2,0) (3 elements = 4 nodes)
+				//When we get j=0, k=1, elementIndex=4, and we will now access (0,0,1), (0,1,1), (0,2,1) and so forth
 
         // copy to local buffer for blas use
         for (int ii = 0; ii < 24; ii++)
           u_local[ii] = u[edof[ii]];
 
         // clocal = ulocal^T * ke * ulocal
+		  //This line calculates ke(24x24 matrix) * ulocal (24x1 vector)
         cblas_dsymv(CblasRowMajor, CblasUpper, 24, 1.0, (MATRIXPRECISION *)ke,
                     24, u_local, 1, 0.0, tmp, 1);
         clocal = 0.0;
+		  //This line calculates ue^T *(ke*ulocal)
+		  //ue^T is a [1x24] row vector and (ke*ulocal) is a [24x1] col. vector. Result is a single number
         for (int ii = 0; ii < 24; ii++)
           clocal += u_local[ii] * tmp[ii];
 
         // apply contribution to c and dcdx
+		  //This value is c(x)=sum(xe^p)*ue^T*ke*ue
         (*c) += clocal *
                 (gc.Emin + pow(x[elementIndex], gc.penal) * (gc.E0 - gc.Emin));
+			
+			//This value is eq. (4), the inital estimate of sensitivity
         dcdx[elementIndex] = clocal * (-gc.penal * (gc.E0 - gc.Emin) *
                                        pow(x[elementIndex], gc.penal - 1));
       }
 }
-
+/**
+ * @brief 
+ * 
+ * @param gc The grid context of the current problem
+ * @param x The current element densities
+ * @param nswp Number of iterations to run the preconditioner
+ * @param omega Damping factor for the preconditioner
+ * @param invD The inverted matrix diagonal of Ke
+ * @param u In: Current estimate to be preconditioned. Out: Result of preconditiong
+ * @param b Right-hand side of preconditiong problem
+ * @param tmp output: Temporary work buffer of size u,b
+ * 
+ */
 void preconditionDampedJacobi(const struct gridContext gc /* in */, DTYPE *x /* in: denseties */, const uint_fast32_t nswp /* in: number of iterations to run */,
                 const MATRIXPRECISION omega /* in: damping factor */, const MATRIXPRECISION *invD /* in: inverted matrix diagonal */,
                 MATRIXPRECISION *u /* in/out: current solution to be preconditioned */, const MATRIXPRECISION *b /* in: right hand side vector*/,
@@ -780,6 +857,7 @@ MATRIXPRECISION innerProduct(MATRIXPRECISION *a, MATRIXPRECISION *b,
 /**
  * @brief Approximates the solution u to Ku=b with tolerance tol. Relies on stencils for applying the K matrix.
  * In other words, performs one iteration of the FE method
+ * Uses some fancy method we need to be made aware of
  * 
  * @param gc The current gridContext with global values
  * @param x The current element densities to be updated
@@ -802,9 +880,9 @@ void solveStateCG(
   const uint_fast32_t ndof = 3 * (gc.nely + 1) * (gc.nelx + 1) * (gc.nelz + 1);
 
   // allocate needed memory
-  CGVECTORPRECISION *r = malloc(sizeof(CGVECTORPRECISION) * ndof);
-  CGVECTORPRECISION *z = malloc(sizeof(CGVECTORPRECISION) * ndof);
-  CGVECTORPRECISION *p = malloc(sizeof(CGVECTORPRECISION) * ndof);
+  CGVECTORPRECISION *r = malloc(sizeof(CGVECTORPRECISION) * ndof); //Residual of b-A*x
+  CGVECTORPRECISION *z = malloc(sizeof(CGVECTORPRECISION) * ndof); //Preconditioned residual
+  CGVECTORPRECISION *p = malloc(sizeof(CGVECTORPRECISION) * ndof); 
   CGVECTORPRECISION *q = malloc(sizeof(CGVECTORPRECISION) * ndof);
   MATRIXPRECISION *invD = malloc(sizeof(MATRIXPRECISION) * ndof);
   MATRIXPRECISION *tmp = malloc(sizeof(MATRIXPRECISION) * ndof);
@@ -814,9 +892,9 @@ void solveStateCG(
   //   u[i] = 0.0;
 
   // setup residual vector
-  applyStateOperator(gc, x, u, r);
+  applyStateOperator(gc, x, u, r); //Computes r=A*x
   for (uint_fast32_t i = 0; i < ndof; i++)
-    r[i] = b[i] - r[i];
+    r[i] = b[i] - r[i]; //Residual r=b-A*x
 
   // setup inverse diagonal of system matrix
   generateMatrixDiagonal(gc, x, invD);
@@ -882,7 +960,7 @@ void solveStateCG(
 }
 
 /**
- * @brief Don't yet know what this does
+ * @brief Main function to perform FE analysis in 3d on a coarse grid
  * 
  * @param nelx Number of elements in the x-direction of the grid
  * @param nely Number of elements in the y-direction of the grid
@@ -943,7 +1021,7 @@ void top3dcg(const uint_fast32_t nelx, const uint_fast32_t nely,
   DTYPE *x = malloc(sizeof(DTYPE) * nelem); //Design variables
   DTYPE *xnew = malloc(sizeof(DTYPE) * nelem); //New design variables
   DTYPE c = 0.0;
-  //Populate design space
+  //Populate design space with initial volume shares
   for (uint_fast64_t i = 0; i < nelem; i++) {
     x[i] = volfrac;
     xPhys[i] = volfrac;
@@ -961,7 +1039,7 @@ void top3dcg(const uint_fast32_t nelx, const uint_fast32_t nely,
 
     int cgiter;
     float cgres;
-    solveStateCG(gridContext, xPhys, 2, cgtol, &cgiter, &cgres, F, U);
+    solveStateCG(gridContext, xPhys, 2, cgtol, &cgiter, &cgres, F, U); //FE-step, solve matrix equation KU=F for matrix U
 
     getComplianceAndSensetivity(gridContext, xPhys, U, &c, dc);
     applyDensityFilterGradient(gridContext, rmin, dc);
@@ -972,8 +1050,8 @@ void top3dcg(const uint_fast32_t nelx, const uint_fast32_t nely,
       g += xPhys[i];
       vol += xPhys[i];
     }
-    g = g / (DTYPE)nelem - volfrac;
-    vol /= (DTYPE)nelem;
+    g = g / (DTYPE)nelem - volfrac; //Current error in volume-per-element value, I think
+    vol /= (DTYPE)nelem; //Current volume-per-element value, I think
 
     // update denseties
 	 //! This part corresponds to optimality criteria update
