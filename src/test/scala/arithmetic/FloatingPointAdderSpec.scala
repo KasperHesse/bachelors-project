@@ -18,8 +18,8 @@ class FloatingPointAdderSpec extends FlatSpec with ChiselScalatestTester with Ma
         val siga = r.nextLong() >>> 9
         val sigb = r.nextLong() >>> 9
 
-        dut.io.siga_in.poke(siga.U)
-        dut.io.sigb_in.poke(sigb.U)
+        dut.io.sigAIn.poke(siga.U)
+        dut.io.sigBIn.poke(sigb.U)
         dut.io.expa.poke(expa.U)
         dut.io.expb.poke(expb.U)
         dut.clock.step()
@@ -35,8 +35,8 @@ class FloatingPointAdderSpec extends FlatSpec with ChiselScalatestTester with Ma
 //        print(dut.io.siga_out.peek())
 //        print(s" sigb=${dut.io.sigb_out.peek()} \n")
         dut.io.exp.expect(expOut.U)
-        dut.io.siga_out.expect(sigaOut.U)
-        dut.io.sigb_out.expect(sigbOut.U)
+        dut.io.sigAOut.expect(sigaOut.U)
+        dut.io.sigBOut.expect(sigbOut.U)
       }
     }
     genAndCalc(20)
@@ -55,7 +55,7 @@ class FloatingPointAdderSpec extends FlatSpec with ChiselScalatestTester with Ma
 
         dut.io.siga.poke(siga.U)
         dut.io.sigb.poke(sigb.U)
-        dut.io.op.poke(op.B)
+        dut.io.opIn.poke(op.B)
         dut.io.signa.poke(signa.B)
         dut.io.signb.poke(signb.B)
         dut.clock.step()
