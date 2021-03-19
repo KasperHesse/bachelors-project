@@ -22,14 +22,15 @@ class MatrixProcessingUnit(nelem: Int) extends Module {
     PE(i).io.in.a := io.in.a(i)
     PE(i).io.in.b := io.in.b(i)
     PE(i).io.in.op := io.in.op
-    PE(i).io.in.en := io.in.en
+    PE(i).io.in.valid := io.in.valid && !(io.in.op === ProcElemOpcode.NOP)
+    PE(i).io.in.macLimit := io.in.macLimit
     io.out.res(i) := PE(i).io.out.res
   }
 
-  val dones = for(i <- 0 until nelem) yield {
-    PE(i).io.out.done
+  val valids = for(i <- 0 until nelem) yield {
+    PE(i).io.out.valid
   }
-  io.out.done := dones.reduce( (a, b) => a && b)
+  io.out.valid := valids.reduce((a, b) => a && b) //And reduction
 }
 
 /**
@@ -51,13 +52,11 @@ class MPUIO(val nelem: Int) extends Bundle {
     /** Vector of second operands */
     val b = Vec(nelem, SInt(FIXED_WIDTH.W))
     /** Opcode. See [[ProcessingElement]] */
-    val op = UInt(5.W)
-    /** Enable signal. Asserted for one clock cycle when input operands are valid
-     * Alternative solution: Use a register to check if op was previously 0 and is now non-zero. If this is the case,
-     * assert enable on all PE's*/
-    val en = Bool()
-
-//    override def cloneType = (new MPUInput(nelem)).asInstanceOf[this.type]
+    val op = UInt(ProcElemOpcode.PE_OP_WIDTH.W)
+    /** Data valid signal. Asserted for one clock cycle when input operands are valid */
+    val valid = Bool()
+    /** Number of values to add before returning a result.  */
+    val macLimit = UInt(32.W)
   }
 
   /**
@@ -67,8 +66,8 @@ class MPUIO(val nelem: Int) extends Bundle {
   class MPUOutput(val nelem: Int) extends Bundle {
     /** Vector of results produced by the processing elements */
     val res = Vec(nelem, SInt(FIXED_WIDTH.W))
-    /** Asserted when the outputs are valid */
-    val done = Bool()
+    /** Asserted for one clock cycle when outputs are valid */
+    val valid = Bool()
   }
 }
 

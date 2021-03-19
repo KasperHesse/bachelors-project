@@ -7,6 +7,8 @@ import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
+import ProcElemOpcode._
+
 class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Matrix processing unit"
 
@@ -39,13 +41,13 @@ class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with 
           dut.io.in.a(j).poke(as(j)(i).S)
           dut.io.in.b(j).poke(bs(j)(i).S)
           dut.io.in.op.poke(ops(i))
-          dut.io.in.en.poke(true.B)
+          dut.io.in.valid.poke(true.B)
         }
       } else {
-        dut.io.in.en.poke(false.B)
+        dut.io.in.valid.poke(false.B)
       }
       dut.clock.step()
-      if(dut.io.out.done.peek().litToBoolean) {
+      if(dut.io.out.valid.peek().litToBoolean) {
         //Using assert instead of expect due to rounding errors when dividing.
         for(j <- 0 until nelem) {
           assert(math.abs(fixed2double(results(j)(resultCnt)) - sint2double(dut.io.out.res(j).peek)) < 1E-5)
@@ -70,10 +72,10 @@ class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with 
         val a = double2fixed(x)
         val b = double2fixed(y)
         val res = op match {
-          case ProcessingElement.ADD => fixedAdd(a, b)
-          case ProcessingElement.SUB => fixedSub(a, b)
-          case ProcessingElement.MUL => fixedMul(a, b)
-          case ProcessingElement.DIV => double2fixed(x / y)
+          case ADD => fixedAdd(a, b)
+          case SUB => fixedSub(a, b)
+          case MUL => fixedMul(a, b)
+          case DIV => double2fixed(x / y)
           case _ => throw new IllegalArgumentException("Unsupported PE Operation")
         }
         as(i)(j) = a
@@ -86,33 +88,33 @@ class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with 
   }
 
   private val iters = 50
-  private val sizes = List(4,8,11,16)
+  private val sizes = List(4,11,16)
 
   it should "add values in parallel at different widths" in {
     for(nelem <- sizes)
       test(new MatrixProcessingUnit(nelem)) { c =>
-        generateStimuli(c, ProcessingElement.ADD, iters, nelem)
+        generateStimuli(c, ADD, iters, nelem)
       }
   }
 
   it should "subtract values in parallel at different widths" in {
     for(nelem <- sizes)
       test(new MatrixProcessingUnit(nelem)) { c =>
-        generateStimuli(c, ProcessingElement.SUB, iters, nelem)
+        generateStimuli(c, SUB, iters, nelem)
       }
   }
 
   it should "multiply values in parallel at different widths" in {
     for(nelem <- sizes)
       test(new MatrixProcessingUnit(nelem)) { c =>
-        generateStimuli(c, ProcessingElement.MUL, iters, nelem)
+        generateStimuli(c, MUL, iters, nelem)
       }
   }
 
   it should "divide values in parallel at different widths" in {
     for(nelem <- sizes)
       test(new MatrixProcessingUnit(nelem)) { c =>
-        generateStimuli(c, ProcessingElement.DIV, iters, nelem)
+        generateStimuli(c, DIV, iters, nelem)
       }
   }
 }
