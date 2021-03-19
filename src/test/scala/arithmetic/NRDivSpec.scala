@@ -166,11 +166,18 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
 
-  def NRDivFullTest(dut: NRDiv, iters: Int): Unit = {
+  def NRDivBenchmark(dut: NRDiv, iters: Int): Unit = {
+
+    val denoms = new Array[Long](iters)
+    val numers = new Array[Long](iters)
+    val results = new Array[Double](iters)
+    val xs = new Array[Double](iters)
+    val ys = new Array[Double](iters)
 
     var maxdiff = Double.MinValue
     var mindiff = Double.MaxValue
     var sumdiff = 0.0
+    //Generate stimuli
     for(i <- 0 until iters) {
       val gen = generateDenomNumer()
       val denom = gen(0).asInstanceOf[Long]
@@ -178,29 +185,50 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       val x = gen(5).asInstanceOf[Double]
       val y = gen(6).asInstanceOf[Double]
 
-      dut.io.in.numer.poke(numer.S)
-      dut.io.in.denom.poke(denom.S)
-      dut.clock.step(3+3*utils.Config.NRDIV_STAGE3_REPS)
-
-      val orig = y/x
-      val got = fixed2double(dut.io.out.res.peek.litValue.toLong)
-      val diff = math.abs(orig-got)
-
-
-//      assert(math.abs(orig-got) < 1E-2)
-      maxdiff = math.max(maxdiff,diff)
-      mindiff = math.min(mindiff,diff)
-      sumdiff += diff
+      denoms(i) = denom
+      numers(i) = numer
+      results(i) = y/x
+      xs(i) = x
+      ys(i) = y
     }
+
+    var i = 0
+    var resultCnt = 0
+    while(resultCnt < iters && i < 500) {
+      if(i < iters) {
+        dut.io.in.numer.poke(numers(i).S)
+        dut.io.in.denom.poke(denoms(i).S)
+        dut.io.in.valid.poke(true.B)
+      } else if (i >= iters/2+2 && i < iters+2) {
+        dut.io.in.numer.poke(numers(i-2).S)
+        dut.io.in.denom.poke(denoms(i-2).S)
+        dut.io.in.valid.poke(true.B)
+      } else {
+        dut.io.in.valid.poke(false.B)
+      }
+      dut.clock.step()
+      if(dut.io.out.valid.peek().litToBoolean) {
+        val orig = ys(resultCnt)/xs(resultCnt)
+        val got = fixed2double(dut.io.out.res.peek.litValue.toLong)
+        val diff = math.abs(orig-got)
+
+        maxdiff = math.max(maxdiff,diff)
+        mindiff = math.min(mindiff,diff)
+        sumdiff += diff
+        resultCnt += 1
+      }
+      i += 1
+    }
+    print(s"NR divider with ${dut.stage3Reps} repetitions in stage 3. $iters iterations. Q$INT_WIDTH.$FRAC_WIDTH\n")
     print(s"Largest deviation from real result: $maxdiff\n")
     print(s"Smallest devitation from real result: $mindiff\n")
-    print(s"Average deviation from real result: ${sumdiff/iters}\nIters: $iters, stage3reps=${utils.Config.NRDIV_STAGE3_REPS}\n")
+    print(s"Average deviation from real result: ${sumdiff/iters}\n\n")
   }
 
   def NRDivMultiTest(dut: NRDiv, iters: Int): Unit = {
-    var denoms = new Array[Long](iters)
-    var numers = new Array[Long](iters)
-    var results = new Array[Double](iters)
+    val denoms = new Array[Long](iters)
+    val numers = new Array[Long](iters)
+    val results = new Array[Double](iters)
 
     //Generate stimuli
     for(i <- 0 until iters) {
@@ -218,19 +246,19 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     var i = 0
     var resultCnt = 0
     while(resultCnt < iters && i < 500) {
-      if(i < iters) {
+      if(i < iters/2) {
         dut.io.in.numer.poke(numers(i).S)
         dut.io.in.denom.poke(denoms(i).S)
-        dut.io.in.en.poke(true.B)
+        dut.io.in.valid.poke(true.B)
       } else if (i >= iters/2+2 && i < iters+2) {
         dut.io.in.numer.poke(numers(i-2).S)
         dut.io.in.denom.poke(denoms(i-2).S)
-        dut.io.in.en.poke(true.B)
+        dut.io.in.valid.poke(true.B)
       } else {
-        dut.io.in.en.poke(false.B)
+        dut.io.in.valid.poke(false.B)
       }
       dut.clock.step()
-      if(dut.io.out.done.peek().litToBoolean) {
+      if(dut.io.out.valid.peek().litToBoolean) {
         assert(math.abs(results(resultCnt) - sint2double(dut.io.out.res.peek)) < 1E-2)
         resultCnt += 1
       } else if(i > 10) {
@@ -239,7 +267,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  val iters = 100
+  val iters = 200
 
   it should "shift denominator and numerator" in {
     test(new NRDivStage1()).withAnnotations(Seq(WriteVcdAnnotation)) {c =>
@@ -265,15 +293,17 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  it should "divide two numbers to a relative degree of precision" in {
-    test(new NRDiv()) {c =>
-      NRDivFullTest(c, iters)
-    }
-  }
-
   it should "be able to handle a stream of divisions, with a break in the middle" in {
     test(new NRDiv()).withAnnotations(Seq(WriteVcdAnnotation)) {c =>
       NRDivMultiTest(c, iters)
+    }
+  }
+
+  it should "benchmark the precision" in {
+    for(i <- 1 to 4) {
+      test(new NRDiv(i)) {c =>
+        NRDivBenchmark(c, iters)
+      }
     }
   }
 }

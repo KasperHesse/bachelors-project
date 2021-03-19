@@ -18,18 +18,28 @@ abstract class FixedPointMul extends Module {
  * I/O Ports for fixed-point multipliers
  */
 class MulIO extends Bundle {
-  /** Input: First operand */
-  val a = Input(SInt(FIXED_WIDTH.W))
-  /** Input: Second operand */
-  val b = Input(SInt(FIXED_WIDTH.W))
-  /** Input: Enable signal. Should be asserted for one clock cycle when a,b are valid */
-  val en = Input(Bool())
-  /** Output: Asserted for one clock cycle when multiplication is finished and the output can be sampled*/
-  val done = Output(Bool())
-  /** Output: Overflow bit, set high when the multiplication overflowed */
-  val q = Output(Bool())
-  /** Output: The result of a*b */
-  val res = Output(SInt(FIXED_WIDTH.W))
+  val in = Input(new MulInput)
+  val out = Output(new MulOutput)
+
+  class MulInput extends Bundle {
+    /** First operand */
+    val a = SInt(FIXED_WIDTH.W)
+    /** Second operand */
+    val b = SInt(FIXED_WIDTH.W)
+    /** Data valid signal. Should be asserted for one clock cycle when a,b are valid */
+    val valid = Bool()
+  }
+
+  class MulOutput extends Bundle {
+    /** Asserted for one clock cycle when multiplication is finished and the output can be sampled */
+    val valid = Bool()
+    /** Output: Overflow bit, set high when the multiplication overflowed */
+    val q = Bool()
+    /** Output: The result of a*b */
+    val res = SInt(FIXED_WIDTH.W)
+  }
+
+
 }
 
 /**
@@ -41,17 +51,17 @@ class MulIO extends Bundle {
  */
 class FixedMulSingleCycle extends FixedPointMul {
   val prod = Wire(SInt((2*FIXED_WIDTH).W))
-  prod := io.a*io.b
+  prod := io.in.a*io.in.b
   // When multiplying Qa.b numbers, we get a Q(2a).(2b) number
   //We must right-shift by "b" to get a Q(2a).b number.
   val prod2 = (prod >> FRAC_WIDTH).asSInt()
  //To ensure proper rounding, we add the digit which was shifted off the end
   val lastBit = Cat(0.S(1.W), prod(FRAC_WIDTH - 1).asSInt()).asSInt()
-  io.res := prod2 + lastBit
+  io.out.res := prod2 + lastBit
 
   //Set overflow bit properly. Overflow starts at bit FIXED_WIDTH+FRAC_WIDTH
-  io.q := prod(2*FIXED_WIDTH-1,FIXED_WIDTH+FRAC_WIDTH) =/= 0.U
-  io.done := io.en
+  io.out.q := prod(2*FIXED_WIDTH-1,FIXED_WIDTH+FRAC_WIDTH) =/= 0.U
+  io.out.valid := io.in.valid
 }
 
 /**

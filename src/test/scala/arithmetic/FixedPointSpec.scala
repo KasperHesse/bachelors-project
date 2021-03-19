@@ -56,11 +56,11 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       val y = getDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
-      dut.io.a.poke(a.S)
-      dut.io.b.poke(b.S)
+      dut.io.in.a.poke(a.S)
+      dut.io.in.b.poke(b.S)
       dut.clock.step()
       val res = fixedMul(a,b)
-      dut.io.res.expect(res.S)
+      dut.io.out.res.expect(res.S)
     }
   }
 
@@ -73,19 +73,19 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       val b = BigInt(double2fixed(y))
       val e = (a*b) >> (FRAC_WIDTH+FIXED_WIDTH)
       val o = e != 0
-      dut.io.a.poke(a.S)
-      dut.io.b.poke(b.S)
+      dut.io.in.a.poke(a.S)
+      dut.io.in.b.poke(b.S)
       dut.clock.step()
-      dut.io.q.expect(o.B)
+      dut.io.out.q.expect(o.B)
     }
   }
 
-  def testStuff(dut: FixedPointMul): Unit = {
-    dut.io.a.poke(0x7f.S)
-    dut.io.b.poke(0x7f.S)
-    dut.clock.step()
-    dut.io.res.expect((-16).S)
-  }
+//  def testStuff(dut: FixedPointMul): Unit = {
+//    dut.io.a.poke(0x7f.S)
+//    dut.io.b.poke(0x7f.S)
+//    dut.clock.step()
+//    dut.io.res.expect((-16).S)
+//  }
 
   it should "correctly add numbers" in {
     test(new FixedPointAddSub) { c =>
@@ -110,7 +110,4 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       testMultiplicationOverflow(c, 5)
     }
   }
-
-
-
 }

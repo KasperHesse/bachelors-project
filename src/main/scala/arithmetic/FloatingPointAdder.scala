@@ -2,10 +2,15 @@ package arithmetic
 
 import chisel3._
 import chisel3.util._
-import utils.Float
+
+class Float extends Bundle {
+  val sign = Bool()
+  val exp = UInt(11.W)
+  val man = UInt(52.W)
+}
 
 /**
- * @brief Module which performs floating point addition or subtraction of two inputs.
+ * Module which performs floating point addition or subtraction of two inputs.
  *
  * a (Float): First operand
  * b (Float): Second operand

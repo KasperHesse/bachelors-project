@@ -4,8 +4,7 @@ import chisel3._
 import chisel3.util._
 import utils.Fixed._
 import utils.DivTypes._
-import utils.MulTypes
-import utils.Config.NRDIV_STAGE3_REPS
+import utils.{Config, MulTypes}
 
 /**
  * Abstract base class for the fixed-point divider. Implements [[DivIO]]
@@ -30,8 +29,8 @@ class DivInput extends Bundle {
   val numer = SInt(FIXED_WIDTH.W)
   /** Denominator of the fraction */
   val denom = SInt(FIXED_WIDTH.W)
-  /** Enable signal. Should be asserted when numer,denom are valid */
-  val en = Bool()
+  /** Should be asserted when numer,denom are valid */
+  val valid = Bool()
 }
 
 /**
@@ -40,8 +39,8 @@ class DivInput extends Bundle {
 class DivOutput extends Bundle {
   /** The result of computing numer/denom */
   val res = SInt(FIXED_WIDTH.W)
-  /** Asserted for one clock cycle when the result is ready */
-  val done = Bool()
+  /** Asserted for one clock cycle when the result is valid */
+  val valid = Bool()
 }
 
 /**
@@ -51,10 +50,10 @@ class DivOutput extends Bundle {
  *       type of multiplier
  *
  */
-class NRDiv extends FixedPointDiv {
+class NRDiv(val stage3Reps: Int = Config.NRDIV_STAGE3_REPS) extends FixedPointDiv {
   val stage1 = Module(new NRDivStage1)
   val stage2 = Module(new NRDivStage2)
-  val stage3 = for (i <- 0 until NRDIV_STAGE3_REPS) yield {
+  val stage3 = for (i <- 0 until stage3Reps) yield {
     val stage = Module(new NRDivStage3)
     stage
   }
@@ -64,28 +63,29 @@ class NRDiv extends FixedPointDiv {
   stage2.io.in <> stage1.io.out
 
   stage3(0).io.in <> stage2.io.out
-  for(i <- 1 until NRDIV_STAGE3_REPS) {
+  for(i <- 1 until stage3Reps) {
     stage3(i).io.in <> stage3(i-1).io.out
   }
 
-  stage4.io.in.numer := stage3(NRDIV_STAGE3_REPS-1).io.out.numer
-  stage4.io.in.X := stage3(NRDIV_STAGE3_REPS-1).io.out.X
-  stage4.io.in.neg := stage3(NRDIV_STAGE3_REPS-1).io.out.neg
-  stage4.io.in.en := stage3(NRDIV_STAGE3_REPS-1).io.out.en
+  stage4.io.in.numer := stage3(stage3Reps-1).io.out.numer
+  stage4.io.in.X := stage3(stage3Reps-1).io.out.X
+  stage4.io.in.neg := stage3(stage3Reps-1).io.out.neg
+  stage4.io.in.valid := stage3(stage3Reps-1).io.out.valid
 
   io.out := stage4.io.out
-}
-
-class Stage1Output extends Bundle {
-  val denom = SInt(FIXED_WIDTH.W)
-  val numer = SInt(FIXED_WIDTH.W)
-  val neg = Bool()
-  val en = Bool()
 }
 
 class Stage1IO extends Bundle {
   val in = Input(new DivInput)
   val out = Output(new Stage1Output)
+}
+
+
+class Stage1Output extends Bundle {
+  val denom = SInt(FIXED_WIDTH.W)
+  val numer = SInt(FIXED_WIDTH.W)
+  val neg = Bool()
+  val valid = Bool()
 }
 
 /**
@@ -125,7 +125,7 @@ class NRDivStage1 extends Module {
   val denomTemp = Mux(shiftDir, in.denom << diffAbs, in.denom >> diff.asUInt)
   io.out.denom := Mux(neg, (~denomTemp).asSInt() + 1.S, denomTemp)
   io.out.neg := neg
-  io.out.en := in.en
+  io.out.valid := in.valid
 }
 
 class Stage2Output extends Bundle {
@@ -133,7 +133,7 @@ class Stage2Output extends Bundle {
   val numer = SInt(FIXED_WIDTH.W)
   val denom = SInt(FIXED_WIDTH.W)
   val neg = Bool()
-  val en = Bool()
+  val valid = Bool()
 }
 
 class Stage2IO extends Bundle {
@@ -149,26 +149,26 @@ class NRDivStage2 extends Module {
 
   val in = RegNext(io.in)
 
-  val fortyEightOverSeventeen = double2fixed(48.0/17.0).S(FIXED_WIDTH.W)
-  val thirtyTwoOverSeventeen = double2fixed(32.0/17.0).S(FIXED_WIDTH.W)
+  val FORTYEIGHTOVERSEVENTEEN = double2fixed(48.0/17.0).S(FIXED_WIDTH.W)
+  val THIRTYTWOOVERSEVENTEEN = double2fixed(32.0/17.0).S(FIXED_WIDTH.W)
 
   val mul = Module(FixedPointMul(MulTypes.SINGLECYCLE))
   val sub = Module(new FixedPointAddSub)
 
-  mul.io.a := in.denom
-  mul.io.b := thirtyTwoOverSeventeen
-  mul.io.en := in.en
+  mul.io.in.a := in.denom
+  mul.io.in.b := THIRTYTWOOVERSEVENTEEN
+  mul.io.in.valid := in.valid
 
-  sub.io.in.a := fortyEightOverSeventeen
-  sub.io.in.b := mul.io.res
+  sub.io.in.a := FORTYEIGHTOVERSEVENTEEN
+  sub.io.in.b := mul.io.out.res
   sub.io.in.op := FixedPointAddSub.SUB
-  sub.io.in.en := mul.io.done
+  sub.io.in.valid := mul.io.out.valid
 
   io.out.X := sub.io.out.res
   io.out.numer := in.numer
   io.out.denom := in.denom
   io.out.neg := in.neg
-  io.out.en := sub.io.out.done
+  io.out.valid := sub.io.out.valid
 }
 
 class Stage3IO extends Bundle {
@@ -194,49 +194,49 @@ class NRDivStage3 extends Module {
   val asu2 = Module(new FixedPointAddSub)
 
   //Stage 3.1 - Calculate D'*X
-  mul1.io.a := in.X
-  mul1.io.b := in.denom
-  mul1.io.en := in.en
+  mul1.io.in.a := in.X
+  mul1.io.in.b := in.denom
+  mul1.io.in.valid := in.valid
 
   val step1 = Wire(new Stage3InternalIO)
   step1.X := in.X
   step1.numer := in.numer
   step1.denom := in.denom
   step1.neg := in.neg
-  step1.res := mul1.io.res //D' * X
-  step1.en := mul1.io.done
+  step1.res := mul1.io.out.res //D' * X
+  step1.valid := mul1.io.out.valid
   val step1Reg = RegNext(step1)
 
   //Stage 3.2 - Calculate X*(1-D'*x)
   asu1.io.in.op := FixedPointAddSub.SUB
   asu1.io.in.a := double2fixed(1).S(FIXED_WIDTH.W)
   asu1.io.in.b := step1Reg.res
-  asu1.io.in.en := step1Reg.en
+  asu1.io.in.valid := step1Reg.valid
 
-  mul2.io.a := asu1.io.out.res
-  mul2.io.b := step1Reg.X
-  mul2.io.en := asu1.io.out.done
+  mul2.io.in.a := asu1.io.out.res
+  mul2.io.in.b := step1Reg.X
+  mul2.io.in.valid := asu1.io.out.valid
 
   val step2 = Wire(new Stage3InternalIO)
   step2.X := step1Reg.X
   step2.numer := step1Reg.numer
   step2.denom := step1Reg.denom
   step2.neg := step1Reg.neg
-  step2.res := mul2.io.res //X*(1-D' * X)
-  step2.en := mul2.io.done
+  step2.res := mul2.io.out.res //X*(1-D' * X)
+  step2.valid := mul2.io.out.valid
   val step2Reg = RegNext(step2)
 
   //Stage 3.3 - Calculate 1+X*(1-D'*x)
   asu2.io.in.a := step2Reg.X
   asu2.io.in.b := step2Reg.res
   asu2.io.in.op := FixedPointAddSub.ADD
-  asu2.io.in.en := step2Reg.en
+  asu2.io.in.valid := step2Reg.valid
 
   io.out.X := asu2.io.out.res
   io.out.denom := step2Reg.denom
   io.out.numer := step2Reg.numer
   io.out.neg := step2Reg.neg
-  io.out.en := asu2.io.out.done
+  io.out.valid := asu2.io.out.valid
 }
 
 class Stage4IO extends Bundle {
@@ -247,7 +247,7 @@ class Stage4IO extends Bundle {
     val X = SInt(FIXED_WIDTH.W)
     val numer = SInt(FIXED_WIDTH.W)
     val neg = Bool()
-    val en = Bool()
+    val valid = Bool()
   }
 }
 
@@ -260,14 +260,14 @@ class NRDivStage4 extends Module {
   val in = RegNext(io.in)
 
   val mul = Module(FixedPointMul(MulTypes.SINGLECYCLE))
-  mul.io.a := in.numer
-  mul.io.b := in.X
-  mul.io.en := in.en
-  val temp = mul.io.res
+  mul.io.in.a := in.numer
+  mul.io.in.b := in.X
+  mul.io.in.valid := in.valid
+  val temp = mul.io.out.res
 
   //Invert the sign of the result if necessary
   io.out.res := Mux(in.neg, (~temp).asSInt() + 1.S, temp)
-  io.out.done := mul.io.done
+  io.out.valid := mul.io.out.valid
 }
 
 class Stage3InternalIO extends Bundle {
@@ -275,7 +275,7 @@ class Stage3InternalIO extends Bundle {
   val numer = SInt(FIXED_WIDTH.W)
   val denom = SInt(FIXED_WIDTH.W)
   val neg = Bool()
-  val en = Bool()
+  val valid = Bool()
   val res = SInt(FIXED_WIDTH.W)
 }
 
