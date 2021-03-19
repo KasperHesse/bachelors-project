@@ -603,7 +603,7 @@ struct FixedDofs getFixedDof(int nelx, int nely, int nelz) {
  * @param j Current iteration/coordinate in the y-direction
  * @param k Current iteration/coordinate in the z-direction
  * @param ny Number of nodes in the y-direction of the grid
- * @param nx Number of nodes in the x-direction of the grid
+ * @param nz Number of nodes in the z-direction of the grid
  */
 void getEdof(uint_fast32_t edof[24] /* out */, 
 	const int i, const int j, const int k,
@@ -702,6 +702,8 @@ void applyStateOperator(const struct gridContext gc /* in */, float *x /* in: el
           u_local[ii] = in[edof[ii]];
 
         // matrix-vector product: out_local = (elementScale*ke) * u_local
+        //Implement as scalar-vector product, followed by matrix-vector product
+        //Implement as ke * (u_local*elementScale)
         cblas_dsymv(CblasRowMajor, CblasUpper, 24, elementScale,
                     (MATRIXPRECISION *)ke, 24, u_local, 1, 0.0, out_local, 1);
 
@@ -1044,6 +1046,7 @@ void top3dcg(const uint_fast32_t nelx, const uint_fast32_t nely,
 
   unsigned int loop = 0;
   float change = 1;
+  //Everything up to this point is deterministic and could be precomputed
 
   while ((change > 1e-2) && (loop < 100)) {
 
