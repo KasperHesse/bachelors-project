@@ -98,11 +98,10 @@ object ArrayInitaliser {
     for(w <- 0 until width) {
       for(d <- 0 until depth/portsize) {
         for(p <- 0 until portsize) {
-          arr(w)(d)(p) = (w*depth+d*portsize+p).S(32.W)
+          arr(w)(d)(p) = long2fixed(w*depth+d*portsize+p)
         }
       }
     }
-
     arr
   }
 }

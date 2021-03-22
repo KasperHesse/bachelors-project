@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util.log2Ceil
 import utils.Config._
 import utils.Fixed._
-import vector.ProcElemOpcode._
+import vector.Opcode
 
 class Interfaces {
 
@@ -29,8 +29,8 @@ class IdExIO extends Bundle {
   val b = Output(Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W)))
   /** Destination register and subvector of the result */
   val dest = Output(new Destination())
-  /** Operation to execute. See [[vector.ProcElemOpcode]] */
-  val op = Output(UInt(PE_OP_WIDTH.W))
+  /** Operation to execute. See [[vector.Opcode]] */
+  val op = Output(Opcode())
   /** Number of multiply-accumulates to perform before releasing the result. Width 32 is currently a guess */
   val macLimit = Output(UInt(32.W))
 }
@@ -71,6 +71,8 @@ class IdControlIO extends Bundle {
   val state = Output(DecodeStage())
   /** Asserted during the final clock cycle of the current instruction mix, signalling that new instructions may be loaded */
   val finalCycle = Output(Bool())
+  /** Asserted while the execute stage is processing. If true, a new instruction may not be executed before this turns false */
+  val exproc = Input(Bool())
 }
 
 /**

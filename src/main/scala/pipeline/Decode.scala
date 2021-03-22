@@ -8,7 +8,7 @@ import DecodeStage._
 import vector.KEWrapper
 import chisel3.experimental.BundleLiterals._
 import chisel3.experimental.ChiselEnum
-import vector.ProcElemOpcode._
+import vector.Opcode._
 
 class Decode extends Module {
   val io = IO(new DecodeIO)
@@ -95,6 +95,7 @@ class Decode extends Module {
   //Keep doing this until control signal "iload" goes low. Then move to execute stage
   switch(stateReg) {
     is(sIdle) {
+      io.out.op := NOP
       val instr = in.instr.asTypeOf(new OtypeInstruction)
       when((instr.iev === OtypeIEV.ELEM || instr.iev === OtypeIEV.VEC) && instr.se === OtypeSE.START && io.ctrl.iload) {
         stateReg := sLoad
@@ -118,6 +119,17 @@ class Decode extends Module {
       X := Mux(Xtick, 0.U, X + 1.U)
       slotSelect := Mux(Xtick, Mux(SStick, 0.U, slotSelect + 1.U), slotSelect)
       IP := Mux(SStick && Xtick, IP + 1.U, IP)
+
+      //TODO Optimize this. We should only be stalled if the upcoming operation is of a different type than the currently
+      //executing op
+      when(X === 0.U && slotSelect === 0.U && io.ctrl.exproc) {
+        X := X
+        slotSelect := slotSelect
+        IP := IP
+        io.out.op := NOP
+      }
+
+      //We need to check if the execute stage is still processing. If this is the case, we will maintain all values until deasserted
 
       when(finalCycle) {
         IP := 0.U

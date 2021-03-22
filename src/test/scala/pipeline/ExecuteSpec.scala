@@ -5,7 +5,7 @@ import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import utils.Config._
 import utils.Fixed._
-import vector.ProcElemOpcode
+import vector.Opcode
 import chisel3.experimental.BundleLiterals._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
@@ -21,7 +21,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
    * @return An 2D-array containing in (0) the a-inputs, in (1) the b-inputs and in (2) the results of a OP b
    *         Each array is nelem long.
    */
-  def genStimuli(op: UInt, nelem: Int): Array[Array[Long]] = {
+  def genStimuli(op: Opcode.Type, nelem: Int): Array[Array[Long]] = {
     val as = Array.ofDim[Long](nelem)
     val bs = Array.ofDim[Long](nelem)
     val results = Array.ofDim[Long](nelem)
@@ -34,10 +34,10 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       as(i) = a
       bs(i) = b
       results(i) = op match {
-        case ProcElemOpcode.ADD => fixedAdd(a, b)
-        case ProcElemOpcode.SUB => fixedSub(a, b)
-        case ProcElemOpcode.MUL => fixedMul(a, b)
-        case ProcElemOpcode.DIV => double2fixed(x / y)
+        case Opcode.ADD => fixedAdd(a, b)
+        case Opcode.SUB => fixedSub(a, b)
+        case Opcode.MUL => fixedMul(a, b)
+        case Opcode.DIV => double2fixed(x / y)
         case _ => throw new IllegalArgumentException("Opcode unknown")
       }
     }
@@ -45,10 +45,11 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   }
   /**
    * Tests the Execute stage by applying two input vectors and observing the outputs.
+ *
    * @param dut The DUT
-   * @param op Opcode. See [[vector.ProcElemOpcode]]
+   * @param op Opcode. See [[vector.Opcode]]
    */
-  def testSubVector(dut: Execute, op: UInt): Unit = {
+  def testSubVector(dut: Execute, op: Opcode.Type): Unit = {
     val nelem = NUM_PROCELEM
     val stim = genStimuli(op, nelem)
     val as = stim(0)
@@ -67,14 +68,14 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     dut.io.ctrl.stall.poke(false.B) //Accept new inputs
     dut.clock.step()
     dut.io.ctrl.stall.poke(true.B) //Don't accept them anymore
-    dut.io.in.op.poke(ProcElemOpcode.NOP)
+    dut.io.in.op.poke(Opcode.NOP)
     dut.clock.step()
     while(i < 200 && resultCnt < 1) {
       dut.io.ctrl.count.expect(1.U)
       i += 1
       if(dut.io.out.valid.peek.litToBoolean) {
         for(j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(j)) - sint2double(dut.io.out.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(j)) - fixed2double(dut.io.out.res(j).peek)) < 1E-4)
         }
         resultCnt += 1
         dut.io.out.dest.expect(dest)
@@ -91,7 +92,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
    * @param op The operation to perform
    * @param count The number of subvectors to generate and apply
    */
-  def testMultiVector(dut: Execute, op: UInt, count: Int): Unit = {
+  def testMultiVector(dut: Execute, op: Opcode.Type, count: Int): Unit = {
     //Generate stimuli
     val nelem = NUM_PROCELEM
     val numSubVectors = VECTOR_REGISTER_DEPTH/NUM_PROCELEM
@@ -126,7 +127,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
 
       if(dut.io.out.valid.peek.litToBoolean) {
         for(j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(resultCnt)(j)) - sint2double(dut.io.out.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(resultCnt)(j)) - fixed2double(dut.io.out.res(j).peek)) < 1E-4)
         }
         dut.io.out.dest.expect(destinations(resultCnt))
         resultCnt += 1
@@ -152,7 +153,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     val dest = (new Destination).Lit(_.rd -> 1.U, _.subvec -> 2.U)
 
     for (i <- 0 until macLimit) {
-      val stim = genStimuli(ProcElemOpcode.MUL, nelem)
+      val stim = genStimuli(Opcode.MUL, nelem)
       as(i) = stim(0)
       bs(i) = stim(1)
       tempResults(i) = stim(2)
@@ -168,7 +169,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     //Input poke
     dut.io.in.dest.poke(dest)
     dut.io.in.macLimit.poke(macLimit.U)
-    dut.io.in.op.poke(ProcElemOpcode.MAC)
+    dut.io.in.op.poke(Opcode.MAC)
     dut.io.ctrl.stall.poke(false.B)
     while (i < 200 && resultCnt < 1) {
       if (i < macLimit) {
@@ -182,7 +183,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       i += 1
       if (dut.io.out.valid.peek.litToBoolean) {
         for (j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(j)) - sint2double(dut.io.out.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(j)) - fixed2double(dut.io.out.res(j).peek)) < 1E-4)
         }
         dut.io.out.dest.expect(dest)
         resultCnt += 1
@@ -204,7 +205,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
 
       for(i <- 0 until iters) {
         for (j <- 0 until macLimit) {
-          val stim = genStimuli(ProcElemOpcode.MUL, nelem)
+          val stim = genStimuli(Opcode.MUL, nelem)
           as(i)(j) = stim(0)
           bs(i)(j) = stim(1)
           tempResults(i)(j) = stim(2)
@@ -229,7 +230,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       if(iter < iters) {
         dut.io.in.dest.poke(dest(iter))
         dut.io.in.macLimit.poke(macLimit.U)
-        dut.io.in.op.poke(ProcElemOpcode.MAC)
+        dut.io.in.op.poke(Opcode.MAC)
         val s = i % macLimit
         for(j <- 0 until nelem) {
           dut.io.in.a(j).poke(as(iter)(s)(j).S)
@@ -241,7 +242,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       i += 1
       if(dut.io.out.valid.peek.litToBoolean) {
         for(j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(resultCnt)(j)) - sint2double(dut.io.out.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(resultCnt)(j)) - fixed2double(dut.io.out.res(j).peek)) < 1E-4)
         }
         dut.io.out.dest.expect(dest(resultCnt))
         resultCnt += 1
@@ -254,50 +255,50 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
 
   it should "perform vector-vector addition of two subvectors" in {
     test(new Execute){c =>
-      testSubVector(c, ProcElemOpcode.ADD)
+      testSubVector(c, Opcode.ADD)
     }
   }
 
   it should "perform vector-vector subtraction of two subvectors" in {
     test(new Execute) {c =>
-      testSubVector(c, ProcElemOpcode.SUB)
+      testSubVector(c, Opcode.SUB)
     }
   }
 
   it should "perform vector-vector multiplication of two subvectors" in {
     test(new Execute) {c =>
-      testSubVector(c, ProcElemOpcode.MUL)
+      testSubVector(c, Opcode.MUL)
     }
   }
 
   it should "perform vector-vector division of two subvectors" in {
     test(new Execute) {c =>
-      testSubVector(c, ProcElemOpcode.DIV)
+      testSubVector(c, Opcode.DIV)
     }
   }
 
   //Multiple: Generate a whole load of input vectors (preferably 20+), and shoot them in one after another
   it should "perform multiple additions in a row" in {
     test(new Execute) {c =>
-      testMultiVector(c, ProcElemOpcode.ADD, 5)
+      testMultiVector(c, Opcode.ADD, 5)
     }
   }
 
   it should "perform multiple subtractions in a row" in {
     test(new Execute) {c =>
-      testMultiVector(c, ProcElemOpcode.SUB, 5)
+      testMultiVector(c, Opcode.SUB, 5)
     }
   }
 
   it should "perform multiple multiplications in a row" in {
     test(new Execute) {c =>
-      testMultiVector(c, ProcElemOpcode.MUL, 5)
+      testMultiVector(c, Opcode.MUL, 5)
     }
   }
 
   it should "perform multiple divisions in a row" in {
     test(new Execute) {c =>
-      testMultiVector(c, ProcElemOpcode.DIV, 32)
+      testMultiVector(c, Opcode.DIV, 32)
     }
   }
 
