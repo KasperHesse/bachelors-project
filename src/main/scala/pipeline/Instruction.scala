@@ -2,55 +2,107 @@ package pipeline
 
 import chisel3._
 import chisel3.experimental.ChiselEnum
+import chisel3.experimental.BundleLiterals._
+import vector.Opcode
 
 
-class Instruction extends Bundle {
-  val value = UInt(32.W)
+trait Instruction {
+  def toUInt(): UInt
+//  def name: String
 }
 
 /**
  * A bundle defining the fields that constitute an R-type instruction
  */
-class RtypeInstruction extends Bundle {
+class RtypeInstruction extends Bundle with Instruction {
   val rd = UInt(5.W)
   val rs2 = UInt(5.W)
   val rs1 = UInt(5.W)
   val mod = RtypeMod()
   val fmt = InstructionFMT()
-  val op = UInt(12.W)
+  val op = Opcode()
 
-  def fromUInt(v: UInt): RtypeInstruction = {
-    val b = new RtypeInstruction
-    b.op := v(11,0)
-    b.fmt := InstructionFMT(v(13,12))
-    b.mod := RtypeMod(v(16,4))
-    b.rs1 := v(21,17)
-    b.rs2 := v(26,22)
-    b.rd := v(31,27)
-    b
+  override def toUInt(): UInt = {
+    RtypeInstruction.apply(this)
   }
+}
+
+object RtypeInstruction {
+  def apply(rd: Int, rs1: Int, rs2: Int, op: Opcode.Type, mod: RtypeMod.Type): RtypeInstruction = {
+    (new RtypeInstruction).Lit(_.rd -> rd.U, _.rs1 -> rs1.U, _.rs2 -> rs2.U, _.op -> op, _.mod -> mod, _.fmt -> InstructionFMT.RTYPE)
+  }
+
+  def apply(v: RtypeInstruction): UInt = {
+    var r = 0
+    r |= (v.op.litValue.toInt)
+    r |= (v.fmt.litValue().toInt << 12)
+    r |= (v.mod.litValue.toInt << 14)
+    r |= (v.rs1.litValue().toInt << 17)
+    r |= (v.rs2.litValue().toInt << 22)
+    r |= (v.rd.litValue().toInt << 27)
+    r.U(32.W)
+  }
+
 }
 
 /**
  * A bundle defining the fields that constitute an S-type instruction
  */
-class StypeInstruction extends Bundle {
+class StypeInstruction extends Bundle with Instruction {
   val nu = UInt(10.W)
   val rsrd = UInt(5.W)
   val mod = StypeMod()
   val fmt = InstructionFMT()
   val offset = StypeOffset()
+
+  override def toUInt(): UInt = {
+    StypeInstruction.apply(this)
+  }
+
+}
+
+object StypeInstruction {
+  def apply(v: StypeInstruction): UInt = {
+    var s = 0
+    s |= (v.offset.litValue().toInt)
+    s |= (v.fmt.litValue().toInt << 12)
+    s |= (v.mod.litValue().toInt << 14)
+    s |= (v.rsrd.litValue().toInt << 17)
+    s.U(32.W)
+  }
+
+  def apply(rsrd: Int, mod: StypeMod.Type, offset: StypeOffset.Type): StypeInstruction = {
+    (new StypeInstruction).Lit(_.rsrd -> rsrd.U, _.mod -> mod, _.offset -> offset, _.fmt -> InstructionFMT.STYPE)
+  }
 }
 
 /**
  * A bundle defining the fields that constitute an O-type instruction
  */
-class OtypeInstruction extends Bundle {
+class OtypeInstruction extends Bundle with Instruction {
   val nu2 = UInt(18.W)
   val fmt = InstructionFMT()
   val nu1 = UInt(10.W)
   val iev = OtypeIEV()
   val se = OtypeSE()
+
+  override def toUInt(): UInt = {
+    OtypeInstruction.apply(this)
+  }
+}
+
+object OtypeInstruction extends Bundle {
+  def apply(se: OtypeSE.Type, iev: OtypeIEV.Type): OtypeInstruction = {
+    (new OtypeInstruction).Lit(_.se -> se, _.iev -> iev, _.fmt -> InstructionFMT.OTYPE)
+  }
+
+  def apply(v: OtypeInstruction): UInt = {
+    var o = 0
+    o |= (v.se.litValue.toInt)
+    o |= (v.iev.litValue().toInt << 1)
+    o |= (v.fmt.litValue().toInt << 12)
+    o.U(32.W)
+  }
 }
 
 /**

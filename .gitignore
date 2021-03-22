@@ -6,6 +6,7 @@
 *.idea
 *.bak
 *.json
+debug
 test_run_dir
 target
 quartus

@@ -7,14 +7,21 @@ import chisel3._
  */
 class DecodeExecute extends Module {
   val io = IO(new Bundle{
-    val iload = Input(Bool())
-    val out = Flipped(new ExWbIO)
+    val in = Flipped(new IpIdIO)
+    val idctrl = new IdControlIO
+    val exctrl = new ExControlIO
+    val out = new ExWbIO
   })
 
   val decode = Module(new Decode)
   val execute = Module(new Execute)
 
+  decode.io.in <> io.in
+  decode.io.ctrl <> io.idctrl
+  io.idctrl.finalCycle := decode.io.ctrl.finalCycle
+  io.idctrl.state := decode.io.ctrl.state
+  decode.io.ctrl.exproc := (execute.io.ctrl.count =/= 0.U)
   decode.io.out <> execute.io.in
-  decode.io.ctrl.iload := io.iload
-  io.out <> execute.io.out
+  execute.io.ctrl <> io.exctrl
+  execute.io.out <> io.out
 }
