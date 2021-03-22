@@ -5,6 +5,7 @@ import chisel3.util._
 import chisel3.experimental.ChiselEnum
 import utils.Fixed.FIXED_WIDTH
 import utils.Config._
+import vector.Opcode._
 /*
 Vi skal holde styr på hvor langt vi er i den nuværende vektor og operation.
 Problem: Jeg er ikke konsekvent i hvad der er vektoren (er den 32-lang eller variabel længde?) og operationen (samme problem)
@@ -40,7 +41,7 @@ class MPUWrapper(val nelem: Int) extends Module {
   val MPU = Module(new MatrixProcessingUnit(nelem))
   val KE = Module(new KEWrapper(nelem))
   val destinationQueue = Module(new util.Queue(UInt(), 16))
-  val currentOpType = RegInit(0.U(ProcElemOpcode.PE_OP_WIDTH.W))
+  val currentOpType = RegInit(NOP)
   val X = RegInit(0.U(log2Ceil(24/NUM_PROCELEM+1).W))  //X-coordinate into KE-wrapper
   val Y = RegInit(0.U(log2Ceil(24/NUM_PROCELEM+1).W)) //Y-coordinate into KE-wrapper
   val col = RegInit(0.U(log2Ceil(NUM_PROCELEM+1).W)) //Column selection from KE submatrix, OR subvector selection
@@ -80,11 +81,11 @@ class MPUWrapper(val nelem: Int) extends Module {
   when(opReg === MPUopcode.ADDV) {
     mpu_a := a_subvec(col)
     mpu_b := b_subvec(col)
-    MPU.io.in.op := ProcElemOpcode.ADD
+    MPU.io.in.op := Opcode.ADD
   } .otherwise {
     mpu_a := VecInit(Seq.fill(nelem)(0.S(FIXED_WIDTH.W)))
     mpu_b := VecInit(Seq.fill(nelem)(0.S(FIXED_WIDTH.W)))
-    MPU.io.in.op := ProcElemOpcode.NOP
+    MPU.io.in.op := Opcode.NOP
   }
 
   //Update col and vectorElementsProcessed

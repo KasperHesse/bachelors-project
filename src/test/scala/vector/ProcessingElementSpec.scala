@@ -6,7 +6,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import ProcElemOpcode._
+import Opcode._
 
 class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Processing elements"
@@ -24,7 +24,7 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
                           as: Array[Long],
                           bs: Array[Long],
                           results: Array[Long],
-                          ops: Array[UInt]): Unit = {
+                          ops: Array[Opcode.Type]): Unit = {
     var i = 0
     var resultCnt = 0
     val itermax = results.length
@@ -40,18 +40,18 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
       dut.clock.step()
       if(dut.io.out.valid.peek().litToBoolean) {
         //Using assert instead of expect due to rounding errors when dividing.
-        assert(math.abs(fixed2double(results(resultCnt)) - sint2double(dut.io.out.res.peek)) < 1E-4)
+        assert(math.abs(fixed2double(results(resultCnt)) - fixed2double(dut.io.out.res.peek)) < 1E-4)
         resultCnt += 1
       }
       i += 1
     }
   }
 
-  def generateStimuliSingleOperation(dut: ProcessingElement, op: UInt, iters: Int): Unit = {
+  def generateStimuliSingleOperation(dut: ProcessingElement, op: Opcode.Type, iters: Int): Unit = {
     val as = new Array[Long](iters)
     val bs = new Array[Long](iters)
     val results = new Array[Long](iters)
-    val ops = new Array[UInt](iters)
+    val ops = new Array[Opcode.Type](iters)
 
     for (i <- 0 until iters ) {
 
@@ -78,7 +78,7 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
     val as = new Array[Long](iters)
     val bs = new Array[Long](iters)
     val results = new Array[Long](iters)
-    val ops = new Array[UInt](iters)
+    val ops = new Array[Opcode.Type](iters)
 
     for (i <- 0 until iters ) {
 
@@ -177,7 +177,6 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
         resultCnt += 1
       }
     }
-//    dut.io.out.res.expect(result.S)
   }
 
 

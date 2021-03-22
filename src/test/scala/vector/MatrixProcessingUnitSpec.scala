@@ -7,7 +7,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import ProcElemOpcode._
+import Opcode._
 
 class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Matrix processing unit"
@@ -30,7 +30,7 @@ class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with 
                     as: Array[Array[Long]],
                     bs: Array[Array[Long]],
                     results: Array[Array[Long]],
-                    ops: Array[UInt]): Unit = {
+                    ops: Array[Opcode.Type]): Unit = {
     var i = 0
     var resultCnt = 0
     val itermax = results(0).length
@@ -50,7 +50,7 @@ class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with 
       if(dut.io.out.valid.peek().litToBoolean) {
         //Using assert instead of expect due to rounding errors when dividing.
         for(j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(j)(resultCnt)) - sint2double(dut.io.out.res(j).peek)) < 1E-5)
+          assert(math.abs(fixed2double(results(j)(resultCnt)) - fixed2double(dut.io.out.res(j).peek)) < 1E-5)
         }
         resultCnt += 1
       }
@@ -59,7 +59,7 @@ class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with 
   }
 
 
-  def generateStimuli(dut: MatrixProcessingUnit, op: UInt, iters: Int, nelem: Int): Unit = {
+  def generateStimuli(dut: MatrixProcessingUnit, op: Opcode.Type, iters: Int, nelem: Int): Unit = {
     val as = Array.ofDim[Long](nelem, iters)
     val bs = Array.ofDim[Long](nelem, iters)
     val results = Array.ofDim[Long](nelem, iters)

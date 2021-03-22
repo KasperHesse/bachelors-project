@@ -7,7 +7,7 @@ import utils.Fixed._
 import org.scalatest.{FlatSpec, Matchers}
 import chiseltest.experimental.TestOptionBuilder._
 import utils.Config._
-import vector.ProcElemOpcode.MAC
+import vector.Opcode.MAC
 
 class MPUWrapperSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   behavior of "MPU Wrapper"
@@ -43,7 +43,7 @@ class MPUWrapperSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       if(dut.io.out.valid.peek.litToBoolean) {
         for(j <- 0 until nelem) {
 //          dut.io.out.res(j).expect(results(resultCnt).S)
-          assert(math.abs(fixed2double(results(resultCnt)) - sint2double(dut.io.out.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(resultCnt)) - fixed2double(dut.io.out.res(j).peek)) < 1E-4)
           resultCnt += 1
         }
         dut.io.out.rd.expect(3.U)

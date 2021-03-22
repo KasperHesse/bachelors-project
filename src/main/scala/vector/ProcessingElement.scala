@@ -3,8 +3,9 @@ package vector
 import arithmetic._
 import chisel3._
 import utils.Fixed._
-import ProcElemOpcode._
+//import ProcElemOpcode._
 import chisel3.util.RegEnable
+import Opcode._
 
 //Takes up 28/342 DSP blocks when used with 2 stage3-reps
 //Allows us to work with 12 of these bad-boys, aww yeah
@@ -37,15 +38,15 @@ class ProcessingElement extends Module {
   //Multiplier and divider. Inputs and outputs up to middle register
   mul.io.in.a := in.a
   mul.io.in.b := in.b
-  mul.io.in.valid := in.valid
+  mul.io.in.valid := in.valid && in.op === MUL
 
   div.io.in.numer := in.a
   div.io.in.denom := in.b
-  div.io.in.valid := in.valid
+  div.io.in.valid := in.valid && in.op === DIV
 
   //Middle register stage. Default to taking multiplier output (useful for MAC operations)
-  val mulDivRes = Mux(in.op(DIV_P), div.io.out.res, mul.io.out.res)
-  val mulDivValid = Mux(in.op(DIV_P), div.io.out.valid, mul.io.out.valid)
+  val mulDivRes = Mux(in.op === DIV, div.io.out.res, mul.io.out.res)
+  val mulDivValid = Mux(in.op === DIV, div.io.out.valid, mul.io.out.valid)
   val mulDivResultReg = RegNext(mulDivRes)
   val mulDivValidReg = RegNext(mulDivValid)
   val tmp = RegNext(in)
@@ -56,19 +57,18 @@ class ProcessingElement extends Module {
   val asu_b = Wire(SInt(FIXED_WIDTH.W))
   asu.io.in.a := asu_a
   asu.io.in.b := asu_b
-  asu.io.in.op := tmp.op(SUB_P) //All other operations should add the operands
-//  asu.io.in.valid := Mux(tmp.op(MUL_P) || tmp.op(DIV_P) || tmp.op(MAC_P), mulDivValidReg, tmp.valid)
-  asu.io.in.valid := Mux(tmp.op(ADD_P) || tmp.op(SUB_P), tmp.valid, mulDivValidReg)
+  asu.io.in.op := tmp.op === SUB //All other operations should add the operands
+  asu.io.in.valid := Mux(tmp.op === ADD || tmp.op === SUB, tmp.valid, mulDivValidReg)
   val resReg = RegEnable(asu.io.out.res, asu.io.out.valid)
   val macLimit = RegInit(0.U(32.W))
   val macCnt = RegInit(0.U(32.W))
 
 
   //Signal multiplexers for asu and result reg
-  when(tmp.op(ADD_P) || tmp.op(SUB_P)) {
+  when(tmp.op === ADD || tmp.op === SUB) {
     asu_a := tmp.a
     asu_b := tmp.b
-  } .elsewhen(tmp.op(MAC_P)) {
+  } .elsewhen(tmp.op === MAC) {
     asu_a := Mux(macCnt === 0.U, 0.S(FIXED_WIDTH.W), resReg) //Resets resReg when restarting a MAC operation
     asu_b := mulDivResultReg
   } .otherwise { //mul, div, other operations
@@ -80,14 +80,12 @@ class ProcessingElement extends Module {
   //macLimit is set when macCnt=0 and a MAC operation is started
   //macCnt is updated on each operation where op=MAC and en=1
   macLimit := Mux(macCnt === 0.U && tmp.valid, tmp.macLimit, macLimit)
-  macCnt := Mux(tmp.op(MAC_P) && tmp.valid, Mux(macCnt === macLimit-1.U, 0.U, macCnt + 1.U), macCnt)
-
+  macCnt := Mux(tmp.op === MAC && tmp.valid, Mux(macCnt === macLimit-1.U, 0.U, macCnt + 1.U), macCnt)
   //Outputs
   io.out.res := asu.io.out.res
   //When processing MAC, MAC_P will always be high
-  io.out.valid := Mux(tmp.op(MAC_P), macCnt === macLimit-1.U && asu.io.out.valid, asu.io.out.valid)
+  io.out.valid := Mux(tmp.op === MAC, macCnt === macLimit-1.U && asu.io.out.valid, asu.io.out.valid)
 }
-
 
 /**
  * I/O Ports for a [[ProcessingElement]].
@@ -107,7 +105,8 @@ class ProcElemIO extends Bundle {
     /** Data valid signal. Should be asserted for one clock cycle when the operands are valid */
     val valid = Bool()
     /** Operation to perform. See [[ProcessingElement]] for the operations available */
-    val op = UInt(ProcElemOpcode.PE_OP_WIDTH.W)
+//    val op = UInt(ProcElemOpcode.OP_WIDTH.W)
+    val op = Opcode()
     /** The number of multiply/accumulates to perform before the summation is finished and the output should be presented.
      * This value should be set in the same clock cycle as op=MAC and valid=true to set the internal register. */
     val macLimit = UInt(32.W) //Magic number for right now

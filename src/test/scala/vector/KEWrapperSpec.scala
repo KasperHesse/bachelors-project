@@ -33,12 +33,12 @@ class KEWrapperSpec  extends FlatSpec with ChiselScalatestTester with Matchers{
           print(s"keX=$keX, keY=$keY, col=$col")
           print(s" Vector values: [")
           for(i <- 0 until nelem) {
-            print(s"${sint2double(dut.io.out.keVals(i).peek)}, ")
+            print(s"${fixed2double(dut.io.out.keVals(i).peek)}, ")
           }
           println("]")
           val outs = dut.io.out.keVals
           for(i <- 0 until nelem) {
-            assert(sint2double(outs(i).peek) == res(i))
+            assert(fixed2double(outs(i).peek) == res(i))
           }
         }
       }

@@ -2,6 +2,7 @@ package vector
 import chisel3._
 import chisel3.experimental.ChiselEnum
 
+//TODO: Rework the opcodes to make use of the ChiselEnum class (chisel3.experimental)
 /**
  * Opcodes supported by a processing element.
  */

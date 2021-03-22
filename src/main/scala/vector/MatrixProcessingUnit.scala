@@ -22,7 +22,7 @@ class MatrixProcessingUnit(nelem: Int) extends Module {
     PE(i).io.in.a := io.in.a(i)
     PE(i).io.in.b := io.in.b(i)
     PE(i).io.in.op := io.in.op
-    PE(i).io.in.valid := io.in.valid && !(io.in.op === ProcElemOpcode.NOP)
+    PE(i).io.in.valid := io.in.valid && !(io.in.op === Opcode.NOP)
     PE(i).io.in.macLimit := io.in.macLimit
     io.out.res(i) := PE(i).io.out.res
   }
@@ -52,7 +52,7 @@ class MPUIO(val nelem: Int) extends Bundle {
     /** Vector of second operands */
     val b = Vec(nelem, SInt(FIXED_WIDTH.W))
     /** Opcode. See [[ProcessingElement]] */
-    val op = UInt(ProcElemOpcode.PE_OP_WIDTH.W)
+    val op = Opcode()
     /** Data valid signal. Asserted for one clock cycle when input operands are valid */
     val valid = Bool()
     /** Number of values to add before returning a result.  */
