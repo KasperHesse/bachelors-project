@@ -38,7 +38,7 @@ class ProcessingElement extends Module {
   //Multiplier and divider. Inputs and outputs up to middle register
   mul.io.in.a := in.a
   mul.io.in.b := in.b
-  mul.io.in.valid := in.valid && in.op === MUL
+  mul.io.in.valid := in.valid && (in.op === MUL || in.op === MAC)
 
   div.io.in.numer := in.a
   div.io.in.denom := in.b

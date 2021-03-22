@@ -7,6 +7,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
+import utils.Config._
 
 class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Newton-Raphson division module"
@@ -259,7 +260,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       }
       dut.clock.step()
       if(dut.io.out.valid.peek().litToBoolean) {
-        assert(math.abs(results(resultCnt) - sint2double(dut.io.out.res.peek)) < 1E-2)
+        assert(math.abs(results(resultCnt) - fixed2double(dut.io.out.res.peek)) < 1E-2)
         resultCnt += 1
       } else if(i > 10) {
       }
@@ -268,7 +269,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   val iters = 200
-
+ /*
   it should "shift denominator and numerator" in {
     test(new NRDivStage1()).withAnnotations(Seq(WriteVcdAnnotation)) {c =>
       testStage1(c, iters)
@@ -304,6 +305,27 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       test(new NRDiv(i)) {c =>
         NRDivBenchmark(c, iters)
       }
+    }
+  } */
+
+  it should "perform 1/3" in {
+        FIXED_WIDTH = 16
+        INT_WIDTH = 7
+        FRAC_WIDTH = 8
+        NRDIV_STAGE3_REPS = 4
+
+    test(new NRDiv()) {dut =>
+      val op1 = double2fixed(9)
+      val op2 = double2fixed(25)
+      dut.io.in.numer.poke(op1.S)
+      dut.io.in.denom.poke(op2.S)
+      print(s"op1=${op1}(${fixed2double(op1)}, op2=${op2}(${fixed2double(op2)})\n")
+      dut.io.in.valid.poke(true.B)
+      while(!dut.io.out.valid.peek.litToBoolean) {
+        dut.clock.step()
+      }
+      print(s"Got: ${dut.io.out.res.peek} / ${fixed2double(dut.io.out.res.peek)}\n")
+      nrDiv(op1, op2)
     }
   }
 }

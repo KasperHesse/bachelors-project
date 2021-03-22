@@ -127,6 +127,8 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
         dut.io.in.valid.poke(true.B)
         dut.io.in.op.poke(op)
         dut.io.in.macLimit.poke(iters.U)
+      } else {
+        dut.io.in.valid.poke(false.B)
       }
       dut.clock.step()
       i += 1

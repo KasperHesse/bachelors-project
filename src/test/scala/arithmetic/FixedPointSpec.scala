@@ -80,13 +80,6 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-//  def testStuff(dut: FixedPointMul): Unit = {
-//    dut.io.a.poke(0x7f.S)
-//    dut.io.b.poke(0x7f.S)
-//    dut.clock.step()
-//    dut.io.res.expect((-16).S)
-//  }
-
   it should "correctly add numbers" in {
     test(new FixedPointAddSub) { c =>
       testAddition(c, 100)
@@ -102,6 +95,21 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   it should "correctly multiply numbers in a single cycle" in {
     test(FixedPointMul(utils.Config.MULTYPE)) { c =>
       testMultiplication(c, 20)
+    }
+  }
+
+  it should "multiply with zero" in {
+    test(FixedPointMul(utils.Config.MULTYPE)) { dut =>
+      dut.io.in.a.poke(long2fixed(5))
+      dut.io.in.b.poke(long2fixed(0))
+      dut.io.in.valid.poke(true.B)
+      dut.clock.step()
+
+      while(!dut.io.out.valid.peek.litToBoolean) {
+        dut.clock.step()
+      }
+      dut.io.out.res.expect(0.S)
+
     }
   }
 
