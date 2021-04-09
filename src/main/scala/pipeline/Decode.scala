@@ -2,150 +2,146 @@ package pipeline
 
 import chisel3._
 import chisel3.util._
+import DecodeState._
 import utils.Config._
-import utils.Fixed._
-import DecodeStage._
-import vector.KEWrapper
-import chisel3.experimental.BundleLiterals._
-import chisel3.experimental.ChiselEnum
-import vector.Opcode._
 
+/**
+ * Main class for the decode stage. Contains two threads which take turns accessing memory and the execution stage.
+ * Implements [[DecodeOldIO]].
+ */
 class Decode extends Module {
-  val io = IO(new DecodeIO)
-
-  // --- CONSTANTS ---
-  private val vregSlotWidth: Int = NUM_VECTOR_REGISTERS/NUM_VREG_SLOTS
-  private val numSubVectors: Int = VECTOR_REGISTER_DEPTH/NUM_PROCELEM
+  val io = IO(new DecodeIO())
 
   // --- MODULES ---
-  val regFile = Module(new VectorRegisterFile(NUM_VECTOR_REGISTERS, VECTOR_REGISTER_DEPTH, VECTOR_REGISTER_DEPTH))
-
-  // --- REGISTERS AND WIRES ---
-  /** Instruction buffer */
-  val iBuffer = RegInit(VecInit(Seq.fill(16)(0.U(32.W))))
-  /** Instruction pointer into the instruction buffer */
-  val IP = RegInit(0.U(4.W))
-  /** Number of instruction in the current instruction buffer */
-  val iCount = RegInit(0.U(4.W))
-  /** Current state for the decoder FSM */
-  val stateReg = RegInit(sIdle)
-  /** Used to index into subvectors */
-  val X = RegInit(0.U(log2Ceil(VECTOR_REGISTER_DEPTH).W))
-  /** Used to select which vector from a vector slot is output */
-  val slotSelect = RegInit(0.U(log2Ceil(vregSlotWidth).W))
-  /** Pipeline register holding all input values. Only loads when io.ctrl.iload is asserted */
-  val in = RegEnable(io.in, io.ctrl.iload) //We only load in values when we're ready and not being stalled by the control unit
-
-  val iload = RegNext(io.ctrl.iload)
-  /** Shortcut to access the current instruction */
-  val currentInstr = iBuffer(IP)
-
-  val Rinst = currentInstr.asTypeOf(new RtypeInstruction)
-  val slot1 = Rinst.rs1
-  val slot2 = Rinst.rs2
-
-  //Generate subvectors for selection
-  //This makes it easier to address subvectors of the output vectors a, b
-  val a_subvec = Wire(Vec(numSubVectors, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
-  val b_subvec = Wire(Vec(numSubVectors, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
-  for(i <- 0 until numSubVectors) {
-    a_subvec(i) := regFile.io.rdData1.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
-    b_subvec(i) := regFile.io.rdData2.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
+  val threads = for(i <- 0 until 2) yield {
+    Module(new Thread(i))
   }
-  /** Currently adressed 'a' vector going into execute stage */
-  val a = a_subvec(X)
-  /** Currently adressed 'b' vector going to execute stage */
-  val b = b_subvec(X)
 
-  //Generate vector register selects based on slot defined in instruction + slot select
-  val rs1 = (slot1 << log2Ceil(vregSlotWidth)).asUInt + slotSelect
-  val rs2 = (slot2 << log2Ceil(vregSlotWidth)).asUInt + slotSelect
+  // --- REGISTERS ---
+  /** Pipeline stage register */
+  val in = RegNext(io.in)
+  /** State register */
+  val state = RegInit(DecodeState.sIdle)
+  /** Instruction buffer */
+  val iBuffer = RegInit(VecInit(Seq.fill(16)(0.U(INSTRUCTION_WIDTH.W))))
+  /** Instruction pointer, used when filling iBuffer */
+  val IP = RegInit(0.U(4.W))
+  /** Number of instructions in iBuffer */
+  val iCount = RegInit(0.U(4.W))
+  /** i element used for indexing */
+  val i = RegInit(0.U(log2Ceil(NELX+1).W))
+  /** j element used for indexing */
+  val j = RegInit(0.U(log2Ceil(NELY+1).W))
+  /** k element used for indexing */
+  val k = RegInit(0.U(log2Ceil(NELZ+1).W))
+  /** Progress when accessing vectors in linear fashion */
+  val progress = RegInit(0.U(log2Ceil(NDOF+1).W))
+  /** Total number of operations to issue before instructions are finished */
+  val maxProgress = RegInit(0.U(log2Ceil(NDOF+1).W))
+  /** Asserted when the current instruction packet is finished */
+  val fin = WireDefault(false.B)
+  /** Asserted when threads should start executing */
+  val start = WireDefault(false.B)
 
-  //Register updates
-  val Xtick: Bool = X === (numSubVectors - 1).U
-  val SStick: Bool = (slotSelect === (vregSlotWidth-1).U)
-  val IPtick: Bool = (IP === iCount)
-  val finalCycle: Bool = Xtick && SStick && IPtick
+  /** Which thread is currently accessing the execute stage */
+  val execThread = RegInit(1.U(1.W))
+  /** Which thread is currently accessing memory */
+  val memThread = RegInit(0.U(1.W))
 
-  // --- DEFAULT CONNECTIONS ---
-  //Register file inputs
-  regFile.io.rs1 := rs1
-  regFile.io.rs2 := rs2
+  // --- WIRES AND SIGNALS ---
 
-  //Output connections
-  io.out.a := a
-  io.out.b := b
-  io.out.dest.rd := Rinst.rd
-  io.out.dest.subvec := X
-  io.out.op := Rinst.op
-  io.ctrl.state := stateReg
-  io.ctrl.finalCycle := finalCycle
+  val instrLen = iBuffer(0).asTypeOf(new OtypeInstruction).len
+  /** LUT to decode vector lengths given in istart */
+  val lenDecode = VecInit(Array(NDOF.U, NELEM.U, 1.U))
+  /** Vector for easier access to the current state of our executing threads */
+  val threadStates = Wire(Vec(2, ThreadState()))
+  /** Vector for easier access to execute outputs of each thread */
+  val threadExes = Wire(Vec(2, new IdExIO))
+  /** Vector for easier access to memory outputs of each thread */
+  val threadMems = Wire(Vec(2, new IdMemIO))
 
-  //Dontcares
-  regFile.io.wrData := DontCare
-  regFile.io.we := false.B
-  regFile.io.rd := 0.U
-  regFile.io.wrMask := 0.U
-  regFile.io.rdMask2 := X
-  regFile.io.rdMask1 := X
-  io.out.macLimit := 0.U
+  for(i <- 0 until 2) {
+    threadStates(i) := threads(i).io.stateOut
+    threadExes(i) := threads(i).io.ex
+    threadMems(i) := threads(i).io.mem
+  }
+
+  // --- OUTPUTS AND CONNECTIONS --- //
+  threads(0).io.instr := iBuffer(threads(0).io.ip)
+  threads(1).io.instr := iBuffer(threads(1).io.ip)
+
+  for(thread <- threads) {
+    thread.io.i := i
+    thread.io.j := j
+    thread.io.k := k
+    thread.io.progress := progress
+    thread.io.fin := fin
+    thread.io.start := start
+    thread.io.mem.rdData := DontCare
+  }
+  threads(0).io.stateIn := threads(1).io.stateOut
+  threads(1).io.stateIn := threads(0).io.stateOut
+  io.threadCtrl(0) <> threads(0).io.ctrl
+  io.threadCtrl(1) <> threads(1).io.ctrl
+
+  io.ctrl.state := state
+  io.ex <> threadExes(execThread)
+  io.mem <> threadMems(memThread)
   // --- LOGIC ---
 
-  //From idle state, move to "load" state when a vstart/estart command is asserted
-  //Keep doing this until control signal "iload" goes low. Then move to execute stage
-  switch(stateReg) {
+  //Next state logic
+  switch(state) {
     is(sIdle) {
-      io.out.op := NOP
-      val instr = in.instr.asTypeOf(new OtypeInstruction)
-      when((instr.iev === OtypeIEV.ELEM || instr.iev === OtypeIEV.VEC) && instr.se === OtypeSE.START && io.ctrl.iload) {
-        stateReg := sLoad
+      when(io.ctrl.iload) {
+        state := sLoad
       }
     }
-
     is(sLoad) {
       iBuffer(IP) := in.instr
       IP := IP + 1.U
       when(!io.ctrl.iload) {
-        stateReg := sExecute
+        state := sExec
         IP := 0.U
         iCount := IP
-        //Reset registers for tracking progress
-        X := 0.U
-        slotSelect := 0.U
+        start := true.B
+        //iBuffer(0) always holds an O-type instruction indicating packet length
+        maxProgress := lenDecode(instrLen.asUInt())
       }
     }
+    is(sExec) {
+      val swapThreads = (threadStates(memThread) === ThreadState.sEstart || threadStates(memThread) === ThreadState.sWait2)
+          .&& (threadStates(execThread) === ThreadState.sEend || threadStates(execThread) === ThreadState.sWait1)
+     //Whenever mem/exec thread swap position, increment progress counter
+      //We can increment progress counter as soon as memThread enters estart
 
-    is (sExecute) {
-      X := Mux(Xtick, 0.U, X + 1.U)
-      slotSelect := Mux(Xtick, Mux(SStick, 0.U, slotSelect + 1.U), slotSelect)
-      IP := Mux(SStick && Xtick, IP + 1.U, IP)
-
-      //TODO Optimize this. We should only be stalled if the upcoming operation is of a different type than the currently
-      //executing op
-      when(X === 0.U && slotSelect === 0.U && io.ctrl.exproc) {
-        X := X
-        slotSelect := slotSelect
-        IP := IP
-        io.out.op := NOP
+      when(swapThreads) {
+        progress := progress + NUM_PROCELEM.U
+        execThread := memThread
+        memThread := execThread
       }
 
-      //We need to check if the execute stage is still processing. If this is the case, we will maintain all values until deasserted
-
-      when(finalCycle) {
-        IP := 0.U
-        when(io.ctrl.iload) {
-          stateReg := sLoad
-        } .otherwise {
-          stateReg := sIdle
-        }
-
+      when(progress >= maxProgress || instrLen === OtypeLen.SINGLE) {
+        fin := true.B
       }
+      when(threadStates(0) === ThreadState.sIdle && threadStates(1) === ThreadState.sIdle) {
+        state := sFinalize //Probably not a necessary state
+      }
+    }
+    is(sFinalize) {
+      fin := true.B
+      start := false.B
     }
   }
-}
 
-class DecodeIO extends Bundle {
-  val out = new IdExIO
-  val in = Flipped(new IpIdIO)
-  val ctrl = new IdControlIO
+  //Stall logic
+  when(io.ctrl.stall) {
+    state := state
+    IP := IP
+    i := i
+    j := j
+    k := k
+    progress := progress
+    maxProgress := maxProgress
+  }
+
 }

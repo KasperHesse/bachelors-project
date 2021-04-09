@@ -65,9 +65,11 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     dut.io.in.op.poke(op)
     val dest = (new Destination).Lit(_.rd -> 3.U, _.subvec -> 1.U)
     dut.io.in.dest.poke(dest)
+    dut.io.in.newDest.poke(true.B)
     dut.io.ctrl.stall.poke(false.B) //Accept new inputs
     dut.clock.step()
     dut.io.ctrl.stall.poke(true.B) //Don't accept them anymore
+    dut.io.in.newDest.poke(false.B)
     dut.io.in.op.poke(Opcode.NOP)
     dut.clock.step()
     while(i < 200 && resultCnt < 1) {
@@ -113,6 +115,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     var resultCnt = 0
     dut.io.in.op.poke(op)
     dut.io.ctrl.stall.poke(false.B)
+    dut.io.in.newDest.poke(true.B)
     while(i < 200 && resultCnt < count) {
       if(i < count) {
         for(j <- 0 until nelem) {
@@ -152,6 +155,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     val results = Array.ofDim[Long](nelem)
     val dest = (new Destination).Lit(_.rd -> 1.U, _.subvec -> 2.U)
 
+    //Generate stimuli and results from each stage
     for (i <- 0 until macLimit) {
       val stim = genStimuli(Opcode.MUL, nelem)
       as(i) = stim(0)
@@ -171,6 +175,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     dut.io.in.macLimit.poke(macLimit.U)
     dut.io.in.op.poke(Opcode.MAC)
     dut.io.ctrl.stall.poke(false.B)
+    dut.io.in.newDest.poke(true.B)
     while (i < 200 && resultCnt < 1) {
       if (i < macLimit) {
         for (j <- 0 until nelem) {
@@ -179,6 +184,10 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         }
       } else {
         dut.io.ctrl.stall.poke(true.B)
+      }
+      //Only first operation should have newDest true
+      if(i > 0) {
+        dut.io.in.newDest.poke(false.B)
       }
       i += 1
       if (dut.io.out.valid.peek.litToBoolean) {
@@ -195,24 +204,25 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   }
 
   def testMACMultiple(dut: Execute, macLimit: Int, iters: Int): Unit = {
-      //Generate input vectors
-      val nelem = NUM_PROCELEM
-      val as = Array.ofDim[Long](iters, macLimit, nelem)
-      val bs = Array.ofDim[Long](iters, macLimit, nelem)
-      val tempResults = Array.ofDim[Long](iters, macLimit, nelem) //intermediate results
-      val results = Array.ofDim[Long](iters, nelem)
-      val dest = Array.ofDim[Destination](iters)
+    //Generate input vectors
+    val nelem = NUM_PROCELEM
+    val as = Array.ofDim[Long](iters, macLimit, nelem)
+    val bs = Array.ofDim[Long](iters, macLimit, nelem)
+    val tempResults = Array.ofDim[Long](iters, macLimit, nelem) //intermediate results
+    val results = Array.ofDim[Long](iters, nelem)
+    val dest = Array.ofDim[Destination](iters)
 
-      for(i <- 0 until iters) {
-        for (j <- 0 until macLimit) {
-          val stim = genStimuli(Opcode.MUL, nelem)
-          as(i)(j) = stim(0)
-          bs(i)(j) = stim(1)
-          tempResults(i)(j) = stim(2)
-        }
-        dest(i) = (new Destination).Lit(_.rd -> ((i+1) % 32).U, _.subvec -> ((i+1) % 4).U)
+    //Generate a bunch of stimuli vectors and results
+    for(i <- 0 until iters) {
+      for (j <- 0 until macLimit) {
+        val stim = genStimuli(Opcode.MUL, nelem)
+        as(i)(j) = stim(0)
+        bs(i)(j) = stim(1)
+        tempResults(i)(j) = stim(2)
       }
-    //Actual, final result
+      dest(i) = (new Destination).Lit(_.rd -> ((i+1) % 32).U, _.subvec -> ((i+1) % 4).U)
+    }
+    //Actual, final results of each mac operation
     for(i <- 0 until iters) {
       for (j <- 0 until macLimit) {
         for (k <- 0 until nelem) {
@@ -220,7 +230,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         }
       }
     }
-    //TODO Finish this test
+
     var i = 0
     var iter = 0
     var resultCnt = 0
@@ -235,6 +245,12 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         for(j <- 0 until nelem) {
           dut.io.in.a(j).poke(as(iter)(s)(j).S)
           dut.io.in.b(j).poke(bs(iter)(s)(j).S)
+        }
+        //Only poke newDest true on the first cycle of each mac operation
+        if(s == 0) {
+          dut.io.in.newDest.poke(true.B)
+        } else {
+          dut.io.in.newDest.poke(false.B)
         }
       } else {
         dut.io.ctrl.stall.poke(true.B)
@@ -279,7 +295,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
 
   //Multiple: Generate a whole load of input vectors (preferably 20+), and shoot them in one after another
   it should "perform multiple additions in a row" in {
-    test(new Execute) {c =>
+    test(new Execute).withAnnotations(Seq(WriteVcdAnnotation)) {c =>
       testMultiVector(c, Opcode.ADD, 5)
     }
   }

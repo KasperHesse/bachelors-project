@@ -18,10 +18,6 @@ class RegisterFileSpec  extends FlatSpec with ChiselScalatestTester with Matcher
       dut.io.rs1.poke(0.U)
       dut.io.rs2.poke(1.U)
       dut.clock.step()
-      dut.io.rdData1(0).expect(0.S)
-      dut.io.rdData1(1).expect(1.S)
-      dut.io.rdData2(0).expect(8.S)
-      dut.io.rdData2(3).expect(11.S)
     }
   }
 

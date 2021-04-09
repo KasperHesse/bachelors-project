@@ -8,9 +8,9 @@ import vector.Opcode._
 /**
  * The vector execution stage of the pipeline. Implements [[ExecuteIO]].
  * The execute stage must not be supplied with new inputs of differing types while processing long instructions.
- * To this end, a signal must be asserted which tells it to keep the current op (io.ctrl.stall)
- * @note When executing multiple MAC-type operations, the 'dest' input must be kept constant for all inputs for the same MAC operation.
- *       Two subsequent MAC operations *must* have different 'dest' inputs - differing either in the destination register or the destination subvector
+ * To ensure this, a signal must be asserted which tells it to keep the current op (io.ctrl.stall).
+ * When stall is asserted, the previously asserted op will be kept, but the internal 'valid' signal and 'newDest' signals will be forced false
+ * @note On most operations, newDest should be true on every clock cycle. On MAC operations, newDest should only be true on the first clock cycle of the mac inputs
  */
 class Execute extends Module {
   val io = IO(new ExecuteIO)
@@ -20,10 +20,10 @@ class Execute extends Module {
   val in = RegNext(io.in)
 
   val op = RegInit(Opcode.NOP)
+  val newDest = RegInit(false.B)
+  //Stall / NOP overrides to ensure we don't process anything
   op := Mux(io.ctrl.stall || io.in.op === NOP, op, io.in.op)
-
-  val destPrev = RegNext(in.dest)
-  val newDest = (destPrev.rd =/= in.dest.rd || destPrev.subvec =/= in.dest.subvec)
+  newDest := Mux(io.ctrl.stall || io.in.op === NOP, false.B, io.in.newDest)
 
   val validOp = !RegNext(io.ctrl.stall) && RegNext(io.in.op) =/= Opcode.NOP
 
@@ -37,7 +37,7 @@ class Execute extends Module {
   MPU.io.in.macLimit := in.macLimit
 
   destinationQueue.io.enq.bits := in.dest
-  destinationQueue.io.enq.valid := Mux(op === MAC, newDest & validOp, validOp)
+  destinationQueue.io.enq.valid := newDest
   destinationQueue.io.deq.ready := MPU.io.out.valid
 
   io.out.res := MPU.io.out.res
@@ -45,6 +45,7 @@ class Execute extends Module {
   io.out.dest := destinationQueue.io.deq.bits
 
   io.ctrl.count := destinationQueue.io.count
+  io.ctrl.op := op
 }
 
 /**
