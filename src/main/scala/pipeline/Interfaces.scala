@@ -76,11 +76,26 @@ class ExControlIO extends Bundle {
  */
 class IdControlIO extends Bundle {
   /** Asserted whenever the decode stage can load new instructions into its instruction buffer */
-  val iload = Input(Bool())
+  val iload = Input(Bool()) //Should be when decode is idle and preview isntr is istart
   /** The current instruction load/execute stage */
   val state = Output(DecodeState())
+  /** Value indicating whether thread 0 or thread 1 is the currently executing thread */
+  val execThread = Output(UInt(1.W))
   /** Asserted when the decode unit should stall. This can either be because the Ex unit is not finished processing,
    * or because data has yet to be transferred from memory into the register file. */
+  val stall = Input(Bool())
+  /** Control signals originating from threads inside of decode stage */
+  val threadCtrl = Vec(2, new ThreadControlIO)
+}
+
+/**
+ * Interface between instruction fetch stage and control module
+ * Use as-is in fetch stage, use Flipped() in control module
+ */
+class IfControlIO extends Bundle {
+  /** The instruction currently being fetched from IM */
+  val instr = Output(UInt(32.W))
+  /** Stall signal */
   val stall = Input(Bool())
 }
 
@@ -135,49 +150,7 @@ class DecodeOldIO extends Bundle {
   val ctrl = new IdControlOldIO
 }
 
-class DecodeIO extends Bundle {
-  val ex = new IdExIO
-  val mem = new IdMemIO
-  val in = Flipped(new IpIdIO)
-  val ctrl = new IdControlIO
-  val threadCtrl = Vec(2, new ThreadControlIO)
-}
 
-
-
-/**
- * I/O Ports for "Thread" modules inside of the decode stage
- */
-class ThreadIO extends Bundle {
-  /** `i` value in the current grid, used to index into memory elemeents */
-  val i = Input(UInt(log2Ceil(NELX+1).W))
-  /** `j` value in the current grid, used to index into memory elements */
-  val j = Input(UInt(log2Ceil(NELY+1).W))
-  /** `k` value in the current grid, used to index into memory elements */
-  val k = Input(UInt(log2Ceil(NELZ+1).W))
-  /** How far into the current vector we have progressed. Used when loading/storing with .vec suffix */
-  val progress = Input(UInt(log2Ceil(NDOF+1).W))
-  /** The current instruction, fetched from instruction buffer in decode stage */
-  val instr = Input(UInt(INSTRUCTION_WIDTH.W))
-  /** Finished flag. Asserted when processing is finished and the thread should move to idle state after writing back */
-  val fin = Input(Bool())
-  /** Start flag. Asserted when a packet has been transferred from IM to instructionBuffer, and processing may begin */
-  val start = Input(Bool())
-  /** Instruction pointer of the current packet. Sent to IM in Decode stage */
-  val ip = Output(UInt(4.W))
-  /** State that this thread is currently in */
-  val stateOut = Output(ThreadState())
-  /** The literal value of the state. Only used for debugging purposes since we cannot peek enums yet */
-  val stateOutUint = Output(UInt(8.W))
-  /** State that the other thread is currently in */
-  val stateIn = Input(ThreadState())
-  /** Connections to the execute stage */
-  val ex = new IdExIO
-  /** Connections to memory stage */
-  val mem = new IdMemIO
-  /** Connections to the control module */
-  val ctrl = new ThreadControlIO
-}
 
 /**
  * A bundle encoding the destination register and subvector for a result.

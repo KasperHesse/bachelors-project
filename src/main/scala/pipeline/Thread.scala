@@ -11,6 +11,40 @@ import chisel3.experimental.BundleLiterals._
 import pipeline.RegisterFileType._
 
 /**
+ * I/O Ports for "Thread" modules inside of the decode stage
+ */
+class ThreadIO extends Bundle {
+  /** `i` value in the current grid, used to index into memory elemeents */
+  val i = Input(UInt(log2Ceil(NELX+1).W))
+  /** `j` value in the current grid, used to index into memory elements */
+  val j = Input(UInt(log2Ceil(NELY+1).W))
+  /** `k` value in the current grid, used to index into memory elements */
+  val k = Input(UInt(log2Ceil(NELZ+1).W))
+  /** How far into the current vector we have progressed. Used when loading/storing with .vec suffix */
+  val progress = Input(UInt(log2Ceil(NDOF+1).W))
+  /** The current instruction, fetched from instruction buffer in decode stage */
+  val instr = Input(UInt(INSTRUCTION_WIDTH.W))
+  /** Finished flag. Asserted when processing is finished and the thread should move to idle state after writing back */
+  val fin = Input(Bool())
+  /** Start flag. Asserted when a packet has been transferred from IM to instructionBuffer, and processing may begin */
+  val start = Input(Bool())
+  /** Instruction pointer of the current packet. Sent to IM in Decode stage */
+  val ip = Output(UInt(4.W))
+  /** State that this thread is currently in */
+  val stateOut = Output(ThreadState())
+  /** The literal value of the state. Only used for debugging purposes since we cannot peek enums yet */
+  val stateOutUint = Output(UInt(8.W))
+  /** State that the other thread is currently in */
+  val stateIn = Input(ThreadState())
+  /** Connections to the execute stage */
+  val ex = new IdExIO
+  /** Connections to memory stage */
+  val mem = new IdMemIO
+  /** Connections to the control module */
+  val ctrl = new ThreadControlIO
+}
+
+/**
  * A module representing a thread in the decode stage. Each decode stage contains two threads
  * @param id The ID of the thread. If id=0, this thread will be the first to fetch data from memory.
  *           If ID=1, this thread will wait until thread 0 has started executing, at which point this one will start loading

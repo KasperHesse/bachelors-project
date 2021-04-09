@@ -12,7 +12,7 @@ import utils.Config._
 import Opcode._
 import utils.Config
 
-class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "decode and execute stages"
 
   /**
@@ -21,7 +21,7 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
    * @param inst The instruction which generated the expected outputs
    */
   def expectVVvalues(dut: DecodeExecute, inst: RtypeInstruction): Unit = {
-    val vReg = dut.decode.vRegFile.arr
+    val vReg = dut.decode.threads(0).vRegFile.arr
     val subvectorsPerRegister = VECTOR_REGISTER_DEPTH/NUM_PROCELEM
 
     val op: Opcode.Type = inst.op
@@ -71,8 +71,8 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
     val rd = inst.rd.litValue().toInt
     val op = inst.op
     val subvecsPerVreg = VECTOR_REGISTER_DEPTH/NUM_PROCELEM
-    val vReg = dut.decode.vRegFile.arr
-    val xReg = dut.decode.xRegFile.arr
+    val vReg = dut.decode.threads(0).vRegFile.arr
+    val xReg = dut.decode.threads(0).xRegFile.arr
 
     for(s <- 0 until VREG_SLOT_WIDTH) {
       for(i <- 0 until subvecsPerVreg) {
@@ -95,7 +95,7 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
     val rs2 = inst.rs2.litValue.toInt
     val rd = inst.rd
     val op = inst.op
-    val xReg = dut.decode.xRegFile.arr
+    val xReg = dut.decode.threads(0).xRegFile.arr
 
     for(i <- 0 until NUM_PROCELEM) {
       val op1 = xReg(rs1)(0)(i)
@@ -114,8 +114,8 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
     val rs2 = inst.rs2.litValue.toInt
     val rd = inst.rd.litValue.toInt
     val op = inst.op
-    val sReg = dut.decode.sRegFile.arr
-    val vReg = dut.decode.vRegFile.arr
+    val sReg = dut.decode.threads(0).sRegFile.arr
+    val vReg = dut.decode.threads(0).vRegFile.arr
 
     for(s <- 0 until VREG_SLOT_WIDTH) {
       for (i <- 0 until SUBVECTORS_PER_VREG) {
@@ -139,7 +139,7 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
     val rs2 = inst.rs2.litValue.toInt
     val rd = inst.rd
     val op = inst.op
-    val sReg = dut.decode.sRegFile.arr
+    val sReg = dut.decode.threads(0).sRegFile.arr
 
     for(i <- 0 until NUM_PROCELEM) {
       val op1 = sReg(rs1)
@@ -202,26 +202,27 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
 
   def testMVP(dut: DecodeExecute): Unit = {
     val smpr = KE_SIZE / NUM_PROCELEM //Sub-matrices per row
-    val vstart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.VEC)
+    val istart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.INSTR)
+    val estart = OtypeInstruction(OtypeSE.START, iev = OtypeIEV.ELEM)
+    val eend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.ELEM)
+    val iend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.INSTR)
     val mvp = RtypeInstruction(0, 0, 1, op = Opcode.MAC, mod = RtypeMod.MVP)
 
-    val ops = Array(vstart, mvp)
+    val ops = Array(istart, estart, mvp, eend, iend)
     val instrs = Array(mvp)
     loadInstructions(ops, dut)
 
-    //Keep polling and wait for the results. 3 results total are expected
+    //Keep polling and wait for the results.
     var i = 0
     var resCnt = 0
-    val KE = dut.decode.KE.KE
-    val arr = dut.decode.vRegFile.arr
+    val KE = dut.decode.threads(0).KE.KE
+    val arr = dut.decode.threads(0).vRegFile.arr
     val Rd = mvp.rd.litValue.toInt
     val rs1 = mvp.rs1.litValue.toInt
 
     val resMax = KE_SIZE * VREG_SLOT_WIDTH / NUM_PROCELEM
     while (i < 400 && resCnt < resMax) {
       if (dut.io.out.valid.peek.litToBoolean) {
-        //Write code to generate expected results. How do?
-
         //Slices of KE-matrix that goes into this result
         val slices = KE.slice((resCnt % smpr) * KE_SIZE, ((resCnt % smpr) + 1) * KE_SIZE)
         //B-values used for this result
@@ -254,20 +255,16 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
    * @param dut the DUT
    */
   def genAndPoke(dut: DecodeExecute, mod: RtypeMod.Type): Array[RtypeInstruction] = {
-    val vstart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.VEC)
-
-    //TODO Update this method to generate entirely random instruction mixes
-//    val is = Array.ofDim[RtypeInstruction](4)
-//    for(i <- is.indices) {
-//      is(i) = genRtype(ADD, mod)
-//    }
-
+    val istart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.INSTR)
+    val estart = OtypeInstruction(OtypeSE.START, iev = OtypeIEV.ELEM)
+    val eend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.ELEM)
+    val iend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.INSTR)
     val add = genRtype(ADD, mod)
     val sub = genRtype(SUB, mod)
     val mul = genRtype(MUL, mod)
     val div = genRtype(DIV, mod)
 
-    val ops = Array(vstart, add, div, mul, sub)
+    val ops = Array(istart, estart, add, div, mul, sub, eend, iend)
     val instrs = Array(add, div, mul, sub)
     loadInstructions(ops, dut)
 
@@ -318,6 +315,16 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
     RtypeInstruction(rd, rs1, rs2, op, mod)
   }
 
+  /**
+   * Computes and prints the random seed to be used for a test
+   * @param name The name of the test
+   */
+  def seed(name: String): Unit = {
+    val seed = scala.util.Random.nextLong()
+    scala.util.Random.setSeed(seed)
+    print(s"$name. Using seed $seed\n")
+  }
+
   it should "not stall the decoder when like operations are processed" in {
     SIMULATION = true
     NUM_VECTOR_REGISTERS = 16
@@ -331,25 +338,38 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       //This is a simple test where we first use two like instructions to ensure no stalls,
       //and then use a final, different instruction to check that it stalls
-      val vstart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.VEC)
+      val istart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.INSTR)
+      val estart = OtypeInstruction(OtypeSE.START, iev = OtypeIEV.ELEM)
+      val eend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.ELEM)
+      val iend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.INSTR)
+
       val addvv = genRtype(ADD, RtypeMod.VV)
       val addvv2 = genRtype(ADD, RtypeMod.VV)
       val subvv = genRtype(SUB, RtypeMod.VV)
 
-      val ops = Array(vstart, addvv, addvv2, subvv)
+      val ops = Array(istart, estart, addvv, addvv2, subvv, eend, iend)
       loadInstructions(ops, dut)
 
       var fc = 0
       var i = 0
+      var execThread = dut.io.idctrl.execThread.peek.litValue.toInt
       while(i < 100 && fc < 2) {
-        dut.io.idstall.expect(false.B)
-        if(dut.io.idctrl.finalCycle.peek.litToBoolean) {fc += 1}
+        execThread = dut.io.idctrl.execThread.peek.litValue.toInt
+        if(dut.io.idctrl.threadCtrl(execThread).finalCycle.peek.litToBoolean) {fc += 1}
         dut.clock.step()
+        i += 1
       }
       assert(fc == 2)
       fc = 0
-      for(i <- 0 until 10) {
-        if(dut.io.idstall.peek.litToBoolean) {fc = 1}
+      i = 0
+      while(i < 20 && fc < 1) {
+      //Should we stall the decoder or the exec thread?
+        //We want to see the decoder/exec being stalled
+        execThread = dut.io.idctrl.execThread.peek.litValue.toInt
+        if(dut.io.idstall.peek.litToBoolean) {
+          fc = 1
+        }
+        i += 1
         dut.clock.step()
       }
       assert(fc == 1)
@@ -362,14 +382,12 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
     VECTOR_REGISTER_DEPTH = 16
     KE_SIZE = 16
     NUM_PROCELEM = 4
-    FIXED_WIDTH = 20
-    INT_WIDTH = 10
-    FRAC_WIDTH = 9
+    FIXED_WIDTH = 24
+    INT_WIDTH = 8
+    FRAC_WIDTH = 15
     Config.checkRequirements()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-      val seed = scala.util.Random.nextLong()
-      print(s"VV decode/execute. Using seed ${seed}\n")
-      scala.util.Random.setSeed(seed)
+      seed("VV decode execute")
       testSameMod(dut, RtypeMod.VV)
     }
   }
@@ -391,8 +409,6 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
       testSameMod(dut, RtypeMod.XV)
     }
   }
-
-
 
   it should "decode and execute XX instructions" in {
     SIMULATION = true
@@ -459,9 +475,9 @@ class DecodeOldExecuteSpec extends FlatSpec with ChiselScalatestTester with Matc
     INT_WIDTH = 8
     FRAC_WIDTH = 15
     Config.checkRequirements()
-    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-      val seeds = Array(6838063735844486541L, -3695747970121693403L)
-      for(seed <- seeds) {
+    val seeds = Array(6838063735844486541L, -3695747970121693403L)
+    for(seed  <- seeds) {
+      test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
         print(s"VV, specific seed. Using seed ${seed}\n")
         scala.util.Random.setSeed(seed)
         testSameMod(dut, RtypeMod.VV)

@@ -274,7 +274,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   def testDecode(dut: Decode, mod: RtypeMod.Type): Unit = {
     val instrs = genAndPoke(dut, mod)
     //Step until outputs are available
-    while(dut.io.threadCtrl(0).stateUint.peek.litValue() != ThreadState.sExec.litValue()) {
+    while(dut.io.ctrl.threadCtrl(0).stateUint.peek.litValue() != ThreadState.sExec.litValue()) {
       dut.clock.step()
     }
     for(inst <- instrs) {
@@ -285,15 +285,15 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   /**
-   * Computes and prints the random seed to be used for this tester. Returns the ID of the thread object instantiated
+   * Computes and prints the random seed to be used for this tester.
    * @param name The name of the test
-   * @return ID to be used for Thread object
    */
   def seed(name: String): Unit = {
     val seed = scala.util.Random.nextLong()
     scala.util.Random.setSeed(seed)
     print(s"$name. Using seed $seed\n")
   }
+
   it should "test VV instruction load and decode" in {
     SIMULATION = true
     Config.checkRequirements()
@@ -355,7 +355,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     test(new Decode).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       val instrs = genAndPoke(dut)
       //Step until outputs are available
-      while(dut.io.threadCtrl(0).stateUint.peek.litValue() != ThreadState.sExec.litValue()) {
+      while(dut.io.ctrl.threadCtrl(0).stateUint.peek.litValue() != ThreadState.sExec.litValue()) {
         dut.clock.step()
       }
       for(inst <- instrs) {
@@ -376,8 +376,8 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       var i = 0
       while(i < iters) {
         //Step until outputs are available
-        while ((dut.io.threadCtrl(0).stateUint.peek.litValue() != ThreadState.sExec.litValue())
-        .&& (dut.io.threadCtrl(1).stateUint.peek.litValue != ThreadState.sExec.litValue) ) {
+        while ((dut.io.ctrl.threadCtrl(0).stateUint.peek.litValue() != ThreadState.sExec.litValue())
+        .&& (dut.io.ctrl.threadCtrl(1).stateUint.peek.litValue != ThreadState.sExec.litValue) ) {
           dut.clock.step()
         }
         for (inst <- instrs) {

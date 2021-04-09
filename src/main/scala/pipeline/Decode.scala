@@ -5,6 +5,14 @@ import chisel3.util._
 import DecodeState._
 import utils.Config._
 
+
+class DecodeIO extends Bundle {
+  val ex = new IdExIO
+  val mem = new IdMemIO
+  val in = Flipped(new IpIdIO)
+  val ctrl = new IdControlIO
+}
+
 /**
  * Main class for the decode stage. Contains two threads which take turns accessing memory and the execution stage.
  * Implements [[DecodeOldIO]].
@@ -43,9 +51,9 @@ class Decode extends Module {
   /** Asserted when threads should start executing */
   val start = WireDefault(false.B)
 
-  /** Which thread is currently accessing the execute stage */
+  /** Thread which is currently accessing the execute stage */
   val execThread = RegInit(1.U(1.W))
-  /** Which thread is currently accessing memory */
+  /** Thread which is currently accessing memory */
   val memThread = RegInit(0.U(1.W))
 
   // --- WIRES AND SIGNALS ---
@@ -81,10 +89,11 @@ class Decode extends Module {
   }
   threads(0).io.stateIn := threads(1).io.stateOut
   threads(1).io.stateIn := threads(0).io.stateOut
-  io.threadCtrl(0) <> threads(0).io.ctrl
-  io.threadCtrl(1) <> threads(1).io.ctrl
+  io.ctrl.threadCtrl(0) <> threads(0).io.ctrl
+  io.ctrl.threadCtrl(1) <> threads(1).io.ctrl
 
   io.ctrl.state := state
+  io.ctrl.execThread := execThread
   io.ex <> threadExes(execThread)
   io.mem <> threadMems(memThread)
   // --- LOGIC ---
