@@ -125,9 +125,9 @@ class MPUWrapper(val nelem: Int) extends Module {
   io.out.rd := destinationQueue.io.deq.bits
 
   //KE matrix
-  KE.io.in.keY := Y
-  KE.io.in.keX := X
-  KE.io.in.keCol := col
+  KE.io.keY := Y
+  KE.io.keX := X
+  KE.io.keCol := col
 
 }
 
