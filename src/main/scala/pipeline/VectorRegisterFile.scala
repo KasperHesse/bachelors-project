@@ -92,6 +92,16 @@ class VectorRegFileIO(width: Int, depth: Int, portsize: Int) extends Bundle {
 }
 
 object ArrayInitaliser {
+  /**
+   * Generates an array used to initalize the register file.
+   * @param width The number of entries in the register file
+   * @param depth The number of values per entry
+   * @param portsize The number of values that may be read on each clock cycle
+   * @return A 3D-array containing the register file initialization.
+   *         The first dimension is `width` deep
+   *         The second dimension is `depth/portsize`. If eg depth=32 and portsize=8, this dimension will be 4 wide (4 subvectors per vector register)
+   *         The third dimension is `portsize`. As above, if portsize=8, 8 values are stored in this dimension.
+   */
   def apply(width: Int, depth: Int, portsize: Int): Array[Array[Array[SInt]]] = {
     val arr = Array.ofDim[SInt](width, depth/portsize, portsize)
 
