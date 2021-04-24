@@ -16,11 +16,11 @@ object Config {
 
   //Compile-time constant definitions
   /** Number of element in the x-direction */
-  val NELX = 3
+  val NELX = 6
   /** Number of elements in the y-direction */
-  val NELY = 3
+  val NELY = 6
   /** Number of element in the z-direction */
-  val NELZ = 3
+  val NELZ = 6
   /** The greatest of the three element dimensions */
   val GDIM = math.max(NELX, math.max(NELY, NELZ))
 
@@ -32,32 +32,35 @@ object Config {
   val NZ = NELZ + 1
 
   /** Total number of elements in the design domain */
-  val NELEM = NELX*NELY*NELZ
+  var NELEM = NELX * NELY * NELZ
   /** Total number of element DOF in the design domain */
   var NDOF = 3 * NX * NY * NZ
 
   val WORD_LENGTH = Fixed.FIXED_WIDTH
 
   /** The number of element in the vector register file */
-  var NUM_VECTOR_REGISTERS = 32
+  var NUM_VREG = 32
   /** The number of vector register slots that are adressible from instructions */
   var NUM_VREG_SLOTS = 4
   /** The number of X-value registers in the x register file. This value is always equal to [[NUM_VREG_SLOTS]] */
-  var NUM_X_REG = NUM_VREG_SLOTS
+  var NUM_XREG = NUM_VREG_SLOTS
   /** The number of values stored in each entry in the vector register file */
-  var VECTOR_REGISTER_DEPTH = 24
+  var VREG_DEPTH = 24
   /** The number of elements in the scalar register file */
-  var NUM_SCALAR_REGISTERS = 32
+  var NUM_SREG = 32
   /** The number of processing elements used in the design. Determines the width of vectors carrying values between modules. */
   var NUM_PROCELEM = 8
   /** The number of subvectors in each vector register */
-  var SUBVECTORS_PER_VREG = VECTOR_REGISTER_DEPTH/NUM_PROCELEM
+  var SUBVECTORS_PER_VREG = VREG_DEPTH/NUM_PROCELEM
   /** The width (number of registers) of each vector register slot */
-  var VREG_SLOT_WIDTH = NUM_VECTOR_REGISTERS/NUM_VREG_SLOTS
+  var VREG_SLOT_WIDTH = NUM_VREG/NUM_VREG_SLOTS
   /** The width and height of the KE matrix */
   var KE_SIZE = 24
   /** The bitwidth of an instruction */
   var INSTRUCTION_WIDTH = 32
+  /** The total number of elements stored in a vector register slot
+   * This value is the increment amount used when processing vectors elementwise */
+  var ELEMS_PER_VSLOT = VREG_SLOT_WIDTH*VREG_DEPTH
   /** Simulation flag. Assert inside of a tester to use simulation-specific functionality */
   var SIMULATION = false
 
@@ -65,18 +68,18 @@ object Config {
 
   /** Checks if all configurations requirements are held. This *must* be called in a tester if config values are changed */
   def checkRequirements() {
-    SUBVECTORS_PER_VREG = VECTOR_REGISTER_DEPTH/NUM_PROCELEM
-    VREG_SLOT_WIDTH = NUM_VECTOR_REGISTERS/NUM_VREG_SLOTS
-    NUM_X_REG = NUM_VREG_SLOTS
-
-    require(NUM_VECTOR_REGISTERS >= NUM_VREG_SLOTS, "Must have more vector registers than register slots")
-    require(NUM_VECTOR_REGISTERS % NUM_VREG_SLOTS == 0, "Number of vector registers must me a multiple of register slots")
-    require(KE_SIZE == VECTOR_REGISTER_DEPTH, "KE_SIZE must equal VECTOR_REGISTER_DEPTH for proper matrix-vector products")
-    require(NRDIV_STAGE3_REPS >= 1, "Newton-Raphson division requires at least one iteration in stage 3")
-    require(NUM_X_REG == NUM_VREG_SLOTS, "NUM_X_REG must equal NUM_VREG_SLOTS for easier access")
-    require(NUM_PROCELEM == VREG_SLOT_WIDTH, "NUM_PROCELEM and VREG_SLOT_WIDTH must be the same")
+    require(NUM_VREG >= NUM_VREG_SLOTS, "Must have more vector registers than register slots")
+    require(NUM_VREG % NUM_VREG_SLOTS == 0, "Number of vector registers must me a multiple of vector register slots")
+    require(KE_SIZE == VREG_DEPTH, s"KE_SIZE must equal VREG_DEPTH for proper matrix-vector products. They are $KE_SIZE, $VREG_DEPTH")
+    require(NRDIV_STAGE3_REPS > 0, "Newton-Raphson division requires at least one iteration in stage 3")
+    require(NUM_XREG == NUM_VREG_SLOTS, s"NUM_X_REG must equal NUM_VREG_SLOTS for easier access. They are $NUM_XREG, $NUM_VREG_SLOTS")
+    require(VREG_SLOT_WIDTH == NUM_VREG/NUM_VREG_SLOTS, s"VREG_SLOT_WIDTH must equal NUM_VREG/NUM_VREG_SLOTS. Got $VREG_SLOT_WIDTH, should be ${NUM_VREG/NUM_VREG_SLOTS}")
+    require(SUBVECTORS_PER_VREG == VREG_DEPTH/NUM_PROCELEM, s"SUBVECTORS_PER_VREG must equal VREG_DPETH/NUM_PROCELEM. Got $SUBVECTORS_PER_VREG, should be ${VREG_DEPTH/NUM_PROCELEM}")
+    require(NUM_PROCELEM == VREG_SLOT_WIDTH, "NUM_PROCELEM and VREG_SLOT_WIDTH must be the same. VREG_SLOT_WIDTH is a calculated property")
+    require(ELEMS_PER_VSLOT == VREG_SLOT_WIDTH*VREG_DEPTH, "ELEMS_PER_VSLOT must equal VREG_SLOT_WIDTH*VREG_DEPTH. ELEMS_PER_SLOT is a calculated property")
+    require(NELEM > ELEMS_PER_VSLOT, s"NELEM(${NELEM}) must be greater than ELEMS_PER_VSLOT(${ELEMS_PER_VSLOT}) for proper computation")
+    require(NDOF > NELEM, "NDOF must be greater than NELEM")
   }
-
 }
 
 object DivTypes extends Enumeration {

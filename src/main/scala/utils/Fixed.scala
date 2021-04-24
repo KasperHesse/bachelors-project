@@ -25,6 +25,8 @@ object Fixed {
     var v = math.round(value*math.pow(2,FRAC_WIDTH))
     if(v >= math.pow(2,FIXED_WIDTH-1).toLong) {
       v = math.pow(2,FIXED_WIDTH-1).toLong - 1L
+    } else if (v < (-math.pow(2, FIXED_WIDTH-1).toLong)) {
+      v = (-math.pow(2, FIXED_WIDTH-1).toLong) + 1L
     }
     v
   }
@@ -188,7 +190,39 @@ object Fixed {
    */
   def fixedDiv(n: SInt, d: SInt): SInt = {
     double2fixed(fixed2double(n) / fixed2double(d)).S(FIXED_WIDTH.W)
-//    (fixed2long(n)/fixed2long(d)).S(FIXED_WIDTH.W)
+  }
+
+  /**
+   * Calculates a square root in the same manner that the hardware would
+   * @param v The value to calculate the square root of
+   * @return The square root of v
+   */
+  def fixedSqrt(v: Double): Double = {
+    fixed2double(fixedSqrt(double2fixed(v).S))
+  }
+  /**
+   * Calculates a square root in the same manner that the hardware would
+   * @param S The value to calculate the square root of
+   * @return The square root of v
+   */
+  def fixedSqrt(S: SInt): SInt = {
+    var x0 = fixedDiv(S, double2fixed(2).S) //Initial estimate, S/2
+    val onehalf = double2fixed(0.5).S //Constant: 1/2
+    var xnew = 0.S //New value
+    for(i <- 0 until 6) {
+      xnew = fixedMul(onehalf, fixedAdd(x0, fixedDiv(S, x0)))
+      x0 = xnew
+    }
+    xnew
+  }
+
+  /**
+   * Calculates a square root in the same manner that the hardware would.
+   * @param S The value to calculate the square root of. Should be a fixed-point value
+   * @return The square root of v
+   */
+  def fixedSqrt(S: Long): Long = {
+    fixedSqrt(S.S).litValue.toLong
   }
 
   /**

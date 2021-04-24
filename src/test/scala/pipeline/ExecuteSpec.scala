@@ -4,6 +4,7 @@ import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import utils.Config._
+import utils.Config
 import utils.Fixed._
 import vector.Opcode
 import chisel3.experimental.BundleLiterals._
@@ -63,7 +64,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       dut.io.in.b(j).poke(bs(j).S)
     }
     dut.io.in.op.poke(op)
-    val dest = (new Destination).Lit(_.rd -> 3.U, _.subvec -> 1.U)
+    val dest = (new RegisterBundle).Lit(_.reg -> 3.U, _.subvec -> 1.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U)
     dut.io.in.dest.poke(dest)
     dut.io.in.newDest.poke(true.B)
     dut.io.ctrl.stall.poke(false.B) //Accept new inputs
@@ -73,7 +74,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     dut.io.in.op.poke(Opcode.NOP)
     dut.clock.step()
     while(i < 200 && resultCnt < 1) {
-      dut.io.ctrl.count.expect(1.U)
+//      dut.io.ctrl.count.expect(1.U)
       i += 1
       if(dut.io.out.valid.peek.litToBoolean) {
         for(j <- 0 until nelem) {
@@ -84,7 +85,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       }
       dut.clock.step()
     }
-    dut.io.ctrl.count.expect(0.U)
+    dut.io.ctrl.empty.expect(true.B)
     assert(resultCnt == 1)
   }
 
@@ -97,18 +98,18 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   def testMultiVector(dut: Execute, op: Opcode.Type, count: Int): Unit = {
     //Generate stimuli
     val nelem = NUM_PROCELEM
-    val numSubVectors = VECTOR_REGISTER_DEPTH/NUM_PROCELEM
+    val numSubVectors = VREG_DEPTH/NUM_PROCELEM
     val as = Array.ofDim[Long](count, nelem)
     val bs = Array.ofDim[Long](count, nelem)
     val results = Array.ofDim[Long](count, nelem)
-    val destinations = Array.ofDim[Destination](count)
+    val destinations = Array.ofDim[RegisterBundle](count)
 
     for(i<- 0 until count) {
       val stim = genStimuli(op, nelem)
       as(i) = stim(0)
       bs(i) = stim(1)
       results(i) = stim(2)
-      destinations(i) = (new Destination).Lit(_.rd -> i.U, _.subvec -> (i % numSubVectors).U)
+      destinations(i) = (new RegisterBundle).Lit(_.reg -> i.U, _.subvec -> (i % numSubVectors).U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U)
     }
 
     var i = 0
@@ -137,7 +138,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       }
       dut.clock.step()
     }
-    dut.io.ctrl.count.expect(0.U)
+    dut.io.ctrl.empty.expect(true.B)
     assert(resultCnt == count)
   }
 
@@ -153,7 +154,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     val bs = Array.ofDim[Long](macLimit, nelem)
     val tempResults = Array.ofDim[Long](macLimit, nelem) //intermediate results
     val results = Array.ofDim[Long](nelem)
-    val dest = (new Destination).Lit(_.rd -> 1.U, _.subvec -> 2.U)
+    val dest = (new RegisterBundle).Lit(_.reg -> 1.U, _.subvec -> 2.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U)
 
     //Generate stimuli and results from each stage
     for (i <- 0 until macLimit) {
@@ -200,7 +201,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       dut.clock.step()
     }
     assert(resultCnt == 1)
-    dut.io.ctrl.count.expect(0.U)
+    dut.io.ctrl.empty.expect(true.B)
   }
 
   def testMACMultiple(dut: Execute, macLimit: Int, iters: Int): Unit = {
@@ -210,7 +211,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     val bs = Array.ofDim[Long](iters, macLimit, nelem)
     val tempResults = Array.ofDim[Long](iters, macLimit, nelem) //intermediate results
     val results = Array.ofDim[Long](iters, nelem)
-    val dest = Array.ofDim[Destination](iters)
+    val dest = Array.ofDim[RegisterBundle](iters)
 
     //Generate a bunch of stimuli vectors and results
     for(i <- 0 until iters) {
@@ -220,7 +221,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         bs(i)(j) = stim(1)
         tempResults(i)(j) = stim(2)
       }
-      dest(i) = (new Destination).Lit(_.rd -> ((i+1) % 32).U, _.subvec -> ((i+1) % 4).U)
+      dest(i) = (new RegisterBundle).Lit(_.reg -> ((i+1) % 32).U, _.subvec -> ((i+1) % 4).U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U)
     }
     //Actual, final results of each mac operation
     for(i <- 0 until iters) {
@@ -242,15 +243,15 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         dut.io.in.macLimit.poke(macLimit.U)
         dut.io.in.op.poke(Opcode.MAC)
         val s = i % macLimit
-        for(j <- 0 until nelem) {
-          dut.io.in.a(j).poke(as(iter)(s)(j).S)
-          dut.io.in.b(j).poke(bs(iter)(s)(j).S)
-        }
         //Only poke newDest true on the first cycle of each mac operation
         if(s == 0) {
           dut.io.in.newDest.poke(true.B)
         } else {
           dut.io.in.newDest.poke(false.B)
+        }
+        for(j <- 0 until nelem) {
+          dut.io.in.a(j).poke(as(iter)(s)(j).S)
+          dut.io.in.b(j).poke(bs(iter)(s)(j).S)
         }
       } else {
         dut.io.ctrl.stall.poke(true.B)
@@ -266,7 +267,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       dut.clock.step()
     }
     assert(resultCnt == iters)
-    dut.io.ctrl.count.expect(0.U)
+    dut.io.ctrl.empty.expect(true.B)
   }
 
   it should "perform vector-vector addition of two subvectors" in {
@@ -328,6 +329,62 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform multiple MAC operations in a row" in {
     test(new Execute).withAnnotations(Seq(WriteVcdAnnotation)) {c =>
       testMACMultiple(c, 5, 5)
+    }
+  }
+
+  it should "keep the result of a MAC operation while processing other instructions" in {
+    NUM_PROCELEM = 2
+    NUM_VREG = 8
+    NUM_VREG_SLOTS = 4
+    NDOF = 8
+    Config.checkRequirements()
+    test(new Execute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      val as = Array(Array(0, 1), Array(2, 3), Array(4,5), Array(6,7))
+      val bs = Array(Array(8, 7), Array(6, 5), Array(4, 3), Array(2, 1))
+
+      var i = 0
+      var r = 0
+      var performedAdd = false
+      var resCnt = 0
+      while(i < 100 && resCnt < 2) {
+        if(r == 2 && !performedAdd) { //Addition
+          for(n <- 0 until NUM_PROCELEM) {
+            dut.io.in.a(n).poke(double2fixed(as(0)(n)).S)
+            dut.io.in.b(n).poke(double2fixed(bs(0)(n)).S)
+          }
+          dut.io.in.op.poke(Opcode.ADD)
+          dut.io.in.newDest.poke(true.B)
+          dut.io.in.dest.poke((new RegisterBundle).Lit(_.reg -> 0.U, _.subvec -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
+          performedAdd = true
+        } else if (r < 4) {
+          for(n <- 0 until NUM_PROCELEM) {
+            dut.io.in.a(n).poke(double2fixed(as(r)(n)).S)
+            dut.io.in.b(n).poke(double2fixed(bs(r)(n)).S)
+          }
+          dut.io.in.macLimit.poke((NDOF/NUM_PROCELEM).U)
+          dut.io.in.newDest.poke((i == 0).B)
+          dut.io.in.dest.poke((new RegisterBundle).Lit(_.reg -> 1.U, _.subvec -> 1.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
+          dut.io.in.op.poke(Opcode.MAC)
+          r += 1
+        }
+
+        if(dut.io.out.valid.peek.litToBoolean) {
+          if (resCnt == 0) { //Result of add
+            dut.io.out.res(0).expect(double2fixed(8).S)
+            dut.io.out.res(1).expect(double2fixed(8).S)
+            dut.io.out.dest.expect((new RegisterBundle).Lit(_.reg -> 0.U, _.subvec -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
+          } else { //Result of MAC
+            dut.io.out.res(0).expect(double2fixed(40).S)
+            dut.io.out.res(1).expect(double2fixed(44).S)
+            dut.io.in.dest.poke((new RegisterBundle).Lit(_.reg -> 1.U, _.subvec -> 1.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
+          }
+          resCnt += 1
+        }
+        i += 1
+        dut.clock.step()
+      }
+      assert(resCnt == 2)
+      dut.io.ctrl.empty.expect(true.B)
     }
   }
 }

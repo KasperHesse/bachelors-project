@@ -17,11 +17,11 @@ class DecodeOld extends Module {
   private val numSubVectors: Int = SUBVECTORS_PER_VREG
 
   // --- MODULES ---
-  /** Vector register file. Has [[NUM_VECTOR_REGISTERS]] entries, each of which holds [[VECTOR_REGISTER_DEPTH]] elements */
-  val vRegFile = Module(new VectorRegisterFile(NUM_VECTOR_REGISTERS, VECTOR_REGISTER_DEPTH, VECTOR_REGISTER_DEPTH))
-  /** X-value vector register file. Has [[NUM_VECTOR_REGISTERS]]/[[NUM_VREG_SLOTS]] entries, each of which holds [[VREG_SLOT_WIDTH]] values */
-  val xRegFile = Module(new VectorRegisterFile(NUM_X_REG, VREG_SLOT_WIDTH, VREG_SLOT_WIDTH))
-  /** Scalar register file. Has [[NUM_SCALAR_REGISTERS]] entries */
+  /** Vector register file. Has [[NUM_VREG]] entries, each of which holds [[VREG_DEPTH]] elements */
+  val vRegFile = Module(new VectorRegisterFile(NUM_VREG, VREG_DEPTH, VREG_DEPTH))
+  /** X-value vector register file. Has [[NUM_VREG]]/[[NUM_VREG_SLOTS]] entries, each of which holds [[VREG_SLOT_WIDTH]] values */
+  val xRegFile = Module(new VectorRegisterFile(NUM_XREG, VREG_SLOT_WIDTH, VREG_SLOT_WIDTH))
+  /** Scalar register file. Has [[NUM_SREG]] entries */
   val sRegFile = Module(new ScalarRegisterFile)
   /** Wrapper for KE-matrix, holding all KE-values */
   val KE = Module(new KEWrapper(NUM_PROCELEM, sync=false, SIMULATION))
@@ -36,7 +36,7 @@ class DecodeOld extends Module {
   /** Current state for the instruction load/execution FSM */
   val iloadStateReg = RegInit(sIdle)
   /** Current index into subvectors. Also gives the x-coordinate of the submatrix in the KE matrix */
-  val X = RegInit(0.U(log2Ceil(VECTOR_REGISTER_DEPTH).W))
+  val X = RegInit(0.U(log2Ceil(VREG_DEPTH).W))
   /** Current y-coordinate used to index into KE matrix */
   val Y = RegInit(0.U(log2Ceil(KE_SIZE/NUM_PROCELEM).W))
   /** Current column of submatrix (x,y) in the KE matrix */
@@ -82,7 +82,7 @@ class DecodeOld extends Module {
   /** Opcode going into execution stage */
   val op = WireDefault(NOP)
   /** Destination register for current operation */
-  val dest = WireDefault((new Destination).Lit(_.rd -> 0.U, _.subvec -> 0.U, _.rf -> VREG))
+  val dest = WireDefault((new RegisterBundle).Lit(_.reg -> 0.U, _.subvec -> 0.U, _.rf -> VREG))
   /** Limit for MAC operations, if such a one is being processed */
   val macLimit = WireDefault(0.U(32.W))
   /** Signals that the outgoing operation should be added to the destination queue */
@@ -155,11 +155,11 @@ class DecodeOld extends Module {
         a := a_subvec(X)
         b := b_subvec(X)
         op := Rinst.op
-        dest.rd := v_rd
+        dest.reg := v_rd
         dest.subvec := X
         dest.rf := VREG
         //TODO This is not the correct way of setting these values. MacLImit should be much higher (nelem or ndof)
-        macLimit := Mux(Rinst.op === MAC, (NUM_VREG_SLOTS*VECTOR_REGISTER_DEPTH/NUM_PROCELEM).U, 0.U)
+        macLimit := Mux(Rinst.op === MAC, (NUM_VREG_SLOTS*VREG_DEPTH/NUM_PROCELEM).U, 0.U)
 
         newDest := Mux(Rinst.op === MAC, slotSelect === 0.U && X === 0.U, Mux(Rinst.op === MAC, false.B, true.B))
 
@@ -180,7 +180,7 @@ class DecodeOld extends Module {
         }
         b := b_subvec(X)
         op := Rinst.op
-        dest.rd := v_rd
+        dest.reg := v_rd
         dest.subvec := X
         dest.rf := VREG
         newDest := true.B
@@ -199,7 +199,7 @@ class DecodeOld extends Module {
         a := xRegFile.io.rdData1
         b := xRegFile.io.rdData2
         op := Rinst.op
-        dest.rd := Rinst.rd
+        dest.reg := Rinst.rd
         dest.subvec := 0.U
         dest.rf := XREG
         newDest := true.B
@@ -219,7 +219,7 @@ class DecodeOld extends Module {
         }
         b := b_subvec(X)
         op := Rinst.op
-        dest.rd := v_rd
+        dest.reg := v_rd
         dest.subvec := X
         dest.rf := VREG
         newDest := true.B
@@ -244,21 +244,21 @@ class DecodeOld extends Module {
           b(i) := sRegFile.io.rdData2
         }
           op := Rinst.op
-          dest.rd := Rinst.rd
+          dest.reg := Rinst.rd
           dest.subvec := 0.U
           dest.rf := SREG
           newDest := true.B
           finalCycle := true.B
       }
 
-      is(RtypeMod.MVP) {
+      is(RtypeMod.KV) {
         a := KE.io.keVals
         for(i <- 0 until NUM_PROCELEM) {
           b(i) := a_subvec(X)(col) //Notice: We're using a_subvec since we're fetching via rs1 and not rs2
         }
         op := MAC
         macLimit := KE_SIZE.U
-        dest.rd := v_rd
+        dest.reg := v_rd
         dest.subvec := Y
         newDest := (X === 0.U) && (col === 0.U)
 
@@ -286,7 +286,7 @@ class DecodeOld extends Module {
       op := NOP
       val instr = in.instr.asTypeOf(new OtypeInstruction)
       //TODO Change this to
-      when((instr.iev === OtypeIEV.ELEM || instr.iev === OtypeIEV.VEC) && instr.se === OtypeSE.START && io.ctrl.iload) {
+      when((instr.iev === OtypeIEV.EXEC || instr.iev === OtypeIEV.VEC) && instr.se === OtypeSE.START && io.ctrl.iload) {
         iloadStateReg := sLoad
       }
     }

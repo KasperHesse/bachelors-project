@@ -22,10 +22,10 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val rs2 = inst.rs2.litValue.toInt
     val rd = inst.rd.litValue.toInt
     for(s <- 0 until VREG_SLOT_WIDTH) {
-      for (i <- 0 until VECTOR_REGISTER_DEPTH by NUM_PROCELEM) {
+      for (i <- 0 until VREG_DEPTH by NUM_PROCELEM) {
         dut.io.ex.a(0).expect(vReg(s + rs1 * VREG_SLOT_WIDTH)(0)(i))
         dut.io.ex.b(0).expect(vReg(s + rs2 * VREG_SLOT_WIDTH)(0)(i))
-        dut.io.ex.dest.rd.expect((rd*VREG_SLOT_WIDTH + s).U)
+        dut.io.ex.dest.reg.expect((rd*VREG_SLOT_WIDTH + s).U)
         dut.io.ex.dest.subvec.expect((i / NUM_PROCELEM).U)
         dut.io.ex.dest.rf.expect(RegisterFileType.VREG)
         dut.io.ex.op.expect(inst.op)
@@ -37,7 +37,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   def expectXVvalues(dut: Thread, inst: RtypeInstruction): Unit = {
     val rs1 = inst.rs1.litValue.toInt
     val rs2 = inst.rs2.litValue.toInt
-    val subvecsPerVreg = VECTOR_REGISTER_DEPTH/NUM_PROCELEM
+    val subvecsPerVreg = VREG_DEPTH/NUM_PROCELEM
     val vReg = dut.vRegFile.arr
     val xReg = dut.xRegFile.arr
 
@@ -62,70 +62,9 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     for(i <- 0 until NUM_PROCELEM) {
       dut.io.ex.a(i).expect(xReg(rs1)(0)(i))
       dut.io.ex.b(i).expect(xReg(rs2)(0)(i))
-      dut.io.ex.dest.rd.expect(rd)
+      dut.io.ex.dest.reg.expect(rd)
       dut.io.ex.dest.subvec.expect(0.U)
       dut.io.ex.dest.rf.expect(RegisterFileType.XREG)
-    }
-    dut.clock.step()
-  }
-
-  def expectSVvalues(dut: Thread, inst: RtypeInstruction): Unit = {
-    val rs1 = inst.rs1.litValue.toInt
-    val rs2 = inst.rs2.litValue.toInt
-    val rd = inst.rd.litValue.toInt
-    val sReg = dut.sRegFile.arr
-    val vReg = dut.vRegFile.arr
-
-    for(s <- 0 until VREG_SLOT_WIDTH) {
-      for (i <- 0 until SUBVECTORS_PER_VREG) {
-        for (j <- 0 until NUM_PROCELEM) {
-          val op1 = sReg(rs1) //first operand from S registers
-          val op2 = vReg(s + rs2 * VREG_SLOT_WIDTH)(0)(i * NUM_PROCELEM + j)
-          dut.io.ex.a(j).expect(op1)
-          dut.io.ex.b(j).expect(op2)
-        }
-        dut.io.ex.dest.rf.expect(RegisterFileType.VREG)
-        dut.io.ex.dest.rd.expect((s + rd * VREG_SLOT_WIDTH).U)
-        dut.io.ex.dest.subvec.expect(i.U)
-        dut.clock.step()
-      }
-    }
-  }
-
-
-  def expectSXvalues(dut: Thread, inst: RtypeInstruction): Unit = {
-    val rs1 = inst.rs1.litValue.toInt
-    val rs2 = inst.rs2.litValue.toInt
-    val rd = inst.rd
-    val xReg = dut.xRegFile.arr
-    val sReg = dut.sRegFile.arr
-
-    for(i <- 0 until NUM_PROCELEM) {
-      val op1 = sReg(rs1)
-      val op2 = xReg(rs2)(0)(i)
-      dut.io.ex.a(i).expect(op1)
-      dut.io.ex.b(i).expect(op2)
-      dut.io.ex.dest.rd.expect(rd)
-      dut.io.ex.dest.subvec.expect(0.U)
-      dut.io.ex.dest.rf.expect(RegisterFileType.XREG)
-    }
-    dut.clock.step()
-  }
-
-  def expectSSvalues(dut: Thread, inst: RtypeInstruction): Unit = {
-    val rs1 = inst.rs1.litValue.toInt
-    val rs2 = inst.rs2.litValue.toInt
-    val rd = inst.rd
-    val sReg = dut.sRegFile.arr
-
-    for(i <- 0 until NUM_PROCELEM) {
-      val op1 = sReg(rs1)
-      val op2 = sReg(rs2)
-      dut.io.ex.a(i).expect(op1)
-      dut.io.ex.b(i).expect(op2)
-      dut.io.ex.dest.rd.expect(rd)
-      dut.io.ex.dest.subvec.expect(0.U)
-      dut.io.ex.dest.rf.expect(RegisterFileType.SREG)
     }
     dut.clock.step()
   }
@@ -139,12 +78,6 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       expectXVvalues(dut, i)
     } else if (mod == RtypeMod.XX.litValue()) {
       expectXXvalues(dut, i)
-    } else if(mod == RtypeMod.SV.litValue()) {
-      expectSVvalues(dut, i)
-    } else if(mod == RtypeMod.SS.litValue()) {
-      expectSSvalues(dut, i)
-    } else if(mod == RtypeMod.SX.litValue()) {
-      expectSXvalues(dut, i)
     } else {
       throw new IllegalArgumentException("Unknown Rtype modifier")
     }
@@ -160,8 +93,8 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
   def genInstructions(dut: Thread, mod: RtypeMod.Type): Array[Bundle with Instruction] = {
     val istart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.INSTR)
-    val estart = OtypeInstruction(OtypeSE.START, iev = OtypeIEV.ELEM)
-    val eend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.ELEM)
+    val estart = OtypeInstruction(OtypeSE.START, iev = OtypeIEV.EXEC)
+    val eend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.EXEC)
     val iend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.INSTR)
     val add = genRtype(ADD, mod)
     val sub = genRtype(SUB, mod)
@@ -228,7 +161,6 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
     dut.clock.step(3)
     assert(resCnt == numRes)
-
   }
 
   /**
@@ -268,33 +200,6 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val id = seed("XX thread decode")
     test(new Thread(id)) {dut =>
       testThread(dut, RtypeMod.XX)
-    }
-  }
-
-  it should "test SV instruction load and decode" in {
-    SIMULATION = true
-    Config.checkRequirements()
-    val id = seed("SV thread decode")
-    test(new Thread(id)) {dut =>
-      testThread(dut, RtypeMod.SV)
-    }
-  }
-
-  it should "test SX instruction load and decode" in {
-    SIMULATION = true
-    Config.checkRequirements()
-    val id = seed("SX thread decode")
-    test(new Thread(id)) {dut =>
-      testThread(dut, RtypeMod.SX)
-    }
-  }
-
-  it should "test SS instruction load and decode" in {
-    SIMULATION = true
-    Config.checkRequirements()
-    val id = seed("SS thread decode")
-    test(new Thread(id)) {dut =>
-      testThread(dut, RtypeMod.SS)
     }
   }
 

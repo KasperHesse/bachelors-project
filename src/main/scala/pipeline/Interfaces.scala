@@ -25,7 +25,11 @@ class IdExIO extends Bundle {
   /** Vector of second operands */
   val b = Output(Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W)))
   /** Destination register and subvector of the result */
-  val dest = Output(new Destination())
+  val dest = Output(new RegisterBundle())
+  /** Register indicating where the first operand came from */
+  val rs1 = Output(new RegisterBundle())
+  /** Register indicating where the second operand came form */
+  val rs2 = Output(new RegisterBundle())
   /** Operation to execute. See [[vector.Opcode]] */
   val op = Output(Opcode())
   /** Number of multiply-accumulates to perform before releasing the result. Only used when MAC operations are performed.
@@ -34,6 +38,8 @@ class IdExIO extends Bundle {
   /** Signals to the execution unit that the incoming operation should be added to the destination queue.
    * Mostly useful for MAC operations, where multiple operations are performed for each destination input. */
   val newDest = Output(Bool())
+  /** Asserted on the first cycle of an executing instruction */
+  val firstCycle = Output(Bool())
 }
 
 /**
@@ -41,7 +47,7 @@ class IdExIO extends Bundle {
  * Instantiate as-is in decode stage and use FLipped() in memory module
  */
 class IdMemIO extends Bundle {
-  val rdData = Input(Vec(KE_SIZE, SInt(FIXED_WIDTH.W)))
+  val rdData = Input(Vec(VREG_DEPTH, SInt(FIXED_WIDTH.W)))
 }
 
 /**
@@ -52,9 +58,55 @@ class ExWbIO extends Bundle {
   /** The result produced in the execute stage */
   val res = Output(Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W)))
   /** Destination register and subvector of result */
-  val dest = Output(new Destination())
+  val dest = Output(new RegisterBundle())
   /** Indicates that the result is valid and should be stored in the register file */
   val valid = Output(Bool())
+  /** Asserted if the result should be and-reduced into a single value and stored into an s-register */
+  val reduce = Output(Bool())
+}
+
+/**
+ * Interface between execution stage and forwarding module.
+ * Instantiase as-is in execute stage, use Flipped() in the forwarding module
+ */
+class ExFwdIO extends Bundle {
+  /** The register source of the first operand */
+  val rs1 = Output(new RegisterBundle())
+  /** The register source of the second operand */
+  val rs2 = Output(new RegisterBundle())
+  /** Whether to use the forwarded value (true) or current value (false) */
+  val rs1swap = Input(Bool())
+  /** Whether to use the forwarded value (true) or current value (false) */
+  val rs2swap = Input(Bool())
+  /** The data to use instead of 'a' if rs1swap is asserted */
+  val rs1newData = Input(Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W)))
+  /** The data to use instead of 'b' if rs2swap is asserted */
+  val rs2newData = Input(Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W)))
+}
+
+/**
+ * Interface between writeback stage and forwarding module
+ * Instantiate as-is in the writeback stage, use Flipped() in forwarding module
+ */
+class WbFwdIO extends Bundle {
+  /** The destinations for all values currently stored in writeback buffer */
+  val rd = Output(Vec(VREG_DEPTH/NUM_PROCELEM, new RegisterBundle()))
+  /** Whether the given writeback destination is actually valid (true) or not (false) */
+  val rdValids = Output(Vec(VREG_DEPTH/NUM_PROCELEM, Bool()))
+  /** The data stored in writeback buffer, used for forwarding purposes */
+  val wbData = Output(Vec(VREG_DEPTH/NUM_PROCELEM, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
+}
+
+/** Interface between writeback stage and register files in instruction decode stage.
+ * Instantiate as-is in the execute stage, use Flipped() in writeback stage
+ * */
+class WbIdIO extends Bundle {
+  /** The data to be written into register file */
+  val wrData = Output(Vec(VREG_DEPTH, SInt(FIXED_WIDTH.W)))
+  /** Which register to write into */
+  val rd = Output(new RegisterBundle)
+  /** Write enable / valid bit */
+  val we = Output(Bool())
 }
 
 /**
@@ -62,12 +114,14 @@ class ExWbIO extends Bundle {
  * Use as-is in the execute stage, use Flipped() in control stage
  */
 class ExControlIO extends Bundle {
-  /** Number of elements in the destination queue / number of operations still processing */
-  val count = Output(UInt(5.W))
+  /** Whether the ordinary destination queue is empty */
+  val empty = Output(Bool())
   /** Whether the pipeline should be stalled. If true, deasserts valid for all operations going into MPU */
   val stall = Input(Bool())
   /** Opcode of the currently executing instruction */
   val op = Output(Opcode())
+  /** Values in the ExecuteHazardAvoider, used to prevent execute hazards */
+  val queueHead = Output(Vec(4, new EHAstore))
 }
 
 /**
@@ -100,28 +154,6 @@ class IfControlIO extends Bundle {
 }
 
 /**
- * Inteface between the instruction decode stage and the control module.
- * Use as-is in the decode stage, use Flipped() in the control module
- */
-class IdControlOldIO extends Bundle {
-  /** Asserted whenever the decode stage can load new instructions into its instruction buffer */
-  val iload = Input(Bool())
-  /** The current instruction load/execute stage */
-  val state = Output(DecodeOldStage())
-  /** Asserted during the final clock cycle of the current instruction */
-  val finalCycle = Output(Bool())
-  /** Asserted during the first clock cycle of the current instruction */
-  val firstCycle = Output(Bool())
-  /** Opcode of the currently decoding instruction */
-  val op = Output(Opcode())
-  /** R-type mod field of the currently decoding instruction */
-  val rtypemod = Output(RtypeMod())
-  /** Asserted when the decode unit should stall. This can either be because the Ex unit is not finished processing,
-   * or because data has yet to be transferred from memory into the register file. */
-  val stall = Input(Bool())
-}
-
-/**
  * Interface between threads and the control module.
  * Use as-is in the decode stage, use Flipped() in control module
  */
@@ -141,35 +173,47 @@ class ThreadControlIO extends Bundle {
   /** Asserted when the unit should stall. This can either be because the Ex unit is not finished processing,
    * or because data has yet to be transferred from memory into the register file. */
   val stall = Input(Bool())
+
+  val rs1 = Output(new RegisterBundle)
+  val rs2 = Output(new RegisterBundle)
 }
-
-class DecodeOldIO extends Bundle {
-  val ex = new IdExIO
-  val mem = new IdMemIO
-  val in = Flipped(new IpIdIO)
-  val ctrl = new IdControlOldIO
-}
-
-
 
 /**
- * A bundle encoding the destination register and subvector for a result.
+ * A bundle encoding the information necessary to specify a register register
  */
-class Destination extends Bundle {
-  /** Destination register */
-  val rd = UInt(log2Ceil(NUM_VECTOR_REGISTERS).W)
-  /** Subvector of that destination register */
-  val subvec = UInt(log2Ceil(VECTOR_REGISTER_DEPTH/NUM_PROCELEM).W)
-  /** The register file that the result should be stored in.
+class RegisterBundle extends Bundle {
+  /** Register number */
+  val reg = UInt(log2Ceil(NUM_VREG).W)
+  /** Subvector of that register */
+  val subvec = UInt(log2Ceil(VREG_DEPTH/NUM_PROCELEM).W)
+  /** The register file that this bundle relates to.
    * When stored in the x-reg file, the subvector is ignored.
-   * When stored in the scalar reg file, only the element at [0] is stored*/
+   * When stored in the scalar reg file, only the element at [0] is stored */
   val rf = RegisterFileType()
-
+  /** UInt value of register file type. Used for debugging purposes. TODO remove it */
   val rfUint = UInt(4.W)
 }
 
+/** Bundle storing the information used in the [[DestinationQueue]] module */
+class EHAstore extends Bundle {
+  /** Destination */
+  val dest = new RegisterBundle
+  /** Whether this entry is valid */
+  val valid = Bool()
+}
+
+/**
+ * A bundle containing a register indicator, a register file type and a valid flag.
+ * Used to avoid exeuction hazards, see [[DestinationQueue]]
+ */
+class RegRfValid extends Bundle {
+  val reg = UInt(log2Ceil(NUM_VREG).W)
+  val rf = RegisterFileType()
+  val valid = Bool()
+}
+
 object RegisterFileType extends ChiselEnum {
-  val SREG, VREG, XREG = Value
+  val SREG, VREG, XREG, KREG = Value
 }
 
 

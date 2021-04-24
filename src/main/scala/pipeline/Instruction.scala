@@ -6,7 +6,9 @@ import chisel3.experimental.BundleLiterals._
 import vector.Opcode
 import vector.Opcode._
 
-
+/**
+ * Defines an instruction. Useful for packaging instructions of different formats inside Scala collections
+ */
 trait Instruction {
   def toUInt(): UInt
 }
@@ -15,13 +17,19 @@ trait Instruction {
  * A bundle defining the fields that constitute an R-type instruction
  */
 class RtypeInstruction extends Bundle with Instruction {
-
+  /** Not used */
   val nu = UInt(2.W)
+  /** Destination register */
   val rd = UInt(4.W)
+  /** Source register 1 */
   val rs2 = UInt(4.W)
+  /** Source register 2 */
   val rs1 = UInt(4.W)
+  /** R-type modifier */
   val mod = RtypeMod()
+  /** Instruction format */
   val fmt = InstructionFMT()
+  /** Opcode */
   val op = Opcode()
 
   override def toUInt(): UInt = {
@@ -31,7 +39,7 @@ class RtypeInstruction extends Bundle with Instruction {
 
 object RtypeInstruction {
   def apply(rd: Int, rs1: Int, rs2: Int, op: Opcode.Type, mod: RtypeMod.Type): RtypeInstruction = {
-    (new RtypeInstruction).Lit(_.rd -> rd.U, _.rs1 -> rs1.U, _.rs2 -> rs2.U, _.op -> op, _.mod -> mod, _.fmt -> InstructionFMT.RTYPE)
+    (new RtypeInstruction).Lit(_.rd -> rd.U, _.rs1 -> rs1.U, _.rs2 -> rs2.U, _.op -> op, _.mod -> mod, _.fmt -> InstructionFMT.RTYPE, _.nu -> 0.U(2.W))
   }
 
   def apply(v: RtypeInstruction): UInt = {
@@ -79,8 +87,8 @@ object RtypeInstruction {
       SV
     } else if (modval.litValue() == SS.litValue()) {
       SS
-    } else if (modval.litValue() == MVP.litValue()) {
-      MVP
+    } else if (modval.litValue() == KV.litValue()) {
+      KV
     } else if (modval.litValue() == XX.litValue()) {
       XX
     } else if(modval.litValue() == SX.litValue()) {
@@ -97,11 +105,16 @@ object RtypeInstruction {
  * A bundle defining the fields that constitute an S-type instruction
  */
 class StypeInstruction extends Bundle with Instruction {
-  val nu = UInt(10.W)
-  val rsrd = UInt(5.W)
-  val mod = StypeMod()
-  val fmt = InstructionFMT()
-  val offset = StypeOffset()
+  /** Not used */
+  val nu = UInt(10.W) //31:22
+  /** Register source (when storing) or destination register (when loading) */
+  val rsrd = UInt(4.W) //21:18
+  /** S-type modifier */
+  val mod = StypeMod() //17:14
+  /** Instruction format */
+  val fmt = InstructionFMT() //13:12
+  /** S-type offset */
+  val offset = StypeOffset() //11:0
 
   override def toUInt(): UInt = {
     StypeInstruction.apply(this)
@@ -128,12 +141,20 @@ object StypeInstruction {
  * A bundle defining the fields that constitute an O-type instruction
  */
 class OtypeInstruction extends Bundle with Instruction {
-  val nu2 = UInt(18.W)        //18
-  val fmt = InstructionFMT()  //2
-  val nu1 = UInt(7.W)         //9
-  val len = OtypeLen()
-  val iev = OtypeIEV()        //2
-  val se = OtypeSE()          //1
+  /** Not used */
+  val nu2 = UInt(18.W)        //31:14
+  /** Instruction format */
+  val fmt = InstructionFMT()  //13:12
+  /** Not used */
+  val nu1 = UInt(6.W)         //11:6
+  /** Increment type */
+  val it = Bool()             //5
+  /** Instruction length */
+  val len = OtypeLen()        //4:3
+  /** Packet/execute flag */
+  val iev = OtypeIEV()        //2:1
+  /** Start/end flag */
+  val se = OtypeSE()          //0
 
   override def toUInt(): UInt = {
     OtypeInstruction.apply(this)
@@ -147,11 +168,11 @@ class OtypeInstruction extends Bundle with Instruction {
 object OtypeInstruction extends Bundle {
   /** Generates an Otype-instruction with length [[OtypeLen.SINGLE]] */
   def apply(se: OtypeSE.Type, iev: OtypeIEV.Type): OtypeInstruction = {
-    (new OtypeInstruction).Lit(_.se -> se, _.iev -> iev, _.len -> OtypeLen.SINGLE, _.fmt -> InstructionFMT.OTYPE)
+    apply(se, iev, OtypeLen.SINGLE)
   }
   /** Generates an Otype instruction with a specified length */
   def apply(se: OtypeSE.Type, iev: OtypeIEV.Type, len: OtypeLen.Type): OtypeInstruction = {
-    (new OtypeInstruction).Lit(_.se -> se, _.iev -> iev, _.len -> len, _.fmt -> InstructionFMT.OTYPE)
+    (new OtypeInstruction).Lit(_.se -> se, _.iev -> iev, _.len -> len, _.fmt -> InstructionFMT.OTYPE, _.it -> false.B)
   }
 
   /**
@@ -164,6 +185,7 @@ object OtypeInstruction extends Bundle {
     o |= (v.se.litValue.toInt)
     o |= (v.iev.litValue().toInt << 1)
     o |= (v.len.litValue().toInt << 3)
+    o |= (v.it.litValue.toInt << 5)
     o |= (v.fmt.litValue().toInt << 12)
     o.U(32.W)
   }
@@ -189,7 +211,7 @@ object RtypeMod extends ChiselEnum {
   val SV = Value("b1000".U)
   val SX = Value("b1001".U)
   val SS = Value("b1010".U)
-  val MVP =Value("b1100".U) //11 = KE, 00 = V
+  val KV = Value("b1100".U) //11 = KE, 00 = V
 }
 
 /**
@@ -197,14 +219,14 @@ object RtypeMod extends ChiselEnum {
  * and what kind of load/store operation to do.
  */
 object StypeMod extends ChiselEnum {
-  val LDVEC = Value("b000".U)
-  val LDDOF = Value("b001".U)
-  val LDSCA = Value(2.U)
-  val LDELEM = Value(3.U)
-  val STVEC = Value(4.U)
-  val STDOF = Value(5.U)
-  val STSCA = Value(6.U)
-  val STELEM = Value(7.U)
+  val LDVEC =  Value("b0000".U)
+  val LDDOF =  Value("b0001".U)
+  val LDSCA =  Value("b0010".U)
+  val LDELEM = Value("b0011".U)
+  val STVEC =  Value("b1100".U)
+  val STDOF =  Value("b1101".U)
+  val STSCA =  Value("b1110".U)
+  val STELEM = Value("b1111".U)
 }
 
 /**
@@ -221,7 +243,7 @@ object StypeOffset extends ChiselEnum {
  */
 object OtypeIEV extends ChiselEnum {
   val INSTR = Value(1.U)
-  val ELEM = Value(2.U)
+  val EXEC = Value(2.U)
   val VEC = Value(3.U)
 }
 
@@ -233,6 +255,9 @@ object OtypeSE extends ChiselEnum {
   val START = Value(1.U)
 }
 
+/**
+ * Defines the length of vectors used in an instruction
+ */
 object OtypeLen extends ChiselEnum {
   val NDOF = Value(0.U)
   val NELEM = Value(1.U)

@@ -4,12 +4,15 @@ import chisel3._
 import chisel3.util._
 import DecodeState._
 import utils.Config._
+import utils.Fixed._
+import chisel3.experimental.BundleLiterals._
 
 
 class DecodeIO extends Bundle {
   val ex = new IdExIO
   val mem = new IdMemIO
-  val in = Flipped(new IpIdIO)
+  val id = Flipped(new IpIdIO)
+  val wb = Flipped(new WbIdIO)
   val ctrl = new IdControlIO
 }
 
@@ -24,10 +27,11 @@ class Decode extends Module {
   val threads = for(i <- 0 until 2) yield {
     Module(new Thread(i))
   }
+  val sRegFile = Module(new ScalarRegisterFile())
 
   // --- REGISTERS ---
   /** Pipeline stage register */
-  val in = RegNext(io.in)
+  val in = RegNext(io.id)
   /** State register */
   val state = RegInit(DecodeState.sIdle)
   /** Instruction buffer */
@@ -43,41 +47,41 @@ class Decode extends Module {
   /** k element used for indexing */
   val k = RegInit(0.U(log2Ceil(NELZ+1).W))
   /** Progress when accessing vectors in linear fashion */
-  val progress = RegInit(0.U(log2Ceil(NDOF+1).W))
+  val progress = RegInit(0.U(log2Ceil(NDOF+ELEMS_PER_VSLOT+1).W))
   /** Total number of operations to issue before instructions are finished */
-  val maxProgress = RegInit(0.U(log2Ceil(NDOF+1).W))
+  val maxProgress = RegInit(0.U(log2Ceil(NDOF+ELEMS_PER_VSLOT+1).W))
+  /** The value by which progress counter should increment on every thread swap */
+  val progressIncr = RegInit(0.U(log2Ceil(NDOF*VREG_DEPTH*VREG_SLOT_WIDTH+1).W))
+  /** ID of thread which is currently accessing the execute stage */
+  val execThread = RegInit(1.U(1.W))
+  /** ID of thread which is currently accessing memory */
+  val memThread = RegInit(0.U(1.W))
+
+  // --- WIRES AND SIGNALS ---
+  /** Length of the current instruction */ //iBuffer(0) always holds an O-type instruction indicating packet length
+  val instrLen = iBuffer(0).asTypeOf(new OtypeInstruction).len
+  private val VV = VREG_SLOT_WIDTH*VREG_DEPTH
+  val NDOFlength = if(NDOF % VV == 0) NDOF else (NDOF/VV+1)*VV
+  val NELEMlength = if(NELEM % VV == 0) NELEM else (NELEM/VV+1)*VV
+  /** LUT to decode vector lengths given in istart */
+  val lenDecode = VecInit(Array(NDOFlength.U, NELEMlength.U, 1.U))
+  /** LUT mapping instruction length to progress increment */
+  val incrDecode = VecInit(Array(VV.U, VV.U, 1.U))
+  //When performing NDOF loads, we access VREG_DEPTH*VREG_SLOT_WIDTH elements per thread.
+  //When performing i,j,k-based loads, we only load VREG_SLOT_WIDTH elements per thread.
+  /** Current state of our  threads */
+  val threadStates = Wire(Vec(2, ThreadState()))
   /** Asserted when the current instruction packet is finished */
   val fin = WireDefault(false.B)
   /** Asserted when threads should start executing */
   val start = WireDefault(false.B)
 
-  /** Thread which is currently accessing the execute stage */
-  val execThread = RegInit(1.U(1.W))
-  /** Thread which is currently accessing memory */
-  val memThread = RegInit(0.U(1.W))
-
-  // --- WIRES AND SIGNALS ---
-
-  val instrLen = iBuffer(0).asTypeOf(new OtypeInstruction).len
-  /** LUT to decode vector lengths given in istart */
-  val lenDecode = VecInit(Array(NDOF.U, NELEM.U, 1.U))
-  /** Vector for easier access to the current state of our executing threads */
-  val threadStates = Wire(Vec(2, ThreadState()))
-  /** Vector for easier access to execute outputs of each thread */
-  val threadExes = Wire(Vec(2, new IdExIO))
-  /** Vector for easier access to memory outputs of each thread */
-  val threadMems = Wire(Vec(2, new IdMemIO))
-
   for(i <- 0 until 2) {
     threadStates(i) := threads(i).io.stateOut
-    threadExes(i) := threads(i).io.ex
-    threadMems(i) := threads(i).io.mem
   }
 
   // --- OUTPUTS AND CONNECTIONS --- //
-  threads(0).io.instr := iBuffer(threads(0).io.ip)
-  threads(1).io.instr := iBuffer(threads(1).io.ip)
-
+  //Common thread connections
   for(thread <- threads) {
     thread.io.i := i
     thread.io.j := j
@@ -86,18 +90,55 @@ class Decode extends Module {
     thread.io.fin := fin
     thread.io.start := start
     thread.io.mem.rdData := DontCare
+    thread.io.sRegFile.rdData1 := sRegFile.io.rdData1
+    thread.io.sRegFile.rdData2 := sRegFile.io.rdData2
+    thread.io.instr := iBuffer(thread.io.ip)
   }
+  //Specific thread connections
   threads(0).io.stateIn := threads(1).io.stateOut
   threads(1).io.stateIn := threads(0).io.stateOut
   io.ctrl.threadCtrl(0) <> threads(0).io.ctrl
   io.ctrl.threadCtrl(1) <> threads(1).io.ctrl
 
+  //Control module connections
   io.ctrl.state := state
   io.ctrl.execThread := execThread
-  io.ex <> threadExes(execThread)
-  io.mem <> threadMems(memThread)
-  // --- LOGIC ---
 
+  //Default connections to shared scalar register file
+  sRegFile.io.rd := io.wb.rd.reg
+  sRegFile.io.wrData := io.wb.wrData(0)
+  sRegFile.io.we := io.wb.we && io.wb.rd.rf === RegisterFileType.SREG
+
+  //Assign shared resources to threads
+  when(execThread === 0.U) {
+    //Thread 0 accessed execute and wb stage
+    threads(0).io.ex <> io.ex
+    threads(0).io.wb <> io.wb
+    threads(0).io.mem.rdData := DontCare
+    sRegFile.io.rs1 := threads(0).io.sRegFile.rs1
+    sRegFile.io.rs2 := threads(0).io.sRegFile.rs2
+
+    //Thread 1 accesses mem stage
+    threads(1).io.mem <> io.mem
+    threads(1).io.wb.rd := (new RegisterBundle).Lit(_.reg -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U, _.subvec -> 0.U)
+    threads(1).io.wb.we := false.B
+    threads(1).io.wb.wrData := DontCare
+  } .otherwise {
+    //Thread 0 accesses mem stage
+    threads(0).io.mem <> io.mem
+    threads(0).io.wb.we := false.B
+    threads(0).io.wb.rd := (new RegisterBundle).Lit(_.reg -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U, _.subvec -> 0.U)
+    threads(0).io.wb.wrData := DontCare
+
+    //Thread 1 accesses execute and wb stage
+    threads(1).io.ex <> io.ex
+    threads(1).io.wb <> io.wb
+    threads(1).io.mem.rdData := DontCare
+    sRegFile.io.rs1 := threads(1).io.sRegFile.rs1
+    sRegFile.io.rs2 := threads(1).io.sRegFile.rs2
+  }
+
+  // --- LOGIC ---
   //Next state logic
   switch(state) {
     is(sIdle) {
@@ -113,22 +154,24 @@ class Decode extends Module {
         IP := 0.U
         iCount := IP
         start := true.B
-        //iBuffer(0) always holds an O-type instruction indicating packet length
+
         maxProgress := lenDecode(instrLen.asUInt())
+        progressIncr := incrDecode(instrLen.asUInt())
+        progress := 0.U
       }
     }
     is(sExec) {
+      //Asserted when memthread and execthread swap roles
       val swapThreads = (threadStates(memThread) === ThreadState.sEstart || threadStates(memThread) === ThreadState.sWait2)
           .&& (threadStates(execThread) === ThreadState.sEend || threadStates(execThread) === ThreadState.sWait1)
-     //Whenever mem/exec thread swap position, increment progress counter
-      //We can increment progress counter as soon as memThread enters estart
 
       when(swapThreads) {
-        progress := progress + NUM_PROCELEM.U
+        progress := Mux(progress >= maxProgress, progress, progress + progressIncr)
         execThread := memThread
         memThread := execThread
       }
 
+      //Single-length instructions are always about to be finished, and the secondary thread shouldn't do anything
       when(progress >= maxProgress || instrLen === OtypeLen.SINGLE) {
         fin := true.B
       }

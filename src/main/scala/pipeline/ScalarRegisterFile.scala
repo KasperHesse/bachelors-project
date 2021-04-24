@@ -12,16 +12,14 @@ import utils.Fixed.double2fixed
 class ScalarRegisterFile extends Module {
   val io = IO(new ScalarRegFileIO)
 
-  var regFile: Vec[SInt] = RegInit(VecInit(Seq.fill(NUM_SCALAR_REGISTERS)(0.S(FIXED_WIDTH.W))))
-  val arr = for(i <- 0 until NUM_SCALAR_REGISTERS) yield {
-    double2fixed(i).S(FIXED_WIDTH.W)
+  val arr: Array[SInt] = Array.ofDim[SInt](NUM_SREG)
+  for(i <- 0 until NUM_SREG) {
+    arr(i) = double2fixed(i).S(FIXED_WIDTH.W)
   }
-
-  if(SIMULATION) {
-//    val inits: Seq[SInt] = for(i <- 0 until NUM_SCALAR_REGISTERS) yield {
-//      double2fixed(i).S(FIXED_WIDTH.W)
-//    }
-    regFile = RegInit(VecInit(arr))
+  val regFile: Vec[SInt] = if(SIMULATION) {
+    RegInit(VecInit(arr))
+  } else {
+    RegInit(VecInit(Seq.fill(NUM_SREG)(0.S(FIXED_WIDTH.W))))
   }
 
   when(io.we && io.rd =/= 0.U) {
@@ -35,11 +33,11 @@ class ScalarRegFileIO extends Bundle {
   /** Write enable bit */
   val we = Input(Bool())
   /** Register select 1 */
-  val rs1 = Input(UInt(log2Ceil(NUM_SCALAR_REGISTERS).W))
+  val rs1 = Input(UInt(log2Ceil(NUM_SREG).W))
   /** Register select 2 */
-  val rs2 = Input(UInt(log2Ceil(NUM_SCALAR_REGISTERS).W))
+  val rs2 = Input(UInt(log2Ceil(NUM_SREG).W))
   /** Destination register for write */
-  val rd = Input(UInt(log2Ceil(NUM_SCALAR_REGISTERS).W))
+  val rd = Input(UInt(log2Ceil(NUM_SREG).W))
   /** Write data */
   val wrData = Input(SInt(FIXED_WIDTH.W))
   /** Read data 1, read from register specified by rs1 */

@@ -28,6 +28,7 @@ class MatrixProcessingUnit(nelem: Int) extends Module {
     PE(i).io.out.valid
   }
   io.out.valid := valids.reduce((a, b) => a && b) //And reduction
+  io.out.macResult := PE(0).io.out.op === Opcode.MAC
 }
 
 /**
@@ -65,6 +66,8 @@ class MPUIO(val nelem: Int) extends Bundle {
     val res = Vec(nelem, SInt(FIXED_WIDTH.W))
     /** Asserted for one clock cycle when outputs are valid */
     val valid = Bool()
+    /** Asserted alongside 'valid' when this result is generated from a MAC instruction */
+    val macResult = Bool()
   }
 }
 

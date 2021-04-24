@@ -26,9 +26,6 @@ When MAC is deasserted, wait until  'done' output goes low, and then output the 
 class ProcessingElement extends Module {
   val io = IO(new ProcElemIO)
 
-  //Latch inputs
-//  val in = RegNext(io.in)
-
   val in = io.in
   //Modules in use
   val mul = Module(FixedPointMul(utils.MulTypes.SINGLECYCLE))
@@ -59,7 +56,7 @@ class ProcessingElement extends Module {
   asu.io.in.b := asu_b
   asu.io.in.op := tmp.op === SUB //All other operations should add the operands
   asu.io.in.valid := Mux(tmp.op === ADD || tmp.op === SUB, tmp.valid, mulDivValidReg)
-  val resReg = RegEnable(asu.io.out.res, asu.io.out.valid)
+  val resReg = RegEnable(asu.io.out.res, asu.io.out.valid && tmp.op === MAC)
   val macLimit = RegInit(0.U(32.W))
   val macCnt = RegInit(0.U(32.W))
 
@@ -76,15 +73,18 @@ class ProcessingElement extends Module {
     asu_b := mulDivResultReg
   }
 
-  //Update macCnt and macLimit when necessary
   //macLimit is set when macCnt=0 and a MAC operation is started
-  //macCnt is updated on each operation where op=MAC and en=1
-  macLimit := Mux(macCnt === 0.U && tmp.valid, tmp.macLimit, macLimit)
+  //macCnt is updated on each operation where op=MAC and valid
+  macLimit := Mux(macCnt === 0.U, tmp.macLimit, macLimit)
   macCnt := Mux(tmp.op === MAC && tmp.valid, Mux(macCnt === macLimit-1.U, 0.U, macCnt + 1.U), macCnt)
+  when(macCnt === macLimit-1.U && tmp.op === MAC && tmp.valid) {
+    //Reset result register after each MAC operation
+    resReg := 0.S(FIXED_WIDTH.W)
+  }
   //Outputs
   io.out.res := asu.io.out.res
-  //When processing MAC, MAC_P will always be high
   io.out.valid := Mux(tmp.op === MAC, macCnt === macLimit-1.U && asu.io.out.valid, asu.io.out.valid)
+  io.out.op := tmp.op
 }
 
 /**
@@ -120,5 +120,7 @@ class ProcElemIO extends Bundle {
     val res = SInt(FIXED_WIDTH.W)
     /** Data valid signal. Signals that the operations is finished and a valid signal can be sampled. High for one clock cycle */
     val valid = Bool()
+    /** The opcode corresponding to the currently generated result */
+    val op = Opcode()
   }
 }

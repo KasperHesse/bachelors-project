@@ -12,8 +12,8 @@ object Assembler {
   def main(args: Array[String]): Unit = {
     val p = "istart\n" +
       "estart\n" +
-      "add.vv vs0 vs1 vs2\n" +
-      "sub.xx x1, x2, x3\n" +
+      "mvp vs0, vs1 \n" +
+      "mul.xv vs0, x1, vs2\n" +
       "eend\n" +
       "iend"
 
@@ -26,16 +26,6 @@ object Assembler {
     code.foreach(a =>
       print(s"0x${(z + a.toHexString).takeRight(8)} / ${(z + a.toBinaryString).takeRight(32)}\n")
     )
-  }
-  /**
-   * Sets the bits given by [[mask]] in value [[v]], starting at index [[lowBit]]
-   * @param v
-   * @param lowBit
-   * @param mask
-   * @return
-   */
-  def setBits(v: Int, lowBit: Int, mask: Int): Int = {
-    v | (mask << lowBit)
   }
 
   /**
@@ -53,14 +43,14 @@ object Assembler {
   def sReg(v: String): Int = {
     require(v.startsWith("s"), "Scalar registers must be prefixed with 's'")
     val i = v.substring(1).toInt
-    require(i >= 0 && i < NUM_SCALAR_REGISTERS, s"Scalar register indices must be between 0 and $NUM_SCALAR_REGISTERS")
+    require(i >= 0 && i < NUM_SREG, s"Scalar register indices must be between 0 and $NUM_SREG")
     i
   }
 
   def xReg(v: String): Int = {
     require(v.startsWith("x"), s"X-registers must be prefixed with 'x', got ${v.substring(0,1)}")
     val i = v.substring(1).toInt
-    require(i >= 0 && i < NUM_X_REG, s"X-register indices must be between 0 and $NUM_X_REG")
+    require(i >= 0 && i < NUM_XREG, s"X-register indices must be between 0 and $NUM_XREG")
     i
   }
 
@@ -87,12 +77,12 @@ object Assembler {
    * @return The enum representing the correct modifier
    */
   def rMod(v: String): RtypeMod.Type = {
-    val s = v.split("\\.")
+    val s = v.split("\\.") //Split at the period
 
     val op = s(0)
     //MVP instructions don't have an explicit modifier
     if(op.equals("mvp") && s.length == 1) {
-      return RtypeMod.MVP
+      return RtypeMod.KV
     }
     val mod = v.split("\\.")(1)
     mod match {
@@ -115,14 +105,14 @@ object Assembler {
     val mod = rMod(tokens(0))
 
     val rd = mod match {
-      case RtypeMod.VV | RtypeMod.XV | RtypeMod.SV | RtypeMod.MVP => vReg(tokens(1))
+      case RtypeMod.VV | RtypeMod.XV | RtypeMod.SV | RtypeMod.KV => vReg(tokens(1))
       case RtypeMod.SS => sReg(tokens(1))
       case RtypeMod.XX => xReg(tokens(1))
       case _ => throw new IllegalArgumentException("Unrecognized modifier for setting rd field")
     }
 
     val rs1 = mod match {
-      case RtypeMod.VV | RtypeMod.MVP => vReg(tokens(2))
+      case RtypeMod.VV | RtypeMod.KV => vReg(tokens(2))
       case RtypeMod.XV |RtypeMod.XX => xReg(tokens(2))
       case RtypeMod.SS | RtypeMod.SV => sReg(tokens(2))
       case _ => throw new IllegalArgumentException("Unrecognized modifier for setting rs1 field")
@@ -132,7 +122,7 @@ object Assembler {
       case RtypeMod.VV | RtypeMod.SV | RtypeMod.XV => vReg(tokens(3))
       case RtypeMod.SS => sReg(tokens(3))
       case RtypeMod.XX => xReg(tokens(3))
-      case RtypeMod.MVP => 0 //MVP instructions don't use rs2 to anything
+      case RtypeMod.KV => 0 //MVP instructions don't use rs2 to anything
       case _ => throw new IllegalArgumentException("Unrecognized modifier for setting rs2 field")
     }
 
@@ -153,11 +143,11 @@ object Assembler {
     for(line <- lines) {
       val tokens = line.split(",? +") //0 or 1 commas followed by any number of spaces
       val instr = tokens(0) match {
-        case x if x.startsWith("#") => //Comment
+        case x if x.startsWith("//") => //Comment
         case "istart" => OtypeInstruction(OtypeSE.START, OtypeIEV.INSTR).toInt()
         case "iend" => OtypeInstruction(OtypeSE.END, OtypeIEV.INSTR).toInt
-        case "estart" => OtypeInstruction(OtypeSE.START, OtypeIEV.ELEM).toInt
-        case "eend" => OtypeInstruction(OtypeSE.END, OtypeIEV.ELEM).toInt
+        case "estart" => OtypeInstruction(OtypeSE.START, OtypeIEV.EXEC).toInt
+        case "eend" => OtypeInstruction(OtypeSE.END, OtypeIEV.EXEC).toInt
           //If it starts with "add.", construct an RtypeInstruction with the given parameters
         case x if x.startsWith("add.") => parseRtype(tokens)
         case x if x.startsWith("sub.") => parseRtype(tokens)

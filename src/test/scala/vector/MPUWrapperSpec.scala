@@ -16,9 +16,9 @@ class MPUWrapperSpec extends FlatSpec with ChiselScalatestTester with Matchers{
    * Tests the MPU wrapper by applying two input vectors and observing the outputs
  *
    * @param dut     The DUT
-   * @param as      Vector of a inputs. Should be [[VECTOR_REGISTER_DEPTH]] long
-   * @param bs      Vector of b inputs. Should be [[VECTOR_REGISTER_DEPTH]] long
-   * @param results Vector of expected results. Should be [[VECTOR_REGISTER_DEPTH]] long
+   * @param as      Vector of a inputs. Should be [[VREG_DEPTH]] long
+   * @param bs      Vector of b inputs. Should be [[VREG_DEPTH]] long
+   * @param results Vector of expected results. Should be [[VREG_DEPTH]] long
    * @param op      Opcode. Only elementwise opcodes should be used with this test
    * @param count   The number of elements in (as, bs, results) that are valid. All other outputs are expected 0
    */
@@ -53,12 +53,12 @@ class MPUWrapperSpec extends FlatSpec with ChiselScalatestTester with Matchers{
 
   def generateStimuli(dut: MPUWrapper, op: MPUopcode.Type, count: Int) : Unit = {
     //Generate stimuli
-    val as = Array.ofDim[Long](VECTOR_REGISTER_DEPTH)
-    val bs = Array.ofDim[Long](VECTOR_REGISTER_DEPTH)
-    val results = Array.ofDim[Long](VECTOR_REGISTER_DEPTH)
+    val as = Array.ofDim[Long](VREG_DEPTH)
+    val bs = Array.ofDim[Long](VREG_DEPTH)
+    val results = Array.ofDim[Long](VREG_DEPTH)
 
     //We need to scale down the values so they don't explode out of our range
-    for (i <- 0 until VECTOR_REGISTER_DEPTH) {
+    for (i <- 0 until VREG_DEPTH) {
 //      val x = getDouble()*math.pow(2,-(INT_WIDTH-2))
 //      val y = getDouble()*math.pow(2,-(INT_WIDTH-2))
       val x = getDouble()
@@ -87,7 +87,7 @@ class MPUWrapperSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   //and "short vector" < VECTOR_REGISTER_WIDTH element large
   it should "perform vector-vector addition on two full vectors" in {
     test(new MPUWrapper(NUM_PROCELEM)) {c =>
-      generateStimuli(c, MPUopcode.ADDV, VECTOR_REGISTER_DEPTH)
+      generateStimuli(c, MPUopcode.ADDV, VREG_DEPTH)
     }
   }
 
@@ -99,7 +99,7 @@ class MPUWrapperSpec extends FlatSpec with ChiselScalatestTester with Matchers{
 
   it should "perform vector-vector subtraction of two long vectors" in {
     test(new MPUWrapper(NUM_PROCELEM)) {c =>
-      generateStimuli(c, MPUopcode.SUBV, VECTOR_REGISTER_DEPTH)
+      generateStimuli(c, MPUopcode.SUBV, VREG_DEPTH)
     }
   }
 

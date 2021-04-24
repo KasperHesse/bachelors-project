@@ -15,49 +15,59 @@ import utils.Config
 class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "decode and execute stages"
 
+  var MAClength: Int = _
+
   /**
    * Used to step through and expect the values output from the decode-execute stage when simulating
    * @param dut the DUT
-   * @param inst The instruction which generated the expected outputs
+   * @param instr The instruction which generated the expected outputs
    */
-  def expectVVvalues(dut: DecodeExecute, inst: RtypeInstruction): Unit = {
+  def expectVVvalues(dut: DecodeExecute, instr: RtypeInstruction): Unit = {
     val vReg = dut.decode.threads(0).vRegFile.arr
-    val subvectorsPerRegister = VECTOR_REGISTER_DEPTH/NUM_PROCELEM
+    val subvectorsPerRegister = VREG_DEPTH/NUM_PROCELEM
 
-    val op: Opcode.Type = inst.op
-    val rs1 = inst.rs1.litValue.toInt
-    val rs2 = inst.rs2.litValue.toInt
-    val rd = inst.rd.litValue().toInt
+    val op: Opcode.Type = instr.op
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val rd = instr.rd.litValue().toInt
 
-
-    //Special case that we need to handle
     if(op.litValue == MAC.litValue) {
-      //Sum and multiply over all values
-      //Result generated at each multiplication stage
+      //Example: Each register is 16(VECTOR_REGISTER_DEPTH) elements deep, and 4(NUM_PROCELEM) elements are processed on each clock cycle.
+      //Hence, it takes 4 cycles to clear each register * 4(VREG_SLOT_WIDTH) registers per slot = 16 cycles for each vreg slot = 64(VECTOR_REGISTER_DEPTH*VREG_SLOT*WIDTH) values processed
+      //After 16 cycles, we swap to the other thread, repeating our calculations
+      //If eg. NDOF=128, we require one full pass through each thread before 128 values have been processed
+      //The result is 4(NUM_PROCELEM) sub-sums, which totalled would give us the final sum.
+
       val tempResults = Array.fill(NUM_PROCELEM)(0.S(FIXED_WIDTH.W))
-      for(s <- 0 until VREG_SLOT_WIDTH) {
-        for(u <- 0 until subvectorsPerRegister) {
-          for(k <- 0 until NUM_PROCELEM) {
-            val sv1 = vReg(rs1*VREG_SLOT_WIDTH+s)(0)(u*NUM_PROCELEM+k)
-            val sv2 = vReg(rs2*VREG_SLOT_WIDTH+s)(0)(u*NUM_PROCELEM+k)
+      //Generate results from traversing the two full vectors
+      for (s <- 0 until VREG_SLOT_WIDTH) {
+        for (u <- 0 until subvectorsPerRegister) {
+          for (k <- 0 until NUM_PROCELEM) {
+            val sv1 = vReg(rs1 * VREG_SLOT_WIDTH + s)(0)(u * NUM_PROCELEM + k)
+            val sv2 = vReg(rs2 * VREG_SLOT_WIDTH + s)(0)(u * NUM_PROCELEM + k)
             tempResults(k) = fixedAdd(tempResults(k), fixedMul(sv1, sv2))
           }
         }
       }
-
-      for(i <- 0 until NUM_PROCELEM) {
-        dut.io.out.res(i).expect(tempResults(i))
+      //In simulation, values in regs don't change. Simply multiply this value by itself to obtain the final result
+      val multiplier = double2fixed(MAClength / ELEMS_PER_VSLOT).S
+      for(k <- 0 until NUM_PROCELEM) {
+        tempResults(k) = fixedMul(multiplier, tempResults(k))
+        dut.io.out.res(k).expect(tempResults(k))
       }
+      dut.io.out.dest.reg.expect(instr.rd)
+      dut.io.out.dest.rf.expect(RegisterFileType.SREG)
       dut.clock.step()
+
     } else {
       for (s <- 0 until VREG_SLOT_WIDTH) {
-        for (i <- 0 until VECTOR_REGISTER_DEPTH by NUM_PROCELEM) {
+        for (i <- 0 until VREG_DEPTH by NUM_PROCELEM) {
           //Extract operands used (a[0] and b[0] in each iteration
           val op1 = vReg(s + rs1 * VREG_SLOT_WIDTH)(0)(i)
           val op2 = vReg(s + rs2 * VREG_SLOT_WIDTH)(0)(i)
-          val res = calculateRes(op, op1, op2)
+          val res = calculateRes(instr, op1, op2)
           assert(math.abs(fixed2double((dut.io.out.res(0).peek.litValue - res.litValue).toLong)) < 1e-2)
-          dut.io.out.dest.rd.expect((rd*VREG_SLOT_WIDTH+s).U)
+          dut.io.out.dest.reg.expect((rd*VREG_SLOT_WIDTH+s).U)
           dut.io.out.dest.subvec.expect((i / NUM_PROCELEM).U)
           dut.clock.step()
         }
@@ -65,23 +75,24 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  def expectXVvalues(dut: DecodeExecute, inst: RtypeInstruction): Unit = {
-    val rs1 = inst.rs1.litValue.toInt
-    val rs2 = inst.rs2.litValue.toInt
-    val rd = inst.rd.litValue().toInt
-    val op = inst.op
-    val subvecsPerVreg = VECTOR_REGISTER_DEPTH/NUM_PROCELEM
+  def expectXVvalues(dut: DecodeExecute, instr: RtypeInstruction): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val rd = instr.rd.litValue().toInt
+    val op = instr.op
+    val subvecsPerVreg = VREG_DEPTH/NUM_PROCELEM
     val vReg = dut.decode.threads(0).vRegFile.arr
     val xReg = dut.decode.threads(0).xRegFile.arr
 
     for(s <- 0 until VREG_SLOT_WIDTH) {
+      val op1 = xReg(rs1)(0)(s)
       for(i <- 0 until subvecsPerVreg) {
         for (j <- 0 until NUM_PROCELEM) {
-          val op1 = xReg(rs1)(0)(s)
+
           val op2 = vReg(s+rs2*VREG_SLOT_WIDTH)(0)(i*NUM_PROCELEM+j)
-          val res = calculateRes(op, op1, op2)
+          val res = calculateRes(instr, op1, op2)
           assert(math.abs(fixed2double(dut.io.out.res(j).peek) - fixed2double(res)) < 1e-2)
-          dut.io.out.dest.rd.expect((rd*VREG_SLOT_WIDTH + s).U)
+          dut.io.out.dest.reg.expect((rd*VREG_SLOT_WIDTH + s).U)
           dut.io.out.dest.subvec.expect(i.U)
         }
         dut.io.out.dest.rf.expect(RegisterFileType.VREG)
@@ -90,138 +101,120 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  def expectXXvalues(dut: DecodeExecute, inst: RtypeInstruction): Unit = {
-    val rs1 = inst.rs1.litValue.toInt
-    val rs2 = inst.rs2.litValue.toInt
-    val rd = inst.rd
-    val op = inst.op
+  def expectXXvalues(dut: DecodeExecute, instr: RtypeInstruction): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val rd = instr.rd
     val xReg = dut.decode.threads(0).xRegFile.arr
 
     for(i <- 0 until NUM_PROCELEM) {
       val op1 = xReg(rs1)(0)(i)
       val op2 = xReg(rs2)(0)(i)
-      val res = calculateRes(op, op1, op2)
+      val res = calculateRes(instr, op1, op2)
       assert(math.abs(fixed2double((dut.io.out.res(i).peek.litValue - res.litValue).toLong)) < 1e-2)
-      dut.io.out.dest.rd.expect(rd)
+      dut.io.out.dest.reg.expect(rd)
       dut.io.out.dest.subvec.expect(0.U)
       dut.io.out.dest.rf.expect(RegisterFileType.XREG)
     }
     dut.clock.step()
   }
 
-  def expectSVvalues(dut: DecodeExecute, inst: RtypeInstruction): Unit = {
-    val rs1 = inst.rs1.litValue.toInt
-    val rs2 = inst.rs2.litValue.toInt
-    val rd = inst.rd.litValue.toInt
-    val op = inst.op
-    val sReg = dut.decode.threads(0).sRegFile.arr
+  def expectSVvalues(dut: DecodeExecute, instr: RtypeInstruction): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val rd = instr.rd.litValue.toInt
+    val sReg = dut.decode.sRegFile.arr
     val vReg = dut.decode.threads(0).vRegFile.arr
 
-    for(s <- 0 until VREG_SLOT_WIDTH) {
-      for (i <- 0 until SUBVECTORS_PER_VREG) {
-        for (j <- 0 until NUM_PROCELEM) {
-          val op1 = sReg(rs1) //first operand from S registers
-          val op2 = vReg(s + rs2 * VREG_SLOT_WIDTH)(0)(i * NUM_PROCELEM + j)
-          val res = calculateRes(op, op1, op2)
-          assert(math.abs(fixed2double((dut.io.out.res(j).peek.litValue - res.litValue).toLong)) < 1e-2)
-          dut.io.out.dest.rf.expect(RegisterFileType.VREG)
-          dut.io.out.dest.rd.expect((s + rd * VREG_SLOT_WIDTH).U)
-          dut.io.out.dest.subvec.expect(i.U)
+    if (instr.op.litValue == MAC.litValue) {
+      //MAC.SV instruction (SUM instruction)
+      val tempResults = Array.fill(NUM_PROCELEM)(0.S(FIXED_WIDTH.W))
+
+      for(s <- 0 until VREG_SLOT_WIDTH) {
+        for (u <- 0 until SUBVECTORS_PER_VREG) {
+          for(k <- 0 until NUM_PROCELEM) {
+            val a = sReg(rs1)
+            val b = vReg(s + rs2 * VREG_SLOT_WIDTH)(0)(u * NUM_PROCELEM + k)
+            tempResults(k) = fixedAdd(tempResults(k), fixedMul(a,b))
+          }
         }
-        dut.clock.step()
+      }
+      val multiplier = double2fixed(MAClength / ELEMS_PER_VSLOT).S
+      for(k <- 0 until NUM_PROCELEM) {
+        tempResults(k) = fixedMul(multiplier, tempResults(k))
+        dut.io.out.res(k).expect(tempResults(k))
+      }
+      dut.io.out.dest.reg.expect(instr.rd)
+      dut.io.out.dest.rf.expect(RegisterFileType.SREG)
+      dut.clock.step()
+    } else {
+      val a = sReg(rs1) //first operand from S registers
+      for (s <- 0 until VREG_SLOT_WIDTH) {
+        for (i <- 0 until SUBVECTORS_PER_VREG) {
+          for (j <- 0 until NUM_PROCELEM) {
+            val b = vReg(s + rs2 * VREG_SLOT_WIDTH)(0)(i * NUM_PROCELEM + j)
+            val res = calculateRes(instr, a, b)
+            assert(math.abs(fixed2double((dut.io.out.res(j).peek.litValue - res.litValue).toLong)) < 1e-2)
+            dut.io.out.dest.rf.expect(RegisterFileType.VREG)
+            dut.io.out.dest.reg.expect((s + rd * VREG_SLOT_WIDTH).U)
+            dut.io.out.dest.subvec.expect(i.U)
+          }
+          dut.clock.step()
+        }
       }
     }
   }
 
+  def expectSXvalues(dut: DecodeExecute, instr: RtypeInstruction): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val rd = instr.rd
+    val op = instr.op
+    val xReg = dut.decode.threads(0).xRegFile.arr
+    val sReg = dut.decode.sRegFile.arr
+    for(i <- 0 until NUM_PROCELEM) {
+      val op1 = sReg(rs1)
+      val op2 = xReg(rs2)(0)(i)
+      val res = calculateRes(instr, op1, op2)
+      assert(math.abs(fixed2double((dut.io.out.res(i).peek.litValue - res.litValue).toLong)) < 1e-2)
+      dut.io.out.dest.reg.expect(rd)
+      dut.io.out.dest.subvec.expect(0.U)
+      dut.io.out.dest.rf.expect(RegisterFileType.XREG)
+    }
+    dut.clock.step()
+  }
 
-  def expectSSvalues(dut: DecodeExecute, inst: RtypeInstruction): Unit = {
-    val rs1 = inst.rs1.litValue.toInt
-    val rs2 = inst.rs2.litValue.toInt
-    val rd = inst.rd
-    val op = inst.op
-    val sReg = dut.decode.threads(0).sRegFile.arr
+
+  def expectSSvalues(dut: DecodeExecute, instr: RtypeInstruction): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val rd = instr.rd
+    val sReg = dut.decode.sRegFile.arr
 
     for(i <- 0 until NUM_PROCELEM) {
       val op1 = sReg(rs1)
       val op2 = sReg(rs2)
-      val res = calculateRes(op, op1, op2)
+      val res = calculateRes(instr, op1, op2)
       assert(math.abs(fixed2double((dut.io.out.res(i).peek.litValue - res.litValue).toLong)) < 1e-2)
-      dut.io.out.dest.rd.expect(rd)
+      dut.io.out.dest.reg.expect(rd)
       dut.io.out.dest.subvec.expect(0.U)
       dut.io.out.dest.rf.expect(RegisterFileType.SREG)
     }
     dut.clock.step()
   }
 
-  /**
-   * Method that calls the correct version of expectZZvalues, where ZZ is some combination of X, V and S
-   *
-   * @param dut The DUT
-   * @param instr The instruction to expect results from
-   */
-  def expectValues(dut: DecodeExecute, instr: RtypeInstruction): Unit = {
-    val mod = instr.mod.litValue
-    if(mod == RtypeMod.VV.litValue) {
-      expectVVvalues(dut, instr)
-    } else if (mod == RtypeMod.XV.litValue()) {
-      expectXVvalues(dut, instr)
-    } else if (mod == RtypeMod.XX.litValue()) {
-      expectXXvalues(dut, instr)
-    } else if (mod == RtypeMod.SV.litValue()) {
-      expectSVvalues(dut, instr)
-    } else if (mod == RtypeMod.SS.litValue()) {
-      expectSSvalues(dut, instr)
-    } else {
-        throw new IllegalArgumentException("Unknown Rtype modifier")
-    }
-  }
-
-
-  /**
-   * Tests an instruction mix where all instructions have the same Rtype-modifier
-   * @param dut The DUT
-   */
-  def testSameMod(dut: DecodeExecute, mod: RtypeMod.Type): Unit = {
-    val instrs = genAndPoke(dut, mod)
-
-    var resCnt = 0
-    var i = 0
-    while(i < 200 && resCnt < instrs.length) {
-      if(dut.io.out.valid.peek.litToBoolean) {
-        expectValues(dut, instrs(resCnt))
-        resCnt += 1
-      } else {
-        dut.clock.step()
-      }
-      i += 1
-    }
-    assert(resCnt == instrs.length)
-    dut.io.exctrl.count.expect(0.U)
-  }
-
-
-  def testMVP(dut: DecodeExecute): Unit = {
-    val smpr = KE_SIZE / NUM_PROCELEM //Sub-matrices per row
-    val istart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.INSTR)
-    val estart = OtypeInstruction(OtypeSE.START, iev = OtypeIEV.ELEM)
-    val eend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.ELEM)
-    val iend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.INSTR)
-    val mvp = RtypeInstruction(0, 0, 1, op = Opcode.MAC, mod = RtypeMod.MVP)
-
-    val ops = Array(istart, estart, mvp, eend, iend)
-    val instrs = Array(mvp)
-    loadInstructions(ops, dut)
-
-    //Keep polling and wait for the results.
-    var i = 0
-    var resCnt = 0
+  def expectKVvalues(dut: DecodeExecute, instr: RtypeInstruction): Unit = {
+    val smpr = KE_SIZE / NUM_PROCELEM //Sub-matrices per row of KE matrix
     val KE = dut.decode.threads(0).KE.KE
     val arr = dut.decode.threads(0).vRegFile.arr
-    val Rd = mvp.rd.litValue.toInt
-    val rs1 = mvp.rs1.litValue.toInt
+    val rs1 = instr.rs1.litValue.toInt
+    val Rd = instr.rd.litValue.toInt
 
-    val resMax = KE_SIZE * VREG_SLOT_WIDTH / NUM_PROCELEM
-    while (i < 400 && resCnt < resMax) {
+    var i = 0
+    var resCnt = 0
+    var resMax = KE_SIZE //KE_SIZE/NUM_PROCELEM (eg 24/8=3) outputs per. matrix-vector product
+    //Multiplied by VREG_SLOT_WIDTH outputs per slot. Since VREG_SLOT_WIDTH==NUM_PROCELEM, we get KE_SIZE total results
+    while (i < 400 && resCnt < resMax) { //If eg KE_SIZE=24 and
       if (dut.io.out.valid.peek.litToBoolean) {
         //Slices of KE-matrix that goes into this result
         val slices = KE.slice((resCnt % smpr) * KE_SIZE, ((resCnt % smpr) + 1) * KE_SIZE)
@@ -238,7 +231,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
         for (j <- 0 until NUM_PROCELEM) {
           dut.io.out.res(j).expect(outVals(j))
         }
-        dut.io.out.dest.rd.expect((Rd + resCnt / smpr).U)
+        dut.io.out.dest.reg.expect((Rd*VREG_SLOT_WIDTH + resCnt / smpr).U)
         dut.io.out.dest.subvec.expect((resCnt % smpr).U)
         resCnt += 1
       }
@@ -246,108 +239,202 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       dut.clock.step()
     }
     assert(resCnt == resMax)
-    dut.io.exctrl.count.expect(0.U)
-    print(s"Final i value $i\n")
   }
 
   /**
-   * Generates 4 random instructions of the given type and pokes them onto the DUT
+   * Method that calls the correct version of expectZZvalues, where ZZ is some combination of X, V and S
+   *
+   * @param dut The DUT
+   * @param instr The instruction to expect results from
+   */
+  def expectValues(dut: DecodeExecute, instr: RtypeInstruction): Unit = {
+    val mod = instr.mod.litValue
+//    print(s"Expecting for mod ${instr.mod}\n")
+    if(mod == RtypeMod.VV.litValue) {
+      expectVVvalues(dut, instr)
+    } else if (mod == RtypeMod.XV.litValue()) {
+      expectXVvalues(dut, instr)
+    } else if (mod == RtypeMod.XX.litValue()) {
+      expectXXvalues(dut, instr)
+    } else if (mod == RtypeMod.SV.litValue()) {
+      expectSVvalues(dut, instr)
+    } else if (mod == RtypeMod.SX.litValue()) {
+      expectSXvalues(dut, instr)
+    } else if (mod == RtypeMod.SS.litValue()) {
+      expectSSvalues(dut, instr)
+    } else if(mod == RtypeMod.KV.litValue()) {
+      expectKVvalues(dut, instr)
+    } else {
+        throw new IllegalArgumentException("Unknown Rtype modifier")
+    }
+  }
+
+  /**
+   * Tests an instruction mix where all instructions only run on one thread
+   * @param dut The DUT
+   * @param instrs The executable instructions that are run
+   */
+  def test(dut: DecodeExecute, instrs: Array[RtypeInstruction]): Unit = {
+    test(dut, instrs, OtypeLen.SINGLE)
+  }
+
+  /**
+   * Tests an instruction mix with a given length
+   * @param dut The DUT
+   * @param instrs The executable instructions
+   * @param len The length of this instruction
+   */
+  def test(dut: DecodeExecute, instrs: Array[RtypeInstruction], len: OtypeLen.Type): Unit = {
+    import OtypeLen._
+    var maxProgress = 0
+    var progressIncr = 0
+    if(len.litValue == SINGLE.litValue) {
+      maxProgress = 1
+      progressIncr = 1
+    } else if (len.litValue == NDOF.litValue) {
+      maxProgress = dut.decode.NDOFlength
+      progressIncr = ELEMS_PER_VSLOT
+    } else if (len.litValue() == NELEM.litValue()) {
+      maxProgress = dut.decode.NELEMlength
+      progressIncr = ELEMS_PER_VSLOT
+    } else {
+      throw new IllegalArgumentException("Unable to decode length")
+    }
+
+    var progress = 0
+    var i = 0
+    //TODO should the nelem/ndof instructions be called on this one with ndof/nelem as length, or single?
+      // ExpectVVvalues should know when doing mac's whether length is nelem or ndof
+    while(progress < maxProgress && i < 200) {
+      var resCnt = 0
+      print(s"resCnt(${instrs.length}): ")
+      while(resCnt < instrs.length && i < 200) {
+
+        if(dut.io.out.valid.peek.litToBoolean) {
+          //MAC.VV instructions only output on the final cycle. Skip them while working towards the final outputs
+          if(instrs(resCnt).op.litValue == MAC.litValue && instrs(resCnt).mod.litValue == RtypeMod.VV.litValue && progress != (maxProgress-progressIncr)) {
+            resCnt += 1
+          }
+          expectValues(dut, instrs(resCnt))
+          resCnt += 1
+          print(s"$resCnt ")
+        } else {
+          dut.clock.step()
+        }
+        i += 1
+      }
+      assert(resCnt == instrs.length)
+      progress += progressIncr
+      print(s"\nProgress: $progress/$maxProgress\n")
+    }
+    dut.clock.step(4)
+    assert(progress == maxProgress)
+    dut.io.exctrl.empty.expect(true.B)
+    dut.io.idctrl.threadCtrl(0).stateUint.expect(ThreadState.sIdle.litValue().U)
+    dut.io.idctrl.threadCtrl(1).stateUint.expect(ThreadState.sIdle.litValue().U)
+  }
+
+  /**
+   * Generates 4 instructions of the same Rtype and pokes them onto the DUT
    * @param dut the DUT
    */
   def genAndPoke(dut: DecodeExecute, mod: RtypeMod.Type): Array[RtypeInstruction] = {
-    val istart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.INSTR)
-    val estart = OtypeInstruction(OtypeSE.START, iev = OtypeIEV.ELEM)
-    val eend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.ELEM)
-    val iend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.INSTR)
     val add = genRtype(ADD, mod)
     val sub = genRtype(SUB, mod)
     val mul = genRtype(MUL, mod)
     val div = genRtype(DIV, mod)
 
-    val ops = Array(istart, estart, add, div, mul, sub, eend, iend)
     val instrs = Array(add, div, mul, sub)
+    val ops = wrapInstructions(instrs)
     loadInstructions(ops, dut)
 
     instrs
   }
 
   /**
-   * Calculates the result of an ordinary arithmetic instruction
-   * @param op The DUT
-   * @param a The first value / numerator
-   * @param b The second value / denominator
+   * Generates and pokes a number of instructions with random Rtype modifiers
+   * @param dut The DUT
    * @return
    */
-  def calculateRes(op: Opcode.Type, a: SInt, b: SInt): SInt = {
-    val ol = op.litValue
-    var res = 0.S
-    //For some reason, we need to use if/else here, instead of ordinary matching
-    if (ol == ADD.litValue) {
-      res = fixedAdd(a, b)
-    } else if (ol == SUB.litValue()) {
-      res = fixedSub(a, b)
-    } else if (ol == MUL.litValue) {
-      res = fixedMul(a, b)
-    } else if (ol == DIV.litValue) {
-      res = fixedDiv(a, b)
-    } else {
-      throw new IllegalArgumentException("Unknown opcode")
-    }
-    res
+  def genAndPoke(dut: DecodeExecute): Array[RtypeInstruction] = {
+    val instrs = Array.fill(4)(genRtype())
+    val ops = wrapInstructions(instrs)
+    loadInstructions(ops, dut)
+
+    instrs
   }
 
   def loadInstructions(ops: Array[Bundle with Instruction], dut: DecodeExecute): Unit = {
-    dut.io.idctrl.iload.poke(true.B)
     for(op <- ops) {
       dut.io.in.instr.poke(op.toUInt())
       dut.clock.step()
     }
-    dut.io.idctrl.iload.poke(false.B)
     dut.clock.step()
   }
-
-  def genRtype(op: Opcode.Type, mod: RtypeMod.Type): RtypeInstruction = {
-    val rand = scala.util.Random
-
-    val rd = rand.nextInt(NUM_VREG_SLOTS)
-    val rs1 = rand.nextInt(NUM_VREG_SLOTS)
-    val rs2 = rand.nextInt(NUM_VREG_SLOTS)
-    RtypeInstruction(rd, rs1, rs2, op, mod)
+  it should "calculate a sum (MAC.SV)" in {
+    genericConfig()
+    test(new DecodeExecute) {dut =>
+      seed("Decode/execute sum instruction")
+      val instrs = Array(genRtype(MAC, RtypeMod.SV))
+      val ops = wrapInstructions(instrs, NDOF)
+      MAClength = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else ((NDOF/ELEMS_PER_VSLOT)+1)*ELEMS_PER_VSLOT
+      loadInstructions(ops, dut)
+      test(dut, instrs)
+    }
   }
 
-  /**
-   * Computes and prints the random seed to be used for a test
-   * @param name The name of the test
-   */
-  def seed(name: String): Unit = {
-    val seed = scala.util.Random.nextLong()
-    scala.util.Random.setSeed(seed)
-    print(s"$name. Using seed $seed\n")
+  it should "postpone MAC.VV results until they are ready" in {
+    //This test ensures that we can delay MAC result generation until the cycle it is actually present
+    genericConfig()
+    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      seed("Decode/execute postpone MAC results")
+      scala.util.Random.setSeed(2)
+      val instrs = Array(genRtype(MAC, RtypeMod.VV), genRtype(DIV, RtypeMod.VV))
+      val ops = wrapInstructions(instrs, NDOF)
+      MAClength = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else ((NDOF/ELEMS_PER_VSLOT)+1)*ELEMS_PER_VSLOT
+      loadInstructions(ops, dut)
+      test(dut, instrs,  OtypeLen.NDOF)
+    }
+  }
+
+  "DecodeExecute" should "decode and execute a dot product (MAC.VV)" in {
+    genericConfig()
+    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      seed("Decode/execute dot product")
+      scala.util.Random.setSeed(1)
+      val instrs = Array(genRtype(MAC, RtypeMod.VV))
+      val len = NELEM
+      val ops = wrapInstructions(instrs, len)
+      MAClength = if (len % ELEMS_PER_VSLOT == 0) len else (math.floor(len.toDouble/ELEMS_PER_VSLOT).toInt+1)*ELEMS_PER_VSLOT
+      loadInstructions(ops, dut)
+      test(dut, instrs)
+    }
+  }
+
+  it should "operate on an NELEM long vector" in {
+    genericConfig()
+    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      //When processing element-wise, we can load down ELEMS_PER_VSLOT elements per iteration
+      // On each thread swap, progress counter should increment by that amount
+      seed("Decode/execute NELEM long instruction")
+      val instrs = Array(genRtype(MAC, RtypeMod.KV), genRtype(MUL, RtypeMod.XX))
+      val ops = wrapInstructions(instrs, NELEM)
+      loadInstructions(ops, dut)
+      test(dut, instrs, OtypeLen.NELEM)
+    }
   }
 
   it should "not stall the decoder when like operations are processed" in {
-    SIMULATION = true
-    NUM_VECTOR_REGISTERS = 16
-    VECTOR_REGISTER_DEPTH = 16
-    NUM_PROCELEM = 4
-    KE_SIZE = 16
-    FIXED_WIDTH = 20
-    INT_WIDTH = 10
-    FRAC_WIDTH = 9
-    Config.checkRequirements()
+    genericConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       //This is a simple test where we first use two like instructions to ensure no stalls,
       //and then use a final, different instruction to check that it stalls
-      val istart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.INSTR)
-      val estart = OtypeInstruction(OtypeSE.START, iev = OtypeIEV.ELEM)
-      val eend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.ELEM)
-      val iend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.INSTR)
-
       val addvv = genRtype(ADD, RtypeMod.VV)
       val addvv2 = genRtype(ADD, RtypeMod.VV)
       val subvv = genRtype(SUB, RtypeMod.VV)
+      val instrs = Array(addvv, addvv2, subvv)
+      val ops = wrapInstructions(instrs)
 
-      val ops = Array(istart, estart, addvv, addvv2, subvv, eend, iend)
       loadInstructions(ops, dut)
 
       var fc = 0
@@ -363,10 +450,8 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       fc = 0
       i = 0
       while(i < 20 && fc < 1) {
-      //Should we stall the decoder or the exec thread?
-        //We want to see the decoder/exec being stalled
         execThread = dut.io.idctrl.execThread.peek.litValue.toInt
-        if(dut.io.idstall.peek.litToBoolean) {
+        if(dut.io.execStall.peek.litToBoolean) {
           fc = 1
         }
         i += 1
@@ -376,132 +461,99 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
+  it should "decode and execute MVP instructions" in {
+    genericConfig()
+    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      seed("Decode/execute MVP")
+      val instrs = Array(genRtype(MAC, RtypeMod.KV))
+      val ops = wrapInstructions(instrs)
+      loadInstructions(ops, dut)
+      test(dut, instrs)
+    }
+  }
+
   it should "decode and execute VV instructions" in {
-    SIMULATION = true
-    NUM_VECTOR_REGISTERS = 16
-    VECTOR_REGISTER_DEPTH = 16
-    KE_SIZE = 16
-    NUM_PROCELEM = 4
-    FIXED_WIDTH = 24
-    INT_WIDTH = 8
-    FRAC_WIDTH = 15
-    Config.checkRequirements()
+    genericConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("VV decode execute")
-      testSameMod(dut, RtypeMod.VV)
+      scala.util.Random.setSeed(5347764876420400419L)
+      val instrs = genAndPoke(dut, RtypeMod.VV)
+      test(dut, instrs)
     }
   }
 
   it should "decode and execute XV instructions" in {
-    SIMULATION = true
-    NUM_VECTOR_REGISTERS = 16
-    VECTOR_REGISTER_DEPTH = 16
-    KE_SIZE = 16
-    NUM_PROCELEM = 4
-    FIXED_WIDTH = 20
-    INT_WIDTH = 10
-    FRAC_WIDTH = 9
-    Config.checkRequirements()
+    genericConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-      val seed = scala.util.Random.nextLong()
-      print(s"XV decode/execute. Using seed ${seed}\n")
-      scala.util.Random.setSeed(seed)
-      testSameMod(dut, RtypeMod.XV)
+      seed("XV decode/execute")
+      val instrs = genAndPoke(dut, RtypeMod.XV)
+      test(dut, instrs)
     }
   }
 
   it should "decode and execute XX instructions" in {
-    SIMULATION = true
-    NUM_VECTOR_REGISTERS = 16
-    VECTOR_REGISTER_DEPTH = 16
-    KE_SIZE = 16
-    NUM_PROCELEM = 4
-    FIXED_WIDTH = 20
-    INT_WIDTH = 10
-    FRAC_WIDTH = 9
-    Config.checkRequirements()
+    genericConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-      val seed = scala.util.Random.nextLong()
-      print(s"XX decode/execute. Using seed ${seed}\n")
-      scala.util.Random.setSeed(seed)
-      testSameMod(dut, RtypeMod.XX)
+      seed("XX decode/execute")
+      val instrs = genAndPoke(dut, RtypeMod.XX)
+      test(dut, instrs)
     }
   }
 
   it should "decode and execute SV instructions" in {
-    SIMULATION = true
-    NUM_VECTOR_REGISTERS = 16
-    VECTOR_REGISTER_DEPTH = 16
-    KE_SIZE = 16
-    NUM_PROCELEM = 4
-    FIXED_WIDTH = 20
-    INT_WIDTH = 10
-    FRAC_WIDTH = 9
-    Config.checkRequirements()
+    genericConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-      val seed = scala.util.Random.nextLong()
-      print(s"SV decode/execute. Using seed ${seed}\n")
-      scala.util.Random.setSeed(seed)
-      testSameMod(dut, RtypeMod.SV)
+      seed("SV decode/execute")
+      val instrs = genAndPoke(dut, RtypeMod.SV)
+      test(dut, instrs)
+    }
+  }
+
+  it should "decode and execute SX instructions" in {
+    genericConfig()
+    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+      seed("SX decode/execute")
+      val instrs = genAndPoke(dut, RtypeMod.SX)
+      test(dut, instrs)
     }
   }
 
   it should "decode and execute SS instructions" in {
-    SIMULATION = true
-    NUM_VECTOR_REGISTERS = 16
-    VECTOR_REGISTER_DEPTH = 16
-    KE_SIZE = 16
-    NUM_PROCELEM = 4
-    FIXED_WIDTH = 20
-    INT_WIDTH = 10
-    FRAC_WIDTH = 9
-    Config.checkRequirements()
+    genericConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-      val seed = scala.util.Random.nextLong()
-      print(s"SS decode/execute. Using seed ${seed}\n")
-      scala.util.Random.setSeed(seed)
-      testSameMod(dut, RtypeMod.SS)
+      seed("SV decode/execute")
+      val instrs = genAndPoke(dut, RtypeMod.SV)
+      test(dut, instrs)
     }
   }
 
+  it should "decode and execute a random instruction mix" in {
+    genericConfig()
+    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      //1254595567306819563
+      seed("Decode/execute random mix")
+      scala.util.Random.setSeed(1254595567306819563L)
+      val instrs = genAndPoke(dut)
+      test(dut, instrs)
+    }
+  }
+
+
   it should "decode and execute specific VV instructions" in {
     //These seeds have previously made the test fail. Used for regression testing
-    SIMULATION = true
-    NUM_VECTOR_REGISTERS = 16
-    VECTOR_REGISTER_DEPTH = 16
-    KE_SIZE = 16
-    NUM_PROCELEM = 4
-    FIXED_WIDTH = 24
-    INT_WIDTH = 8
-    FRAC_WIDTH = 15
-    Config.checkRequirements()
+    genericConfig()
     val seeds = Array(6838063735844486541L, -3695747970121693403L)
     for(seed  <- seeds) {
       test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
         print(s"VV, specific seed. Using seed ${seed}\n")
         scala.util.Random.setSeed(seed)
-        testSameMod(dut, RtypeMod.VV)
+        val instrs = genAndPoke(dut, RtypeMod.VV)
+        test(dut, instrs)
       }
     }
   }
 
-  it should "decode and execute MVP instructions" in {
-    SIMULATION = true
-    KE_SIZE = 6
-    NUM_PROCELEM = 2
-    VECTOR_REGISTER_DEPTH = 6
-    NUM_VECTOR_REGISTERS = 8
-    FIXED_WIDTH = 20
-    INT_WIDTH = 18
-    FRAC_WIDTH = 1
-    Config.checkRequirements()
-    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      val seed = scala.util.Random.nextLong()
-      print(s"MVP decode/execute. Using seed ${seed}\n")
-      scala.util.Random.setSeed(seed)
-      testMVP(dut)
-    }
-  }
+
 
 
 }

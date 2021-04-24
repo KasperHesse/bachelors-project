@@ -21,10 +21,10 @@ class DecodeOldSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val rs2 = inst.rs2.litValue.toInt
     val rd = inst.rd.litValue.toInt
     for(s <- 0 until VREG_SLOT_WIDTH) {
-      for (i <- 0 until VECTOR_REGISTER_DEPTH by NUM_PROCELEM) {
+      for (i <- 0 until VREG_DEPTH by NUM_PROCELEM) {
         dut.io.ex.a(0).expect(vReg(s + rs1 * VREG_SLOT_WIDTH)(0)(i))
         dut.io.ex.b(0).expect(vReg(s + rs2 * VREG_SLOT_WIDTH)(0)(i))
-        dut.io.ex.dest.rd.expect((rd*VREG_SLOT_WIDTH + s).U)
+        dut.io.ex.dest.reg.expect((rd*VREG_SLOT_WIDTH + s).U)
         dut.io.ex.dest.subvec.expect((i / NUM_PROCELEM).U)
         dut.io.ex.dest.rf.expect(RegisterFileType.VREG)
         dut.io.ex.op.expect(inst.op)
@@ -36,7 +36,7 @@ class DecodeOldSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   def expectXVvalues(dut: DecodeOld, inst: RtypeInstruction): Unit = {
     val rs1 = inst.rs1.litValue.toInt
     val rs2 = inst.rs2.litValue.toInt
-    val subvecsPerVreg = VECTOR_REGISTER_DEPTH/NUM_PROCELEM
+    val subvecsPerVreg = VREG_DEPTH/NUM_PROCELEM
     val vReg = dut.vRegFile.arr
     val xReg = dut.xRegFile.arr
 
@@ -61,7 +61,7 @@ class DecodeOldSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     for(i <- 0 until NUM_PROCELEM) {
       dut.io.ex.a(i).expect(xReg(rs1)(0)(i))
       dut.io.ex.b(i).expect(xReg(rs2)(0)(i))
-      dut.io.ex.dest.rd.expect(rd)
+      dut.io.ex.dest.reg.expect(rd)
       dut.io.ex.dest.subvec.expect(0.U)
       dut.io.ex.dest.rf.expect(RegisterFileType.XREG)
     }
@@ -84,7 +84,7 @@ class DecodeOldSpec extends FlatSpec with ChiselScalatestTester with Matchers {
           dut.io.ex.b(j).expect(op2)
         }
         dut.io.ex.dest.rf.expect(RegisterFileType.VREG)
-        dut.io.ex.dest.rd.expect((s + rd * VREG_SLOT_WIDTH).U)
+        dut.io.ex.dest.reg.expect((s + rd * VREG_SLOT_WIDTH).U)
         dut.io.ex.dest.subvec.expect(i.U)
         dut.clock.step()
       }
@@ -103,7 +103,7 @@ class DecodeOldSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       val op2 = xReg(rs2)(0)(i)
       dut.io.ex.a(i).expect(op1)
       dut.io.ex.b(i).expect(op2)
-      dut.io.ex.dest.rd.expect(rd)
+      dut.io.ex.dest.reg.expect(rd)
       dut.io.ex.dest.subvec.expect(0.U)
       dut.io.ex.dest.rf.expect(RegisterFileType.XREG)
     }
@@ -121,7 +121,7 @@ class DecodeOldSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       val op2 = sReg(rs2)
       dut.io.ex.a(i).expect(op1)
       dut.io.ex.b(i).expect(op2)
-      dut.io.ex.dest.rd.expect(rd)
+      dut.io.ex.dest.reg.expect(rd)
       dut.io.ex.dest.subvec.expect(0.U)
       dut.io.ex.dest.rf.expect(RegisterFileType.SREG)
     }
@@ -193,7 +193,7 @@ class DecodeOldSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
     val ke = dut.KE.KE
     val vstart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.VEC)
-    val mvp = genRtype(op=MAC, mod=RtypeMod.MVP)
+    val mvp = genRtype(op=MAC, mod=RtypeMod.KV)
 
     val ops = Array(vstart, mvp)
     val instrs = Array(mvp)
@@ -211,7 +211,7 @@ class DecodeOldSpec extends FlatSpec with ChiselScalatestTester with Matchers {
                 dut.io.ex.a(i).expect(double2fixed(ke(y * KE_SIZE + x * NUM_PROCELEM + c)(i)).S)
                 dut.io.ex.b(i).expect(arr(rs1 * VREG_SLOT_WIDTH + s)(0)(x * NUM_PROCELEM + c))
                 dut.io.ex.dest.subvec.expect(y.U)
-                dut.io.ex.dest.rd.expect((rd * VREG_SLOT_WIDTH + s).U)
+                dut.io.ex.dest.reg.expect((rd * VREG_SLOT_WIDTH + s).U)
                 dut.io.ex.macLimit.expect(KE_SIZE.U)
               }
               dut.clock.step()
@@ -273,8 +273,8 @@ class DecodeOldSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     SIMULATION = true
     KE_SIZE = 12
     NUM_PROCELEM = 4
-    VECTOR_REGISTER_DEPTH = 12
-    NUM_VECTOR_REGISTERS = 8
+    VREG_DEPTH = 12
+    NUM_VREG = 8
     NUM_VREG_SLOTS = 2
     FIXED_WIDTH = 16
     INT_WIDTH = 15

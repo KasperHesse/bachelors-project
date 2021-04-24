@@ -53,7 +53,7 @@ class MPUWrapper(val nelem: Int) extends Module {
   opReg := Mux(ready, Mux(io.in.stall, MPUopcode.NOP, io.in.op), opReg)
 
   val vectorLength = in.vectorLength //Total length of the vector being processed.
-  val vectorElementsProcessed = RegInit(0.U(log2Ceil(VECTOR_REGISTER_DEPTH+1).W))
+  val vectorElementsProcessed = RegInit(0.U(log2Ceil(VREG_DEPTH+1).W))
 
   ready := !((vectorLength - vectorElementsProcessed) > nelem.U)
   valid := !ready || (ready && col =/= 0.U)
@@ -70,9 +70,9 @@ class MPUWrapper(val nelem: Int) extends Module {
 
 
   //This makes it easier to address subvectors of the input vectors a, b
-  val a_subvec = Wire(Vec(VECTOR_REGISTER_DEPTH/nelem, Vec(nelem, SInt(FIXED_WIDTH.W))))
-  val b_subvec = Wire(Vec(VECTOR_REGISTER_DEPTH/nelem, Vec(nelem, SInt(FIXED_WIDTH.W))))
-  for(i <- 0 until VECTOR_REGISTER_DEPTH/nelem) {
+  val a_subvec = Wire(Vec(VREG_DEPTH/nelem, Vec(nelem, SInt(FIXED_WIDTH.W))))
+  val b_subvec = Wire(Vec(VREG_DEPTH/nelem, Vec(nelem, SInt(FIXED_WIDTH.W))))
+  for(i <- 0 until VREG_DEPTH/nelem) {
     a_subvec(i) := io.in.a.slice(i*nelem, (i+1)*nelem)
     b_subvec(i) := io.in.b.slice(i*nelem, (i+1)*nelem)
   }
@@ -146,15 +146,15 @@ class MPUWrapIO(val nelem: Int) extends Bundle {
    */
   class MPUWrapInput(val nelem: Int) extends Bundle {
     /** Vector of first operands (if KE-matrix isn't used) */
-    val a = Vec(VECTOR_REGISTER_DEPTH, SInt(FIXED_WIDTH.W))
+    val a = Vec(VREG_DEPTH, SInt(FIXED_WIDTH.W))
     /** Vector of second operands */
-    val b = Vec(VECTOR_REGISTER_DEPTH, SInt(FIXED_WIDTH.W))
+    val b = Vec(VREG_DEPTH, SInt(FIXED_WIDTH.W))
     /** Opcode. See [[MPUopcode]] */
     val op = MPUopcode()
     /** Destination register for result when produced */
-    val rd = UInt(log2Ceil(NUM_VECTOR_REGISTERS+1).W)
+    val rd = UInt(log2Ceil(NUM_VREG+1).W)
     /** Number of elements in the two vectors being operated on */
-    val vectorLength = UInt(log2Ceil(VECTOR_REGISTER_DEPTH+1).W)
+    val vectorLength = UInt(log2Ceil(VREG_DEPTH+1).W)
     /** Number of multiply-accumulates to perform if the operation specified is a MAC */
     val macLimit = UInt(32.W)
     /** Indicates that the pipeline should be stalled, converting all incoming operations to NOPs */
@@ -169,7 +169,7 @@ class MPUWrapIO(val nelem: Int) extends Bundle {
     /** Vector of results produced by the processing elements */
     val res = Vec(nelem, SInt(FIXED_WIDTH.W))
     /** Destination register for the result produced */
-    val rd = UInt(log2Ceil(NUM_VECTOR_REGISTERS+1).W)
+    val rd = UInt(log2Ceil(NUM_VREG+1).W)
     /** Asserted when the outputs are valid */
     val valid = Bool()
     /** Type of operation currently being processed in the MPU. Only operations of the same type may be processed at once*/

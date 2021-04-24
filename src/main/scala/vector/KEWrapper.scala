@@ -82,7 +82,7 @@ object KEWrapper {
    * Gets the 2D-array representing the KE-matrix
    * @return A 2D-array of doubles representing the KE-matrix values
    */
-  def getKE(): Array[Array[Double]] = {
+  def getKEMatrix(): Array[Array[Double]] = {
     val KE = Array.ofDim[Double](KE_SIZE,KE_SIZE)
     for(i <- 0 until KE_SIZE) {
       for (j <- 0 until KE_SIZE) {
@@ -97,7 +97,7 @@ object KEWrapper {
   }
 
   def printKE(): Unit = {
-    val KE = getKE()
+    val KE = getKEMatrix()
     for (i <- 0 until KE_SIZE) {
       for (j <- 0 until KE_SIZE) {
         print(s"${KE(i)(j)}, ")
@@ -120,7 +120,7 @@ object KEWrapper {
     if(width % nelem != 0) {
       throw new IllegalArgumentException("Can only split KE matrix into equally sized chunks")
     }
-    val KE = getKE()
+    val KE = getKEMatrix()
 
     val numSlices = (math.pow(width/nelem,2)*nelem).toInt
     val retVal = Array.ofDim[Double](numSlices, nelem)
