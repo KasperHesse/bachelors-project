@@ -1062,7 +1062,7 @@ void top3dcg(const uint_fast32_t nelx, const uint_fast32_t nely,
     DTYPE g = 0.0;
     DTYPE vol = 0.0;
     for (uint_least32_t i = 0; i < nelem; i++) {
-      g += xPhys[i];
+      g += xPhys[i]; //Sum of all xphys values. Implement summation add.sv vs1, s0, vs0
       vol += xPhys[i];
     }
     g = g / (DTYPE)nelem - volfrac; //Current error in volume-per-element value, I think
@@ -1080,7 +1080,7 @@ void top3dcg(const uint_fast32_t nelx, const uint_fast32_t nely,
             MAX(0.0, MAX(x[i] - move,
                          MIN(1.0, MIN(x[i] + move,
                                       x[i] * sqrt(-dc[i] / (dv[i] * lmid))))));
-        gt += dv[i] * (xnew[i] - x[i]);
+        gt += dv[i] * (xnew[i] - x[i]); //This looks like an innerProduct / dot product
       }
       gt += g;
       if (gt > 0)

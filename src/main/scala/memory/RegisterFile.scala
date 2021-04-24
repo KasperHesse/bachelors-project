@@ -2,7 +2,7 @@ package memory
 
 import chisel3._
 import chisel3.util._
-import utils.Config.{NUM_VECTOR_REGISTERS, NUM_SCALAR_REGISTERS, VECTOR_REGISTER_DEPTH}
+import utils.Config.{NUM_VREG, NUM_SREG, VREG_DEPTH}
 import utils.Fixed.FIXED_WIDTH
 import utils.Config._
 

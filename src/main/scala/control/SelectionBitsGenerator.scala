@@ -12,9 +12,9 @@ import utils.Config._
  */
 class SelectionBitsGenerator extends Module {
   val io = IO(new Bundle {
-    val diff = Input(UInt(log2Ceil(VECTOR_REGISTER_DEPTH+1).W))
-    val length = Input(UInt(log2Ceil(VECTOR_REGISTER_DEPTH+1).W))
-    val processed = Input(UInt(log2Ceil(VECTOR_REGISTER_DEPTH+1).W))
+    val diff = Input(UInt(log2Ceil(VREG_DEPTH+1).W))
+    val length = Input(UInt(log2Ceil(VREG_DEPTH+1).W))
+    val processed = Input(UInt(log2Ceil(VREG_DEPTH+1).W))
     /** The one-hot coded output signal */
     val selectBits = Output(Vec(NUM_PROCELEM, Bool()))
   })

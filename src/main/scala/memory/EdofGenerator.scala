@@ -16,8 +16,6 @@ class EdofGenerator(val nx: Int, val ny: Int, val nz: Int, val width: Int) exten
   val ndof: Int = 3*ny*nx*nz
   val io: EdofGeneratorIO = IO(new EdofGeneratorIO(ndof))
 
-
-
   val outputStep = RegInit(0.U(2.W)) //Which part-of-8 of the indices is currently being output?
 
   val nIndex = Wire(Vec(8, UInt(log2Ceil(ndof).W)))
