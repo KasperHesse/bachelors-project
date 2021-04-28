@@ -183,7 +183,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   def loadInstructions(ops: Array[Bundle with Instruction], dut: Decode): Unit = {
     dut.io.ctrl.iload.poke(true.B)
     for(op <- ops) {
-      dut.io.id.instr.poke(op.toUInt())
+      dut.io.fe.instr.poke(op.toUInt())
       dut.clock.step()
     }
     dut.io.ctrl.iload.poke(false.B)

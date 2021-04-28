@@ -5,6 +5,7 @@ import vector._
 import utils.Config._
 import vector.Opcode._
 import chisel3.util._
+import utils.Fixed._
 
 /**
  * I/O ports for the vector execution stage.
@@ -48,9 +49,16 @@ class Execute extends Module {
   val newDestSignal = Mux(io.ctrl.stall || io.in.op === NOP, false.B, io.in.newDest)
   newDest := newDestSignal
 
+  //Select between forwarding values or original values
+  val a = Mux(io.fwd.rs1swap, io.fwd.rs1newData, in.a)
+  val b = Mux(io.fwd.rs2swap, io.fwd.rs2newData, in.b)
+  val immVec = Wire(Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W)))
+  for(i <- 0 until NUM_PROCELEM) {
+    immVec(i) := in.imm
+  }
   // --- CONNECTIONS ---
-  MPU.io.in.a := Mux(io.fwd.rs1swap, io.fwd.rs1newData, in.a)
-  MPU.io.in.b := Mux(io.fwd.rs2swap, io.fwd.rs2newData, in.b)
+  MPU.io.in.a := a
+  MPU.io.in.b := Mux(in.useImm, immVec, b)
   MPU.io.in.valid := validIn
   MPU.io.in.op := op
   MPU.io.in.macLimit := in.macLimit

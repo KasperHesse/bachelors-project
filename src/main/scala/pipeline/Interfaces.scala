@@ -8,10 +8,10 @@ import utils.Fixed._
 import vector.Opcode
 
 /**
- * Interface between the instruction preview and instruction decode stages.
- * Instantiate as-is in the preview stage, use Flipped() in the decode stage
+ * Interface between the instruction fetch and instruction decode stages.
+ * Instantiate as-is in the fetch stage, use Flipped() in the decode stage
  */
-class IpIdIO extends Bundle {
+class IfIdIO extends Bundle {
   val instr = Output(UInt(32.W))
 }
 
@@ -40,6 +40,10 @@ class IdExIO extends Bundle {
   val newDest = Output(Bool())
   /** Asserted on the first cycle of an executing instruction */
   val firstCycle = Output(Bool())
+  /** Immediate value */
+  val imm = Output(SInt(FIXED_WIDTH.W))
+  /** Asserted when the immediate should be used instead of b-values */
+  val useImm = Output(Bool())
 }
 
 /**

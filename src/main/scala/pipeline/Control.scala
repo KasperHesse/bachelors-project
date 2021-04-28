@@ -44,8 +44,8 @@ class Control extends Module {
   val Oinst = io.fe.instr.asTypeOf(new OtypeInstruction)
   val isInstr: Bool = Oinst.iev === OtypeIEV.INSTR
   val isEnd = Oinst.se === OtypeSE.END
-  private val isOtype: Bool = Oinst.fmt === InstructionFMT.OTYPE
-  private val isStart: Bool = Oinst.se === OtypeSE.START
+  val isOtype: Bool = Oinst.fmt === InstructionFMT.OTYPE
+  val isStart: Bool = Oinst.se === OtypeSE.START
 
   // --- INSTRUCTION FETCH/DECODE CONTROL SIGNALS ---
   //When idling and instructions are available, load them in
@@ -73,25 +73,20 @@ class Control extends Module {
   val validHead = {for(head <- io.ex.queueHead) yield { //We don't need to stall if queue is non-empty but no entries in dQueue are invalid (this happens when the final value in dQueue is being output)
     head.valid
   }}.reduce((a,b) => a|b)
-  when(execThread.state === ThreadState.sExec && execThread.firstCycle && execThread.op =/= io.ex.op && !io.ex.empty && validHead) {
+  when(execThread.state === ThreadState.sExec && execThread.op =/= io.ex.op && !io.ex.empty && validHead) {
     destQueueStall := true.B
   }
 
   //When decoding XX, SX and SS instructions, stall for one clock cycle if the executing instruction
   //does not exactly match the decoding instruction. This ensures proper arrival into destination queue
   //Stalls on *second* cycle after we've ensured delivery
+  //See DecExWbSpec random instruction mix with seed -1059893295096578903L for why this is necessary
   val isSingleCycleOp: Bool = (execThread.rtypemod === RtypeMod.XX) || (execThread.rtypemod === RtypeMod.SX) || (execThread.rtypemod === RtypeMod.SS)
-  val newOp: Bool = execThread.op =/= RegNext(execThread.op)
+  val newOp: Bool = execThread.op =/= RegNext(execThread.op) && execThread.rtypemod =/= RegNext(execThread.rtypemod)
   val singleCycleAwaitStall = WireDefault(false.B)
-  when(RegNext(isSingleCycleOp) && newOp && execThread.state === ThreadState.sExec) {
+  when(isSingleCycleOp && newOp && execThread.state === ThreadState.sExec) {
     singleCycleAwaitStall := true.B
   }
-
-
-
   execStall := dataHazardStall | destQueueStall | singleCycleAwaitStall
-
-
-
 }
 

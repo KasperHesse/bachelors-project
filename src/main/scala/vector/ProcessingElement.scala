@@ -30,7 +30,7 @@ class ProcessingElement extends Module {
   //Modules in use
   val mul = Module(FixedPointMul(utils.MulTypes.SINGLECYCLE))
   val div = Module(FixedPointDiv(utils.DivTypes.NEWTONRAPHSON))
-  val asu = Module(new FixedPointAddSub)
+  val asu = Module(new FixedPointALU)
 
   //Multiplier and divider. Inputs and outputs up to middle register
   mul.io.in.a := in.a
@@ -54,15 +54,15 @@ class ProcessingElement extends Module {
   val asu_b = Wire(SInt(FIXED_WIDTH.W))
   asu.io.in.a := asu_a
   asu.io.in.b := asu_b
-  asu.io.in.op := tmp.op === SUB //All other operations should add the operands
-  asu.io.in.valid := Mux(tmp.op === ADD || tmp.op === SUB, tmp.valid, mulDivValidReg)
+  asu.io.in.op := tmp.op //All operations not SUB, MAX, MIn will add the operands
+  asu.io.in.valid := Mux(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN, tmp.valid, mulDivValidReg)
   val resReg = RegEnable(asu.io.out.res, asu.io.out.valid && tmp.op === MAC)
   val macLimit = RegInit(0.U(32.W))
   val macCnt = RegInit(0.U(32.W))
 
 
   //Signal multiplexers for asu and result reg
-  when(tmp.op === ADD || tmp.op === SUB) {
+  when(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN) {
     asu_a := tmp.a
     asu_b := tmp.b
   } .elsewhen(tmp.op === MAC) {

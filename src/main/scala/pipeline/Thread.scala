@@ -62,10 +62,10 @@ class Thread(id: Int) extends Module {
   val vRegFile = Module(new VectorRegisterFile(NUM_VREG, VREG_DEPTH, VREG_DEPTH))
   /** X-value vector register file. Has [[utils.Config.NUM_XREG]] entries, each of which holds [[utils.Config.VREG_SLOT_WIDTH]] values */
   val xRegFile = Module(new VectorRegisterFile(NUM_XREG, VREG_SLOT_WIDTH, VREG_SLOT_WIDTH))
-  /** Scalar register file. Has [[utils.Config.NUM_SREG]] entries */
-//  val sRegFile = Module(new ScalarRegisterFile)
   /** Wrapper for KE-matrix, holding all KE-values */
   val KE = Module(new KEWrapper(NUM_PROCELEM, sync=false, SIMULATION))
+  /** Immediate generator */
+  val immGen = Module(new ImmediateGenerator)
 
   // --- REGISTERS ---
   /** Instruction pointer into the instruction buffer */
@@ -106,7 +106,7 @@ class Thread(id: Int) extends Module {
   /** VREG slot as specified by rs2 */
   val slot2 = Rinst.rs2
   /** Asserted whenever the first cycle of an instruction is being processed. Used by the control unit */
-  val firstCycle = (X === 0.U) && (Y === 0.U) && (col === 0.U) && (slotSelect === 0.U)
+  val firstCycle = IP =/= RegNext(IP)
   /** Used to indicate whenever an instruction is finished and the IP should update */
   val finalCycle = WireDefault(false.B)
 
@@ -160,12 +160,16 @@ class Thread(id: Int) extends Module {
   xRegFile.io.we := io.wb.we && (io.wb.rd.rf === RegisterFileType.XREG)
   xRegFile.io.rd := io.wb.rd.reg
 
-
   io.sRegFile.rs1 := Rinst.rs1
   io.sRegFile.rs2 := Rinst.rs2
   KE.io.keX := X
   KE.io.keY := Y
   KE.io.keCol := col
+
+  immGen.io.int := Rinst.rs2
+  immGen.io.frac := Rinst.immfrac
+  io.ex.imm := immGen.io.imm
+  io.ex.useImm := Rinst.immflag
 
   //Dontcares
   vRegFile.io.wrMask := 0.U

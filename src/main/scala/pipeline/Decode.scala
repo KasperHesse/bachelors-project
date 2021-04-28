@@ -11,7 +11,7 @@ import chisel3.experimental.BundleLiterals._
 class DecodeIO extends Bundle {
   val ex = new IdExIO
   val mem = new IdMemIO
-  val id = Flipped(new IpIdIO)
+  val fe = Flipped(new IfIdIO)
   val wb = Flipped(new WbIdIO)
   val ctrl = new IdControlIO
 }
@@ -31,7 +31,7 @@ class Decode extends Module {
 
   // --- REGISTERS ---
   /** Pipeline stage register */
-  val in = RegNext(io.id)
+  val in = RegNext(io.fe)
   /** State register */
   val state = RegInit(DecodeState.sIdle)
   /** Instruction buffer */

@@ -1,12 +1,13 @@
 package utils
 
 import chisel3._
+import pipeline.RtypeInstruction
 
 /**
  * This object contains all constants and methods relating to operating with fixed-point numbers.
  */
 object Fixed {
-  //Default config: Fracwidth 48, intwidth 15, fixedwidth 64
+  //Default config: Fracwidth 38, intwidth 15, fixedwidth 54
   /** Number of bits in the fractional part of a fixed-point number */
   var FRAC_WIDTH = 38
   /** Number of bits in the integer part of a fixed-point number */
@@ -18,6 +19,7 @@ object Fixed {
 
   /**
    * Converts a given double value into its corresponding fixed-point representation
+   * Values outside of the possible range are saturated at the largest possible value
    * @param value The number to convert
    * @return A long corresponding to the bit pattern of that number
    */
@@ -26,7 +28,7 @@ object Fixed {
     if(v >= math.pow(2,FIXED_WIDTH-1).toLong) {
       v = math.pow(2,FIXED_WIDTH-1).toLong - 1L
     } else if (v < (-math.pow(2, FIXED_WIDTH-1).toLong)) {
-      v = (-math.pow(2, FIXED_WIDTH-1).toLong) + 1L
+      v = (-math.pow(2, FIXED_WIDTH-1).toLong)
     }
     v
   }
@@ -223,6 +225,75 @@ object Fixed {
    */
   def fixedSqrt(S: Long): Long = {
     fixedSqrt(S.S).litValue.toLong
+  }
+
+  /**
+   * Returns the largest of two fixed-point numbers
+   * @param a The first value
+   * @param b The second value
+   * @return The largest of the two inputs
+   */
+  def fixedMax(a: Long, b: Long): Long = {
+    if (a > b) a else b
+  }
+
+  /**
+   * Returns the largest of two fixed-point numbers
+   * @param a The first value
+   * @param b The second value
+   * @return The largest of the two inputs
+   */
+  def fixedMax(a: SInt, b: SInt): SInt = {
+    fixedMax(a.litValue.toLong, b.litValue.toLong).S
+  }
+
+  /**
+   * Returns the largest of two doubles, when interpreted as fixed-point numbers
+   * @param a The first value
+   * @param b The second value
+   * @return The largest of the two when interpreted as fixed-point numbers
+   */
+  def fixedMax(a: Double, b: Double): Double = {
+    fixed2double(fixedMax(double2fixed(a), double2fixed(b)))
+  }
+
+  /**
+   * Returns the smallest of two fixed-point numbers
+   * @param a The first value
+   * @param b The second value
+   * @return The smallest of the two inputs
+   */
+  def fixedMin(a: Long, b: Long): Long = {
+    if (a < b) a else b
+  }
+
+  def fixedMin(a: SInt, b: SInt): SInt = {
+    fixedMin(a.litValue().toLong, b.litValue().toLong).S
+  }
+
+  /**
+   * Returns the smallest of two doubles, when interpreted as fixed-point numbers
+   * @param a The first value
+   * @param b The second value
+   * @return The smallest of the two when interpreted as fixed-point numbers
+   */
+  def fixedMin(a: Double, b: Double): Double = {
+    fixed2double(fixedMin(double2fixed(a), double2fixed(b)))
+  }
+
+  /**
+   * Computes the immediate value stored in an Rtype instruction
+   * @param instr The instruction
+   * @return The immediate value encoded in the instruction
+   */
+  def getImmediate(instr: RtypeInstruction): SInt = {
+    val immh = instr.rs2.litValue.toInt
+    val immfrac = instr.immfrac.litValue.toInt
+    val neg = (immh & 0x8) > 0
+    //If negative, we utilize the fact that 16-immh gives the correct negative version of our value
+    val high = if(neg) -1*(16-immh) else immh
+    val imm: Double = high + immfrac*math.pow(2,-7)
+    return double2fixed(imm).S
   }
 
   /**

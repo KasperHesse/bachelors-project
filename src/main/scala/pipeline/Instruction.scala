@@ -5,11 +5,13 @@ import chisel3.experimental.ChiselEnum
 import chisel3.experimental.BundleLiterals._
 import vector.Opcode
 import vector.Opcode._
+import utils.Config.{NUM_SREG}
 
 /**
  * Defines an instruction. Useful for packaging instructions of different formats inside Scala collections
  */
 trait Instruction {
+  /** Converts the instruction into its' UInt representation */
   def toUInt(): UInt
 }
 
@@ -17,20 +19,22 @@ trait Instruction {
  * A bundle defining the fields that constitute an R-type instruction
  */
 class RtypeInstruction extends Bundle with Instruction {
-  /** Not used */
-  val nu = UInt(2.W)
-  /** Destination register */
-  val rd = UInt(4.W)
-  /** Source register 1 */
-  val rs2 = UInt(4.W)
+  /** Fractional part of immediate. Only used when immflag = true */
+  val immfrac = UInt(7.W) //31:25
   /** Source register 2 */
-  val rs1 = UInt(4.W)
+  val rs2 = UInt(4.W) //24:21
+  /** Source register 1 */
+  val rs1 = UInt(4.W) //20:17
+  /** Destination register */
+  val rd = UInt(4.W) //16:13
+  /** Immediate flag */
+  val immflag = Bool() //12
   /** R-type modifier */
-  val mod = RtypeMod()
+  val mod = RtypeMod() //11:8
   /** Instruction format */
-  val fmt = InstructionFMT()
+  val fmt = InstructionFMT() //7:6
   /** Opcode */
-  val op = Opcode()
+  val op = Opcode() //5:0
 
   override def toUInt(): UInt = {
     RtypeInstruction.apply(this)
@@ -38,18 +42,29 @@ class RtypeInstruction extends Bundle with Instruction {
 }
 
 object RtypeInstruction {
+  /** Creates an R-type instruction which takes two register operands */
   def apply(rd: Int, rs1: Int, rs2: Int, op: Opcode.Type, mod: RtypeMod.Type): RtypeInstruction = {
-    (new RtypeInstruction).Lit(_.rd -> rd.U, _.rs1 -> rs1.U, _.rs2 -> rs2.U, _.op -> op, _.mod -> mod, _.fmt -> InstructionFMT.RTYPE, _.nu -> 0.U(2.W))
+    (new RtypeInstruction).Lit(_.rd -> rd.U, _.rs1 -> rs1.U, _.rs2 -> rs2.U, _.op -> op, _.mod -> mod, _.fmt -> InstructionFMT.RTYPE, _.immflag -> false.B, _.immfrac -> 0.U(7.W))
   }
 
+  /** Creates an R-type instruction which takes a single register operand and an immediate */
+  def apply(rd: Int, rs1: Int, immh: Int, frac: Int, op: Opcode.Type, mod: RtypeMod.Type): RtypeInstruction = {
+    require(immh < 16, "Integer part of immediate must be less than 16")
+    require(frac < 128, "Fractional part of immediate must be less than 128")
+    (new RtypeInstruction).Lit(_.rd -> rd.U, _.rs1 -> rs1.U, _.rs2 -> immh.U, _.op -> op, _.mod -> mod, _.fmt -> InstructionFMT.RTYPE, _.immflag -> true.B, _.immfrac -> frac.U)
+  }
+
+  /** Converts an R-type instruction to its UInt representation */
   def apply(v: RtypeInstruction): UInt = {
-    var r = 0
+    var r: Long = 0
     r |= (v.op.litValue.toInt)
-    r |= (v.fmt.litValue().toInt << 12)
-    r |= (v.mod.litValue.toInt << 14)
-    r |= (v.rs1.litValue().toInt << 18)
-    r |= (v.rs2.litValue().toInt << 22)
-    r |= (v.rd.litValue().toInt << 26)
+    r |= (v.fmt.litValue().toInt << 6)
+    r |= (v.mod.litValue.toInt << 8)
+    r |= (v.immflag.litValue.toInt << 12)
+    r |= (v.rd.litValue().toInt << 13)
+    r |= (v.rs1.litValue().toInt << 17)
+    r |= (v.rs2.litValue().toInt << 21)
+    r |= (v.immfrac.litValue.toLong << 25)
     r.U(32.W)
   }
 
@@ -61,8 +76,8 @@ object RtypeInstruction {
   def apply(v: UInt): RtypeInstruction = {
     //Beware, ugly code below. May be possible to optimize in some way, but it's what we have to work with
     import RtypeMod._
-    val opval = v(11,0)
-    val modval = v(17,14)
+    val opval = v(5,0)
+    val modval = v(12,8)
 
     val op: Opcode.Type = if(opval.litValue == ADD.litValue()) {
       ADD
@@ -74,6 +89,10 @@ object RtypeInstruction {
       DIV
     } else if (opval.litValue == MAC.litValue()) {
       MAC
+    } else if (opval.litValue == MAX.litValue()) {
+      MAX
+    }else if (opval.litValue == MIN.litValue()) {
+      MIN
     } else {
       throw new IllegalArgumentException("Unable to decode op")
     }
@@ -96,7 +115,7 @@ object RtypeInstruction {
     } else {
       throw new IllegalArgumentException("Unable to decode mod")
     }
-    (new RtypeInstruction).Lit(_.op -> op, _.fmt -> fmt, _.mod -> mod, _.rs1 -> v(21,18), _.rs2 -> v(25,22), _.rd -> v(29,26))
+    (new RtypeInstruction).Lit(_.op -> op, _.fmt -> fmt, _.mod -> mod, _.rs1 -> v(21,18), _.rs2 -> v(25,22), _.rd -> v(29,26), _.immflag -> v(12).asBool())
   }
 
 }
@@ -106,32 +125,35 @@ object RtypeInstruction {
  */
 class StypeInstruction extends Bundle with Instruction {
   /** Not used */
-  val nu = UInt(10.W) //31:22
+  val nu1 = UInt(15.W) //31:17
   /** Register source (when storing) or destination register (when loading) */
-  val rsrd = UInt(4.W) //21:18
+  val rsrd = UInt(4.W) //16:13
+  /** Not used */
+  val nu2 = UInt(1.W) //12
   /** S-type modifier */
-  val mod = StypeMod() //17:14
+  val mod = StypeMod() //11:8
   /** Instruction format */
-  val fmt = InstructionFMT() //13:12
+  val fmt = InstructionFMT() //7:6
   /** S-type offset */
-  val offset = StypeOffset() //11:0
+  val offset = StypeOffset() //5:0
 
   override def toUInt(): UInt = {
     StypeInstruction.apply(this)
   }
-
 }
 
 object StypeInstruction {
+  /** Converts an S-type instruction to it's UInt representation */
   def apply(v: StypeInstruction): UInt = {
     var s = 0
     s |= (v.offset.litValue().toInt)
-    s |= (v.fmt.litValue().toInt << 12)
-    s |= (v.mod.litValue().toInt << 14)
-    s |= (v.rsrd.litValue().toInt << 17)
+    s |= (v.fmt.litValue().toInt << 6)
+    s |= (v.mod.litValue().toInt << 8)
+    s |= (v.rsrd.litValue().toInt << 13)
     s.U(32.W)
   }
 
+  /** Constructs an S-type instruction from the given parameters */
   def apply(rsrd: Int, mod: StypeMod.Type, offset: StypeOffset.Type): StypeInstruction = {
     (new StypeInstruction).Lit(_.rsrd -> rsrd.U, _.mod -> mod, _.offset -> offset, _.fmt -> InstructionFMT.STYPE)
   }
@@ -142,11 +164,9 @@ object StypeInstruction {
  */
 class OtypeInstruction extends Bundle with Instruction {
   /** Not used */
-  val nu2 = UInt(18.W)        //31:14
+  val nu2 = UInt(24.W)        //31:8
   /** Instruction format */
-  val fmt = InstructionFMT()  //13:12
-  /** Not used */
-  val nu1 = UInt(6.W)         //11:6
+  val fmt = InstructionFMT()  //7:6
   /** Increment type */
   val it = Bool()             //5
   /** Instruction length */
@@ -186,8 +206,57 @@ object OtypeInstruction extends Bundle {
     o |= (v.iev.litValue().toInt << 1)
     o |= (v.len.litValue().toInt << 3)
     o |= (v.it.litValue.toInt << 5)
-    o |= (v.fmt.litValue().toInt << 12)
+    o |= (v.fmt.litValue().toInt << 6)
     o.U(32.W)
+  }
+}
+
+class BtypeInstruction extends Bundle with Instruction {
+  /** Upper bits of branch target */
+  val targeth = UInt(7.W) //31:25
+  /** Register source for comparison */
+  val rs2 = UInt(4.W) //24:21
+  /** Register source 1 for comparison */
+  val rs1 = UInt(4.W) //20:17
+  /** Lower bits of branch target */
+  val targetl = UInt(9.W) //16:8
+  /** Instruction format */
+  val fmt = InstructionFMT() //7:6
+  /** Branch comparsion operation */
+  val branch = BranchComp() //5:0
+
+  override def toUInt(): UInt = {
+    BtypeInstruction.apply(this)
+  }
+}
+
+object BtypeInstruction {
+  /** Generates a B-type instruction from the given parameters */
+  def apply(branch: BranchComp.Type, rs1: Int, rs2: Int, target: Int): BtypeInstruction = {
+    //Convert branch target to correct representation
+    require(-math.pow(2,17)<= target && target < math.pow(2,17)-4, "Target must be in range (-1)*2^17 : 2^17-4")
+    require(target % 4 == 0, "Branch target must be a multiple of 4")
+    require(rs1 < NUM_SREG)
+    require(rs2 < NUM_SREG)
+    //Extract bits of target
+    val targetl = (target & 0x7fc) >> 2
+    val targeth = (target & 0x3f800) >> 11
+    (new BtypeInstruction).Lit(_.fmt -> InstructionFMT.BTYPE, _.rs1 -> rs1.U, _.rs2 -> rs2.U, _.targetl -> targetl.U, _.targeth -> targeth.U)
+  }
+  /**
+   * Converts a B-type instruction to it's UInt representation
+   * @param v The b-type instruction to convert
+   * @return The UInt value of that instruction
+   */
+  def apply(v: BtypeInstruction): UInt = {
+    var b = 0
+    b |= (v.branch.litValue().toInt)
+    b |= (v.fmt.litValue.toInt << 6)
+    b |= (v.targetl.litValue().toInt << 8)
+    b |= (v.rs1.litValue.toInt << 17)
+    b |= (v.rs2.litValue.toInt << 21)
+    b |= (v.targeth.litValue.toInt << 25)
+    b.U(32.W)
   }
 }
 
@@ -198,6 +267,7 @@ object InstructionFMT extends ChiselEnum {
   val RTYPE = Value(0.U)
   val STYPE = Value(1.U)
   val OTYPE = Value(2.U)
+  val BTYPE = Value(3.U)
 }
 
 /**
@@ -205,6 +275,10 @@ object InstructionFMT extends ChiselEnum {
  * and second operands come from.
  */
 object RtypeMod extends ChiselEnum {
+  //00 = V
+  //01 = X
+  //10 = S
+  //11 = K
   val VV = Value("b0000".U)
   val XV = Value("b0100".U)
   val XX = Value("b0101".U)
@@ -235,7 +309,7 @@ object StypeMod extends ChiselEnum {
  */
 object StypeOffset extends ChiselEnum {
   val X, XPHYS, XNEW, DC, DV, F, U, R, Z, P, Q, INVD, TMP = Value
-  val WIDTH = Value(0xfff.U)
+  val WIDTH = Value("b111111".U)
 }
 
 /**
@@ -262,4 +336,11 @@ object OtypeLen extends ChiselEnum {
   val NDOF = Value(0.U)
   val NELEM = Value(1.U)
   val SINGLE = Value(2.U)
+}
+
+object BranchComp extends ChiselEnum {
+  val EQUAL = Value("b000000".U)
+  val NEQ = Value("b000001".U)
+  val LT = Value("b000010".U)
+  val GEQ = Value("b000011".U)
 }

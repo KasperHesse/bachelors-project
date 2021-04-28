@@ -81,15 +81,22 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
     val ops = new Array[Opcode.Type](iters)
 
     for (i <- 0 until iters ) {
-
       val x = getDouble()
       val y = getDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
-      val op = if( scala.util.Random.nextBoolean() ) {ADD} else {SUB}
-      val res = op match {
-        case ADD => fixedAdd(a, b)
-        case SUB => fixedSub(a, b)
+      val myint = scala.util.Random.nextInt(4)
+      val op = myint match {
+        case 0 => ADD
+        case 1 => SUB
+        case 2 => MAX
+        case 3 => MIN
+      }
+      val res = myint match {
+        case 0 => fixedAdd(a, b)
+        case 1 => fixedSub(a, b)
+        case 2 => fixedMax(a, b)
+        case 3 => fixedMin(a, b)
         case _ => throw new IllegalArgumentException("Unsupported PE Operation")
       }
       as(i) = a

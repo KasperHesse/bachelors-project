@@ -35,7 +35,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   /**
-   * Waits until the result of the given instruction is presented on the output of the writebacks stage
+   * Waits until the result of the given instruction is presented on the output of the writeback stage
    * @param dut The DUT
    * @param instr The instruction to wait on
    */
@@ -95,9 +95,10 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
+    val imm = getImmediate(instr)
     for(i <- 0 until VREG_DEPTH) {
       val a = vReg(rs1*VREG_SLOT_WIDTH+rdOffset)(0)(i)
-      val b = vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
+      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -113,8 +114,9 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val rs2 = instr.rs2.litValue.toInt
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
     val a = xReg(rs1)(0)(rdOffset)
+    val imm = getImmediate(instr)
     for(i <- 0 until VREG_DEPTH) {
-      val b = vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
+      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -130,9 +132,10 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
+    val imm = getImmediate(instr)
     for(i <- 0 until VREG_DEPTH) {
       val a = sReg(rs1)
-      val b = vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
+      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -145,9 +148,10 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   def calculateXXresult(instr: RtypeInstruction, results: Array[SInt]): Unit = {
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
+    val imm = getImmediate(instr)
     for (i <- 0 until NUM_PROCELEM) {
       val a = xReg(rs1)(0)(i)
-      val b = xReg(rs2)(0)(i)
+      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(0)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -158,11 +162,13 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
    * @param results Result buffer
    */
   def calculateSXresult(instr: RtypeInstruction, results: Array[SInt]): Unit = {
+    //TODO Figure out why this fails with seed -4870111997865438359
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
+    val imm = getImmediate(instr)
     for (i <- 0 until NUM_PROCELEM) {
       val a = sReg(rs1)
-      val b = xReg(rs2)(0)(i)
+      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(0)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -175,9 +181,10 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   def calculateSSresult(instr: RtypeInstruction, results: Array[SInt]): Unit = {
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
+    val imm = getImmediate(instr)
     for (i <- 0 until NUM_PROCELEM) {
       val a = sReg(rs1)
-      val b = sReg(rs2)
+      val b = if(instr.immflag.litToBoolean) imm else sReg(rs2)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -441,11 +448,12 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       println("Instruction done")
       dut.clock.step()
     }
+    dut.io.exctrl.empty.expect(true.B)
   }
 
   "DecExWbSpec" should "execute a VREG instruction and store the result" in {
     genericConfig()
-    test(new DecExWb).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    test(new DecExWb) {dut =>
       seed("DecExWb vreg store result")
       val instrs = Array(RtypeInstruction(1, 1, 3, DIV, RtypeMod.VV), RtypeInstruction(1, 1, 3, DIV, RtypeMod.VV))
       test(dut, instrs)
@@ -456,7 +464,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     genericConfig()
     test(new DecExWb).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("DecExWb xreg store result")
-      val instrs = Array(RtypeInstruction(1, 2, 1, ADD, RtypeMod.SX), RtypeInstruction(2, 1, 1, ADD, RtypeMod.SX))
+      val instrs = Array(RtypeInstruction(1, 2, 1, DIV, RtypeMod.SX),  RtypeInstruction(2, 3, 3, ADD, RtypeMod.XX))
       test(dut, instrs)
     }
   }
@@ -472,7 +480,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
   "DecExWbSpec" should "execute a random instruction mix" in {
     genericConfig()
-    test(new DecExWb) {dut =>
+    test(new DecExWb){dut =>
       seed("DecExWb random mix")
       val instrs = Array.fill(8)(genRtype())
       test(dut,instrs)
@@ -519,6 +527,15 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
         expectAndUpdate(dut, results, instr)
         dut.clock.step()
       }
+    }
+  }
+
+  "DecExWbSpec" should "execute immediate instruction" in {
+    genericConfig()
+    test(new DecExWb) {dut =>
+      seed("DecExWb immediates")
+      val instrs = Array.fill(8)(genRtype(scala.util.Random.nextBoolean()))
+      test(dut, instrs)
     }
   }
 }

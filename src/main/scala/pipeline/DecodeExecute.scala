@@ -7,7 +7,7 @@ import chisel3._
  */
 class DecodeExecute extends Module {
   val io = IO(new Bundle{
-    val in = Flipped(new IpIdIO)
+    val in = Flipped(new IfIdIO)
     val idctrl = new IdControlIO
     val exctrl = new ExControlIO
     val out = new ExWbIO
@@ -18,7 +18,7 @@ class DecodeExecute extends Module {
   val execute = Module(new Execute)
   val control = Module(new Control)
 
-  io.in <> decode.io.id
+  io.in <> decode.io.fe
   decode.io.ex <> execute.io.in
   execute.io.out <> io.out
 

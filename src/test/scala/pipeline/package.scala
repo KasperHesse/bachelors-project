@@ -2,7 +2,7 @@ import chisel3._
 import chiseltest._
 import utils.Config
 import utils.Config._
-import utils.Fixed.{FIXED_WIDTH, FRAC_WIDTH, INT_WIDTH, fixedAdd, fixedDiv, fixedMul, fixedSub}
+import utils.Fixed._
 import vector.{KEWrapper, Opcode}
 import vector.Opcode._
 
@@ -23,10 +23,41 @@ package object pipeline {
     }
 
     val mods = Array(VV, XV, SV, XX, SX, SS)
-    val opcodes = Array(ADD, SUB, MUL, DIV)
+    val opcodes = Array(ADD, SUB, MUL, DIV, MAX, MIN)
     val mod = mods(rand.nextInt(mods.length))
     val op = opcodes(rand.nextInt(opcodes.length))
     RtypeInstruction(rd, rs1, rs2, op, mod)
+  }
+
+  /**
+   * Generates a random Rtype-instruction, possibly with an immediate
+   * @param hasImm Whether to generate the instruction with an immediate (true) or not (false)
+   * @return
+   */
+  def genRtype(hasImm: Boolean): RtypeInstruction = {
+    import RtypeMod._
+    if(!hasImm) {
+      return genRtype()
+    }
+    val rand = scala.util.Random
+    val rd = rand.nextInt(NUM_VREG_SLOTS)
+    val rs1 = rand.nextInt(NUM_VREG_SLOTS)
+
+    //Generate random immediate
+    val imm = rand.nextDouble()*math.pow(2,3)*{if(rand.nextBoolean()) 1 else -1}
+    //Convert to Qs3.7 number
+    val immfixed = math.round(imm*math.pow(2,7))
+    //Extract fractional and integer part of that fixed-point value
+    val immfrac = (immfixed & 0x7f).toInt //Bits 6:0
+    val immh = ((immfixed & 0x780) >> 7).toInt //Bits 10:7
+    print(s"Generated instruction with immediate ${immfixed*math.pow(2,-7)}\n")
+
+    val mods = Array(VV, XV, SV, XX, SX, SS)
+    val opcodes = Array(ADD, SUB, MUL, DIV, MAX, MIN)
+    val mod = mods(rand.nextInt(mods.length))
+    val op = opcodes(rand.nextInt(opcodes.length))
+    RtypeInstruction(rd, rs1, immh, immfrac, op, mod)
+    //101 0001110
   }
 
   /**
@@ -76,6 +107,7 @@ package object pipeline {
 
   /**
    * Calculates the result of an ordinary arithmetic instruction
+   *
    * @param instr The instruction being calculated
    * @param a The first value / numerator
    * @param b The second value / denominator
@@ -83,20 +115,28 @@ package object pipeline {
    */
   def calculateRes(instr: RtypeInstruction, a: SInt, b: SInt): SInt = {
     val ol = instr.op.litValue
-//    var res = 0.S
-    //For some reason, we need to use if/else here, instead of ordinary matching
+
+    //If instruction is immediate, replace b-value with immediate value
+    val B = if(instr.immflag.litToBoolean) {
+      getImmediate(instr)
+    } else {
+      b
+    }
     if (ol == ADD.litValue) {
-      fixedAdd(a, b)
+      fixedAdd(a, B)
     } else if (ol == SUB.litValue()) {
-      fixedSub(a, b)
+      fixedSub(a, B)
     } else if (ol == MUL.litValue) {
-      fixedMul(a, b)
+      fixedMul(a, B)
     } else if (ol == DIV.litValue) {
-      fixedDiv(a, b)
+      fixedDiv(a, B)
+    } else if (ol == MIN.litValue) {
+      fixedMin(a, B)
+    } else if (ol == MAX.litValue) {
+      fixedMax(a, B)
     } else {
       throw new IllegalArgumentException("Unknown opcode")
     }
-    //TODO implement support for MAC operations (esp MAC.KV operations)
   }
 
   /**

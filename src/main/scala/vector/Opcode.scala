@@ -7,11 +7,13 @@ import chisel3.experimental.ChiselEnum
  * Opcodes supported by a processing element.
  */
 object Opcode extends ChiselEnum {
-  val NOP = Value(0.U)
-  val ADD = Value(1.U)
-  val SUB = Value(0x2.U)
-  val MUL = Value(0x4.U)
-  val DIV = Value(0x8.U)
-  val MAC = Value(0x10.U)
-  val WIDTH = Value(0xfff.U)
+  val NOP = Value("b000000".U)
+  val ADD = Value("b000100".U)
+  val SUB = Value("b000101".U)
+  val MAX = Value("b000110".U)
+  val MIN = Value("b000111".U)
+  val MUL = Value("b001000".U)
+  val MAC = Value("b011000".U)
+  val DIV = Value("b100000".U)
+
 }

@@ -6,11 +6,13 @@ import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
+import vector.Opcode._
+import vector.Opcode
 
 class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Fixed Point Circuitry"
 
-  def testAddition(dut: FixedPointAddSub, iters: Int): Unit = {
+  def testAddition(dut: FixedPointALU, iters: Int): Unit = {
     val r = scala.util.Random
     for(i <- 0 to iters) {
       //Generate random doubles which fit in INT_WIDTH bits
@@ -18,10 +20,9 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       val y = getDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
-      val op = false
       dut.io.in.a.poke(a.S)
       dut.io.in.b.poke(b.S)
-      dut.io.in.op.poke(op.B)
+      dut.io.in.op.poke(ADD)
       dut.clock.step()
       val res = fixedAdd(a,b)
 
@@ -30,7 +31,7 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  def testSubtraction(dut: FixedPointAddSub, iters: Int): Unit = {
+  def testSubtraction(dut: FixedPointALU, iters: Int): Unit = {
     val r = scala.util.Random
     for (i <- 0 to iters) {
       //Generate random doubles which fit in INT_WIDTH bits
@@ -38,14 +39,31 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       val y = getDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
-      val op = true
       dut.io.in.a.poke(a.S)
       dut.io.in.b.poke(b.S)
-      dut.io.in.op.poke(op.B)
+      dut.io.in.op.poke(SUB)
       dut.clock.step()
       val res = fixedSub(a,b)
       //Ugly hack that's necessary due to bit-level errors once FIXED_WIDTH goes above 54
       assert(math.abs(dut.io.out.res.peek.litValue().toLong - res) < (1 << FIXED_WIDTH-53))
+    }
+  }
+
+  def testMaxMin(dut: FixedPointALU, iters: Int): Unit = {
+    val r = scala.util.Random
+    for(i <- 0 until iters) {
+      val x = getDouble()
+      val y = getDouble()
+      val a = double2fixed(x)
+      val b = double2fixed(y)
+      val bool = r.nextBoolean()
+      val op = if (bool) Opcode.MAX else Opcode.MIN
+      dut.io.in.a.poke(a.S)
+      dut.io.in.b.poke(b.S)
+      dut.io.in.op.poke(op)
+      dut.clock.step()
+      val res = if (bool) fixedMax(a,b) else fixedMin(a,b)
+      dut.io.out.res.expect(res.S)
     }
   }
 
@@ -81,13 +99,13 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "correctly add numbers" in {
-    test(new FixedPointAddSub) { c =>
+    test(new FixedPointALU) { c =>
       testAddition(c, 100)
     }
   }
 
   it should "correctly subtract numbers" in {
-    test(new FixedPointAddSub) { c =>
+    test(new FixedPointALU) { c =>
       testSubtraction(c, 20)
     }
   }
@@ -95,6 +113,12 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   it should "correctly multiply numbers in a single cycle" in {
     test(FixedPointMul(utils.Config.MULTYPE)) { c =>
       testMultiplication(c, 20)
+    }
+  }
+
+  "FixedPointAlu" should "correctly assert max or min" in {
+    test(new FixedPointALU) {dut =>
+      testMaxMin(dut, 20)
     }
   }
 

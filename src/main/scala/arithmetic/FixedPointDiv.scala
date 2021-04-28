@@ -5,6 +5,7 @@ import chisel3.util._
 import utils.Fixed._
 import utils.DivTypes._
 import utils.{Config, MulTypes}
+import vector.Opcode
 
 /**
  * Abstract base class for the fixed-point divider. Implements [[DivIO]]
@@ -169,7 +170,7 @@ class NRDivStage2 extends Module {
   val THIRTYTWOOVERSEVENTEEN = double2fixed(32.0/17.0).S(FIXED_WIDTH.W)
 
   val mul = Module(FixedPointMul(MulTypes.SINGLECYCLE))
-  val sub = Module(new FixedPointAddSub)
+  val sub = Module(new FixedPointALU)
 
   mul.io.in.a := in.denom
   mul.io.in.b := THIRTYTWOOVERSEVENTEEN
@@ -177,7 +178,7 @@ class NRDivStage2 extends Module {
 
   sub.io.in.a := FORTYEIGHTOVERSEVENTEEN
   sub.io.in.b := mul.io.out.res
-  sub.io.in.op := FixedPointAddSub.SUB
+  sub.io.in.op := Opcode.SUB
   sub.io.in.valid := mul.io.out.valid
 
   io.out.X := sub.io.out.res
@@ -206,8 +207,8 @@ class NRDivStage3 extends Module {
   val mul1 = Module(FixedPointMul(MulTypes.SINGLECYCLE))
   val mul2 = Module(FixedPointMul(MulTypes.SINGLECYCLE))
 
-  val asu1 = Module(new FixedPointAddSub)
-  val asu2 = Module(new FixedPointAddSub)
+  val asu1 = Module(new FixedPointALU)
+  val asu2 = Module(new FixedPointALU)
 
   //Stage 3.1 - Calculate D'*X
   mul1.io.in.a := in.X
@@ -224,7 +225,7 @@ class NRDivStage3 extends Module {
   val step1Reg = RegNext(step1)
 
   //Stage 3.2 - Calculate X*(1-D'*x)
-  asu1.io.in.op := FixedPointAddSub.SUB
+  asu1.io.in.op := Opcode.SUB
   asu1.io.in.a := double2fixed(1).S(FIXED_WIDTH.W)
   asu1.io.in.b := step1Reg.res
   asu1.io.in.valid := step1Reg.valid
@@ -245,7 +246,7 @@ class NRDivStage3 extends Module {
   //Stage 3.3 - Calculate 1+X*(1-D'*x)
   asu2.io.in.a := step2Reg.X
   asu2.io.in.b := step2Reg.res
-  asu2.io.in.op := FixedPointAddSub.ADD
+  asu2.io.in.op := Opcode.ADD
   asu2.io.in.valid := step2Reg.valid
 
   io.out.X := asu2.io.out.res

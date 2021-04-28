@@ -7,7 +7,7 @@ import chisel3._
  */
 class DecExWb extends Module {
   val io = IO(new Bundle{
-    val in = Flipped(new IpIdIO)
+    val in = Flipped(new IfIdIO)
     val idctrl = new IdControlIO
     val exctrl = new ExControlIO
     val wb = new WbIdIO
@@ -20,7 +20,7 @@ class DecExWb extends Module {
   val control = Module(new Control)
 
 
-  io.in <> decode.io.id
+  io.in <> decode.io.fe
   decode.io.ex <> execute.io.in
   execute.io.out <> wb.io.in
   wb.io.out <> decode.io.wb
