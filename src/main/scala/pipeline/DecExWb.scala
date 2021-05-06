@@ -19,12 +19,15 @@ class DecExWb extends Module {
   val fwd = Module(new Forwarding)
   val control = Module(new Control)
 
+  //Connect outputs to top level
+  io.idctrl <> decode.io.ctrl
+  io.exctrl <> execute.io.ctrl
 
   io.in <> decode.io.fe
-  decode.io.ex <> execute.io.in
-  execute.io.out <> wb.io.in
-  wb.io.out <> decode.io.wb
-  io.wb := wb.io.out
+  decode.io.ex <> execute.io.id
+  execute.io.wb <> wb.io.ex
+  wb.io.id <> decode.io.wb
+  io.wb := wb.io.id
 
   fwd.io.wb <> wb.io.fwd
   fwd.io.ex <> execute.io.fwd
@@ -32,24 +35,6 @@ class DecExWb extends Module {
   control.io.id <> decode.io.ctrl
   control.io.ex <> execute.io.ctrl
   control.io.fe.instr := io.in.instr
-
-  io.idctrl.state := decode.io.ctrl.state
-  io.idctrl.execThread := decode.io.ctrl.execThread
-
-  io.exctrl.empty := execute.io.ctrl.empty
-  io.exctrl.op := execute.io.ctrl.op
-  io.exctrl.queueHead := execute.io.ctrl.queueHead
-
-  for(i <- 0 until 2) {
-    io.idctrl.threadCtrl(i).stateUint := decode.io.ctrl.threadCtrl(i).stateUint
-    io.idctrl.threadCtrl(i).state := decode.io.ctrl.threadCtrl(i).state
-    io.idctrl.threadCtrl(i).finalCycle := decode.io.ctrl.threadCtrl(i).finalCycle
-    io.idctrl.threadCtrl(i).firstCycle := decode.io.ctrl.threadCtrl(i).firstCycle
-    io.idctrl.threadCtrl(i).op := decode.io.ctrl.threadCtrl(i).op
-    io.idctrl.threadCtrl(i).rtypemod := decode.io.ctrl.threadCtrl(i).rtypemod
-    io.idctrl.threadCtrl(i).rs1 := decode.io.ctrl.threadCtrl(i).rs1
-    io.idctrl.threadCtrl(i).rs2 := decode.io.ctrl.threadCtrl(i).rs2
-  }
 
   /** Dontcares */
   decode.io.mem := DontCare

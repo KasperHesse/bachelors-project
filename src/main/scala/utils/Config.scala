@@ -22,7 +22,7 @@ object Config {
   /** Number of element in the z-direction */
   val NELZ = 6
   /** The greatest of the three element dimensions */
-  val GDIM = math.max(NELX, math.max(NELY, NELZ))
+  var GDIM = math.max(NELX, math.max(NELY, NELZ))
 
   /** Number of nodes in the x-direction */
   val NX = NELX + 1
@@ -36,8 +36,6 @@ object Config {
   /** Total number of element DOF in the design domain */
   var NDOF = 3 * NX * NY * NZ
 
-  val WORD_LENGTH = Fixed.FIXED_WIDTH
-
   /** The number of element in the vector register file */
   var NUM_VREG = 32
   /** The number of vector register slots that are adressible from instructions */
@@ -47,7 +45,7 @@ object Config {
   /** The number of values stored in each entry in the vector register file */
   var VREG_DEPTH = 24
   /** The number of elements in the scalar register file */
-  var NUM_SREG = 32
+  var NUM_SREG = 16
   /** The number of processing elements used in the design. Determines the width of vectors carrying values between modules. */
   var NUM_PROCELEM = 8
   /** The number of subvectors in each vector register */
@@ -61,13 +59,18 @@ object Config {
   /** The total number of elements stored in a vector register slot
    * This value is the increment amount used when processing vectors elementwise */
   var ELEMS_PER_VSLOT = VREG_SLOT_WIDTH*VREG_DEPTH
+  /** Number of elements parsed when performing an operation over NELEM-long vectors */
+  var NELEMLENGTH = if(NELEM % ELEMS_PER_VSLOT == 0) NELEM else (NELEM/ELEMS_PER_VSLOT+1)*ELEMS_PER_VSLOT
+  /** Number of elements parsed when performing an operation over NDOF-long vectors */
+  var NDOFLENGTH = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else (NDOF/ELEMS_PER_VSLOT+1)*ELEMS_PER_VSLOT
+
   /** Simulation flag. Assert inside of a tester to use simulation-specific functionality */
   var SIMULATION = false
 
   checkRequirements()
 
   /** Checks if all configurations requirements are held. This *must* be called in a tester if config values are changed */
-  def checkRequirements() {
+  def checkRequirements(): Unit = {
     require(NUM_VREG >= NUM_VREG_SLOTS, "Must have more vector registers than register slots")
     require(NUM_VREG % NUM_VREG_SLOTS == 0, "Number of vector registers must me a multiple of vector register slots")
     require(KE_SIZE == VREG_DEPTH, s"KE_SIZE must equal VREG_DEPTH for proper matrix-vector products. They are $KE_SIZE, $VREG_DEPTH")
@@ -79,6 +82,10 @@ object Config {
     require(ELEMS_PER_VSLOT == VREG_SLOT_WIDTH*VREG_DEPTH, "ELEMS_PER_VSLOT must equal VREG_SLOT_WIDTH*VREG_DEPTH. ELEMS_PER_SLOT is a calculated property")
     require(NELEM > ELEMS_PER_VSLOT, s"NELEM(${NELEM}) must be greater than ELEMS_PER_VSLOT(${ELEMS_PER_VSLOT}) for proper computation")
     require(NDOF > NELEM, "NDOF must be greater than NELEM")
+    require(NUM_SREG <= 16, "NUM_SREG must be <= 16 as only 4 bits are used for register fields")
+
+    NELEMLENGTH = if(NELEM % ELEMS_PER_VSLOT == 0) NELEM else (NELEM/ELEMS_PER_VSLOT+1)*ELEMS_PER_VSLOT
+    NDOFLENGTH = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else (NDOF/ELEMS_PER_VSLOT+1)*ELEMS_PER_VSLOT
   }
 }
 

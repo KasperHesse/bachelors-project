@@ -8,8 +8,8 @@ import utils.Fixed._
 import pipeline.RegisterFileType._
 
 class WritebackIO extends Bundle {
-  val in = Flipped(new ExWbIO)
-  val out = new WbIdIO
+  val ex = Flipped(new ExWbIO)
+  val id = new WbIdIO
   val fwd = new WbFwdIO
 }
 
@@ -21,7 +21,7 @@ class Writeback extends Module {
   require(SUBVECTORS_PER_VREG > 2, "Writeback stage currently does not support subvectors_per_vreg <= 2")
   import WritebackState._
   val io = IO(new WritebackIO)
-  val in = RegNext(io.in)
+  val in = RegNext(io.ex)
 
   /** Buffer for building results to be written back */
   val writeBuffer = RegInit(VecInit(Seq.fill(SUBVECTORS_PER_VREG-1)(VecInit(Seq.fill(NUM_PROCELEM)(0.S(FIXED_WIDTH.W))))))
@@ -82,6 +82,7 @@ class Writeback extends Module {
         we := true.B
       }
 
+      //Valid, reduced result from mac.sv or mac.vv
       when(in.valid && (in.dest.rf === SREG && in.reduce)) {
         for(i <- 0 until NUM_PROCELEM) {
           res(i) := in.res.reduceTree( (a,b) => a+b )
@@ -93,9 +94,9 @@ class Writeback extends Module {
       }
     }
   }
-  io.out.wrData := res
-  io.out.rd := in.dest
-  io.out.we := we
+  io.id.wrData := res
+  io.id.rd := in.dest
+  io.id.we := we
 
   //Assign outputs to forwarding stage
   //Position '0' corresponds to ptr=0, position '1' to ptr=1 and final position corresponds to most value on pipeline register

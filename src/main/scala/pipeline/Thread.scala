@@ -133,7 +133,7 @@ class Thread(id: Int) extends Module {
   /** Limit for MAC operations, if such a one is being processed */
   val macLimit = WireDefault(0.U(32.W))
   /** Signals that the outgoing operation should be added to the destination queue */
-  val newDest = WireDefault(false.B)
+  val valid = WireDefault(false.B)
 
   //Generate vector register selects based on slot defined in instruction + slot select
   val v_rs1 = (slot1 << log2Ceil(VREG_SLOT_WIDTH)).asUInt + slotSelect
@@ -166,8 +166,7 @@ class Thread(id: Int) extends Module {
   KE.io.keY := Y
   KE.io.keCol := col
 
-  immGen.io.int := Rinst.rs2
-  immGen.io.frac := Rinst.immfrac
+  immGen.io.instr := Rinst
   io.ex.imm := immGen.io.imm
   io.ex.useImm := Rinst.immflag
 
@@ -190,8 +189,9 @@ class Thread(id: Int) extends Module {
   io.ex.b := b
   io.ex.dest:= dest
   io.ex.op := op
+
   io.ex.macLimit := macLimit
-  io.ex.newDest := newDest
+  io.ex.valid := valid
   io.ex.firstCycle := firstCycle
   io.ex.rs1 := rs1
   io.ex.rs2 := rs2
@@ -210,6 +210,7 @@ class Thread(id: Int) extends Module {
   io.stateOutUint := state.asUInt()
   io.ctrl.stateUint := state.asUInt()
   io.ex.dest.rfUint := dest.rf.asUInt()
+  io.ex.opUInt := op.asUInt()
 
 
   // --- LOGIC ---
@@ -313,13 +314,11 @@ class Thread(id: Int) extends Module {
         b := b_subvec(X)
         op := Rinst.op
 
-        //When processing a MAC instruction, rd and subvec should be constant?
-        dest.reg := Mux(Rinst.op === MAC, Rinst.rd, v_rd)
+        dest.reg := Mux(Rinst.op === MAC, Rinst.rd, v_rd) //MAC.VV instructions always end in s-registers
         dest.subvec := Mux(Rinst.op === MAC, 0.U, X)
         dest.rf := Mux(Rinst.op === MAC, SREG, VREG)
         macLimit := instrLen
-        //Only poke newDest true on the first cycle of MAC operations
-        newDest := Mux(Rinst.op === MAC, io.progress === (VREG_SLOT_WIDTH*VREG_DEPTH).U && X === 0.U && slotSelect === 0.U, true.B)
+        valid := true.B
         //Updates
         val Xtick = X === (SUBVECTORS_PER_VREG - 1).U
         val SStick: Bool = slotSelect === (VREG_SLOT_WIDTH - 1).U
@@ -342,7 +341,7 @@ class Thread(id: Int) extends Module {
         dest.reg := v_rd
         dest.subvec := X
         dest.rf := VREG
-        newDest := true.B
+        valid := true.B
 
         //Updates
         val Xtick = X === (SUBVECTORS_PER_VREG - 1).U
@@ -363,13 +362,8 @@ class Thread(id: Int) extends Module {
         dest.reg := Rinst.rd
         dest.subvec := 0.U
         dest.rf := XREG
-        newDest := true.B
+        valid := true.B
 
-        //        X := Mux(X === 1.U, 0.U, X + 1.U)
-        //        when(X =/= 0.U) {
-        //          op := NOP
-        //        }
-        //        finalCycle := X === 1.U
         finalCycle := true.B
         assignRsRfValues(Rinst.rs1, Rinst.rs2, 0.U, XREG, XREG)
       }
@@ -384,7 +378,7 @@ class Thread(id: Int) extends Module {
         dest.subvec := Mux(Rinst.op === MAC, 0.U, X)
         dest.rf := Mux(Rinst.op === MAC, SREG, VREG)
         macLimit := instrLen
-        newDest := Mux(Rinst.op === MAC, io.progress === (VREG_SLOT_WIDTH*VREG_DEPTH).U && X === 0.U && slotSelect === 0.U, true.B)
+        valid := true.B
         //Updates
         val Xtick = X === (SUBVECTORS_PER_VREG - 1).U
         val SStick: Bool = slotSelect === (VREG_SLOT_WIDTH - 1).U
@@ -405,7 +399,7 @@ class Thread(id: Int) extends Module {
         dest.reg := Rinst.rd
         dest.subvec := 0.U
         dest.rf := XREG
-        newDest := true.B
+        valid := true.B
         finalCycle := true.B
         assignRsRfValues(Rinst.rs1, Rinst.rs2, 0.U, SREG, XREG)
       }
@@ -420,7 +414,7 @@ class Thread(id: Int) extends Module {
         dest.reg := Rinst.rd
         dest.subvec := 0.U
         dest.rf := SREG
-        newDest := true.B
+        valid := true.B
         finalCycle := true.B
         assignRsRfValues(Rinst.rs1, Rinst.rs2, 0.U, SREG, SREG)
       }
@@ -435,7 +429,8 @@ class Thread(id: Int) extends Module {
         macLimit := KE_SIZE.U
         dest.reg := v_rd
         dest.subvec := Y
-        newDest := (X === 0.U) && (col === 0.U)
+        dest.rf := VREG
+        valid := true.B
 
         val colTick = col === (NUM_PROCELEM - 1).U
         val Xtick = X === (KE_SIZE / NUM_PROCELEM - 1).U
@@ -461,7 +456,7 @@ class Thread(id: Int) extends Module {
     Y := Y
     col := col
     IP := IP
-    newDest := false.B
+    valid := false.B
     state := state
   }
 

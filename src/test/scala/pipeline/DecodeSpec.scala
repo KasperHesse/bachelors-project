@@ -196,7 +196,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
    * @param mod The Rtype-modifier to use for all of the instructions
    * @return An array of the executable instructions
    */
-  def genAndPoke(dut: Decode, mod: RtypeMod.Type): Array[RtypeInstruction] = {
+  def genAndPokeRtype(dut: Decode, mod: RtypeMod.Type): Array[RtypeInstruction] = {
     val add = genRtype(ADD, mod)
     val sub = genRtype(SUB, mod)
     val mul = genRtype(MUL, mod)
@@ -215,7 +215,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
    * @return
    */
   def genAndPoke(dut: Decode): Array[RtypeInstruction] = {
-    genAndPoke(dut, 1)
+    genAndPoke(dut, OtypeLen.SINGLE)
   }
 
   /**
@@ -224,7 +224,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
    * @param len The length of the instruction (Single, Ndof or Nelem operations)
    * @return
    */
-  def genAndPoke(dut: Decode, len: Int): Array[RtypeInstruction] = {
+  def genAndPoke(dut: Decode, len: OtypeLen.Type): Array[RtypeInstruction] = {
     val instrs = Array.fill(4)(genRtype())
     val ops = wrapInstructions(instrs, len)
     loadInstructions(ops, dut)
@@ -234,7 +234,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
 
   def testDecode(dut: Decode, mod: RtypeMod.Type): Unit = {
-    val instrs = genAndPoke(dut, mod)
+    val instrs = genAndPokeRtype(dut, mod)
     //Step until outputs are available
     while(dut.io.ctrl.threadCtrl(0).stateUint.peek.litValue() != ThreadState.sExec.litValue()) {
       dut.clock.step()
@@ -266,8 +266,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "test VV instruction load and decode" in {
-    SIMULATION = true
-    Config.checkRequirements()
+    genericConfig()
     seed("VV Decode")
     test(new Decode).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       testDecode(dut, RtypeMod.VV)
@@ -275,8 +274,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "test XV instruction load and decode" in {
-    SIMULATION = true
-    Config.checkRequirements()
+    genericConfig()
     seed("XV Decode")
     test(new Decode) { dut =>
       testDecode(dut, RtypeMod.XV)
@@ -284,8 +282,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "test SV instruction load and decode" in {
-    SIMULATION = true
-    Config.checkRequirements()
+    genericConfig()
     seed("SV Decode")
     test(new Decode) { dut =>
       testDecode(dut, RtypeMod.SV)
@@ -293,16 +290,14 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "test XX instruction load and decode" in {
-    SIMULATION = true
-    Config.checkRequirements()
+    genericConfig()
     seed("XX Decode")
     test(new Decode) { dut =>
       testDecode(dut, RtypeMod.XX)
     }
   }
   it should "test SX instruction load and decode" in {
-    SIMULATION = true
-    Config.checkRequirements()
+    genericConfig()
     seed("SX Decode")
     test(new Decode) { dut =>
       testDecode(dut, RtypeMod.SX)
@@ -310,8 +305,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "test SS instruction load and decode" in {
-    SIMULATION = true
-    Config.checkRequirements()
+    genericConfig()
     seed("SS Decode")
     test(new Decode) { dut =>
       testDecode(dut, RtypeMod.SS)
@@ -321,8 +315,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
   //Generate random instructions of different kinds
   it should "Decode a random instruction mix" in {
-    SIMULATION = true
-    Config.checkRequirements()
+    genericConfig()
     seed("Random mix decode")
     test(new Decode).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       val instrs = genAndPoke(dut)
@@ -337,14 +330,12 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  it should "Decode a random mix for multiple iterations" in {
-    SIMULATION = true
-    NDOF = 3*NUM_PROCELEM
-    Config.checkRequirements()
+  "Decode stage" should "Decode a random mix for multiple iterations" in {
+    genericConfig()
     seed("Random mix decode")
-    test(new Decode).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-      val iters = NDOF/NUM_PROCELEM
-      val instrs = genAndPoke(dut, NDOF)
+    test(new Decode) { dut =>
+      val iters = (if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else ((NDOF/ELEMS_PER_VSLOT)+1)*ELEMS_PER_VSLOT)/ELEMS_PER_VSLOT
+      val instrs = genAndPoke(dut, OtypeLen.NDOF)
       var i = 0
       while(i < iters) {
         //Step until outputs are available
@@ -361,4 +352,97 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.clock.step(5)
     }
   }
-}
+
+  /**
+   * Tests branching behavior of the decode stage
+   * @param dut The decode stage
+   * @param comp The comparison to perform
+   * @param rs1 Register source 1
+   * @param rs2 Register source 2
+   * @param offset The branch offset (+/- 200)
+   */
+  def testBranchBehavior(dut: Decode, comp: BranchComp.Type, rs1: Int, rs2: Int, offset: Int): Unit = {
+    import BranchComp._
+    require(math.abs(offset) <= 200)
+
+    val sReg = dut.sRegFile.arr
+    val Binst = BtypeInstruction(comp, rs1, rs2, offset)
+    dut.io.fe.instr.poke(Binst.toUInt())
+    dut.io.fe.pc.poke(200.U)
+    dut.io.ctrl.iload.poke(false.B)
+    dut.clock.step()
+
+    val taken: Boolean = if(comp.litValue == EQUAL.litValue) {
+      sReg(rs1).litValue == sReg(rs2).litValue
+    } else if (comp.litValue == NEQ.litValue) {
+      sReg(rs1).litValue() != sReg(rs2).litValue()
+    } else if (comp.litValue == LT.litValue) {
+      sReg(rs1).litValue() < sReg(rs2).litValue()
+    } else if (comp.litValue == GEQ.litValue) {
+      sReg(rs1).litValue() >= sReg(rs2).litValue
+    } else {
+      throw new IllegalArgumentException("Unable to decode comp value")
+    }
+    dut.io.fe.branchTarget.expect((200+offset).U)
+    dut.io.fe.branch.expect(taken.B)
+  }
+
+  "Decode stage" should "take a branch when EQUAL" in {
+    genericConfig()
+    seed("Decode branch equal")
+    test(new Decode) {dut =>
+      testBranchBehavior(dut, BranchComp.EQUAL, 0, 0, -8)
+    }
+  }
+
+  "Decode stage" should "take a branch when NOT EQUAL" in {
+    genericConfig()
+    seed("Decode branch equal")
+    test(new Decode) {dut =>
+      testBranchBehavior(dut, BranchComp.NEQ, 1, 0, -8)
+    }
+  }
+
+  //This simply attempts a bunch of branches in a row, to test if they work correctly
+  "Decode stage" should "test branch behavior" in {
+    genericConfig()
+    seed("Decode branch multiple")
+    test(new Decode) {dut =>
+      val rand = scala.util.Random
+      val sReg = dut.sRegFile.arr
+      var pc = 200
+      for(i <- 0 until 20) {
+        //Generate random rs1, rs2, comp values. Use to test and update
+        val rs1 = rand.nextInt(NUM_SREG)
+        val rs2 = rand.nextInt(NUM_SREG)
+        val compInt = rand.nextInt(4)
+        val comp = compInt match {
+          case 0 => BranchComp.EQUAL
+          case 1 => BranchComp.NEQ
+          case 2 => BranchComp.LT
+          case 3 => BranchComp.GEQ
+          case _ => throw new IllegalArgumentException("Unable to generate comp")
+        }
+        val taken = compInt match {
+          case 0 => sReg(rs1).litValue == sReg(rs2).litValue
+          case 1 => sReg(rs1).litValue != sReg(rs2).litValue
+          case 2 => sReg(rs1).litValue <  sReg(rs2).litValue()
+          case 3 => sReg(rs1).litValue >= sReg(rs2).litValue()
+        }
+        val offset = rand.nextInt(8) * 4 * {if(rand.nextBoolean()) 1 else -1}
+
+        val Binstr = BtypeInstruction(comp, rs1, rs2, offset)
+        dut.io.fe.instr.poke(Binstr.toUInt())
+        dut.io.fe.pc.poke(pc.U)
+
+        dut.clock.step()
+
+        dut.io.fe.branchTarget.expect((pc + offset).U)
+        dut.io.fe.branch.expect(taken.B)
+        if(taken) {
+          pc += offset
+        }
+      } //end for
+    } //end test()
+  } //end suite
+} //end class

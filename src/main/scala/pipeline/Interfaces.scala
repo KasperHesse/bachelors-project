@@ -12,7 +12,14 @@ import vector.Opcode
  * Instantiate as-is in the fetch stage, use Flipped() in the decode stage
  */
 class IfIdIO extends Bundle {
+  /** Instruction fetched from IM */
   val instr = Output(UInt(32.W))
+  /** Current value of the program counter */
+  val pc = Output(UInt(32.W))
+  /** Address to jump to when branching */
+  val branchTarget = Input(UInt(32.W))
+  /** Whether to go to branch target (true) or not (false) */
+  val branch = Input(Bool())
 }
 
 /**
@@ -32,12 +39,14 @@ class IdExIO extends Bundle {
   val rs2 = Output(new RegisterBundle())
   /** Operation to execute. See [[vector.Opcode]] */
   val op = Output(Opcode())
+  /** UInt version of opcode. Debug purposes only */
+  val opUInt = Output(UInt(6.W))
   /** Number of multiply-accumulates to perform before releasing the result. Only used when MAC operations are performed.
    * Width 32 is currently a guess */
   val macLimit = Output(UInt(32.W))
   /** Signals to the execution unit that the incoming operation should be added to the destination queue.
    * Mostly useful for MAC operations, where multiple operations are performed for each destination input. */
-  val newDest = Output(Bool())
+  val valid = Output(Bool())
   /** Asserted on the first cycle of an executing instruction */
   val firstCycle = Output(Bool())
   /** Immediate value */
@@ -134,11 +143,15 @@ class ExControlIO extends Bundle {
  */
 class IdControlIO extends Bundle {
   /** Asserted whenever the decode stage can load new instructions into its instruction buffer */
-  val iload = Input(Bool()) //Should be when decode is idle and preview isntr is istart
-  /** The current instruction load/execute stage */
+  val iload = Input(Bool())
+  /** The current state of the decoder*/
   val state = Output(DecodeState())
+  /** The decoder state as UInt. For debug purposes only */
+  val stateUint = Output(UInt(4.W))
   /** Value indicating whether thread 0 or thread 1 is the currently executing thread */
   val execThread = Output(UInt(1.W))
+  /** Whether a branch was taken */
+  val branch = Output(Bool())
   /** Asserted when the decode unit should stall. This can either be because the Ex unit is not finished processing,
    * or because data has yet to be transferred from memory into the register file. */
   val stall = Input(Bool())
@@ -154,7 +167,7 @@ class IfControlIO extends Bundle {
   /** The instruction currently being fetched from IM */
   val instr = Output(UInt(32.W))
   /** Stall signal */
-  val stall = Input(Bool())
+  val iload = Input(Bool())
 }
 
 /**
@@ -174,11 +187,11 @@ class ThreadControlIO extends Bundle {
   val op = Output(Opcode())
   /** R-type mod field of the currently executing instruction */
   val rtypemod = Output(RtypeMod())
-  /** Asserted when the unit should stall. This can either be because the Ex unit is not finished processing,
-   * or because data has yet to be transferred from memory into the register file. */
+  /** Asserted when the thread  should stall.*/
   val stall = Input(Bool())
-
+  /** Register bundle for source 1 of the incoming instruction */
   val rs1 = Output(new RegisterBundle)
+  /** Register bundle for source 2 of the incoming instruction */
   val rs2 = Output(new RegisterBundle)
 }
 

@@ -16,13 +16,11 @@ class FetchSpec  extends FlatSpec with ChiselScalatestTester with Matchers  {
     SIMULATION = true
     test(new Fetch(memsize=8, memfile)) {dut =>
       val lines = Source.fromFile(memfile)
-      var i = 0
+      dut.io.ctrl.iload.poke(true.B)
       for(line <- lines.getLines()) {
-//        dut.io.addr.poke(i.U)
         val myint = Integer.parseInt(line, 16)
         dut.io.id.instr.expect(myint.U)
         dut.clock.step()
-        i += 1
       }
       lines.close()
     }
@@ -33,8 +31,56 @@ class FetchSpec  extends FlatSpec with ChiselScalatestTester with Matchers  {
     try {
       new Fetch()
     } catch {
-      case a: IllegalArgumentException => assert(true)
+      case x: IllegalArgumentException => assert(true)
       case _: Throwable => assert(false)
+    }
+  }
+
+  "Fetch stage" should "branch when iload is asserted" in {
+    SIMULATION = false
+    test(new Fetch()) {dut =>
+      dut.io.id.pc.expect(0.U)
+      dut.io.id.branchTarget.poke(200.U)
+      dut.io.ctrl.iload.poke(true.B)
+      dut.io.id.branch.poke(true.B)
+      dut.clock.step()
+      dut.io.id.pc.expect(200.U)
+    }
+  }
+
+  "Fetch stage" should "branch when iload is not asserted" in {
+    SIMULATION = false
+    test(new Fetch()) {dut =>
+      dut.io.id.pc.expect(0.U)
+      dut.io.id.branchTarget.poke(200.U)
+      dut.io.ctrl.iload.poke(false.B)
+      dut.io.id.branch.poke(true.B)
+      dut.clock.step()
+      dut.io.id.pc.expect(200.U)
+    }
+  }
+
+  "Fetch stage" should "update PC when branch is not asserted" in {
+    SIMULATION = false
+    test(new Fetch()) {dut =>
+      dut.io.id.pc.expect(0.U)
+      dut.io.id.branchTarget.poke(200.U)
+      dut.io.ctrl.iload.poke(true.B)
+      dut.io.id.branch.poke(false.B)
+      dut.clock.step()
+      dut.io.id.pc.expect(4.U)
+    }
+  }
+
+  "Fetch stage" should "keep PC constant when nothing is asserted" in {
+    SIMULATION = false
+    test(new Fetch()) {dut =>
+      dut.io.id.pc.expect(0.U)
+      dut.io.id.branchTarget.poke(200.U)
+      dut.io.ctrl.iload.poke(false.B)
+      dut.io.id.branch.poke(false.B)
+      dut.clock.step()
+      dut.io.id.pc.expect(0.U)
     }
   }
 }

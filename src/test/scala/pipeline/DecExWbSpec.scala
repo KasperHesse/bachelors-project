@@ -55,164 +55,6 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     vReg = dut.decode.threads(0).vRegFile.arr
   }
 
-
-  /**
-   * Returns the [[RegisterFileType]] of the destination of the given instruction
-   * @param instr The instruction to be parsed
-   * @return The register file type of the register file where the result will be stored
-   */
-  def getResultRegisterType(instr: RtypeInstruction): RegisterFileType.Type = {
-    import RtypeMod._
-    import RegisterFileType._
-    import Opcode._
-
-    val mod = instr.mod.litValue
-    if(mod == SS.litValue || (mod == SV.litValue && instr.op.litValue == MAC.litValue)) {
-      SREG
-    } else if (Seq(SX.litValue, XX.litValue).contains(mod)) {
-      XREG
-    } else if (Seq(XV.litValue, SV.litValue, KV.litValue).contains(mod)) {
-      VREG
-    } else if (mod == VV.litValue) {
-      if(instr.op.litValue == MAC.litValue) {
-        SREG
-      } else {
-        VREG
-      }
-    } else {
-      throw new IllegalArgumentException("Could not calculate result register type")
-    }
-  }
-
-  /**
-   * Calculates the result of an instruction with R-type modifier VV. Does not calculate dot products.
-   * For that, see [[calculateDOTresult]]
-   * @param instr The instruction
-   * @param results Result buffer
-   * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
-   */
-  def calculateVVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt): Unit = {
-    val rs1 = instr.rs1.litValue.toInt
-    val rs2 = instr.rs2.litValue.toInt
-    val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
-    val imm = getImmediate(instr)
-    for(i <- 0 until VREG_DEPTH) {
-      val a = vReg(rs1*VREG_SLOT_WIDTH+rdOffset)(0)(i)
-      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
-      results(i) = calculateRes(instr, a, b)
-    }
-  }
-
-  /**
-   * Calculates the result of an instruction with R-type modifier XV
-   * @param instr The instruction
-   * @param results Result buffer
-   * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
-   */
-  def calculateXVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt): Unit = {
-    val rs1 = instr.rs1.litValue.toInt
-    val rs2 = instr.rs2.litValue.toInt
-    val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
-    val a = xReg(rs1)(0)(rdOffset)
-    val imm = getImmediate(instr)
-    for(i <- 0 until VREG_DEPTH) {
-      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
-      results(i) = calculateRes(instr, a, b)
-    }
-  }
-
-  /**
-   * Calculates the result of an instruction with R-type modifier SV. Does not calculate summations (mac.sv).
-   * For that, see [[calculateDOTresult]]
-   * @param instr The instruction
-   * @param results Result buffer
-   * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
-   */
-  def calculateSVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt): Unit = {
-    val rs1 = instr.rs1.litValue.toInt
-    val rs2 = instr.rs2.litValue.toInt
-    val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
-    val imm = getImmediate(instr)
-    for(i <- 0 until VREG_DEPTH) {
-      val a = sReg(rs1)
-      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
-      results(i) = calculateRes(instr, a, b)
-    }
-  }
-
-  /**
-   * Calculates the result of an instruction with R-type modifier XX
-   * @param instr The instruction
-   * @param results Result buffer
-   */
-  def calculateXXresult(instr: RtypeInstruction, results: Array[SInt]): Unit = {
-    val rs1 = instr.rs1.litValue.toInt
-    val rs2 = instr.rs2.litValue.toInt
-    val imm = getImmediate(instr)
-    for (i <- 0 until NUM_PROCELEM) {
-      val a = xReg(rs1)(0)(i)
-      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(0)(i)
-      results(i) = calculateRes(instr, a, b)
-    }
-  }
-
-  /**
-   * Calculates the result of an instruction with R-type modifier SX
-   * @param instr The instruction
-   * @param results Result buffer
-   */
-  def calculateSXresult(instr: RtypeInstruction, results: Array[SInt]): Unit = {
-    //TODO Figure out why this fails with seed -4870111997865438359
-    val rs1 = instr.rs1.litValue.toInt
-    val rs2 = instr.rs2.litValue.toInt
-    val imm = getImmediate(instr)
-    for (i <- 0 until NUM_PROCELEM) {
-      val a = sReg(rs1)
-      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(0)(i)
-      results(i) = calculateRes(instr, a, b)
-    }
-  }
-
-  /**
-   * Calculates the result of an instruction with R-type modifier SS
-   * @param instr The instruction
-   * @param results Result buffer
-   */
-  def calculateSSresult(instr: RtypeInstruction, results: Array[SInt]): Unit = {
-    val rs1 = instr.rs1.litValue.toInt
-    val rs2 = instr.rs2.litValue.toInt
-    val imm = getImmediate(instr)
-    for (i <- 0 until NUM_PROCELEM) {
-      val a = sReg(rs1)
-      val b = if(instr.immflag.litToBoolean) imm else sReg(rs2)
-      results(i) = calculateRes(instr, a, b)
-    }
-  }
-
-  /**
-   * Calculates the result of an instruction with R-type modifier KV
-   * @param instr The instruction
-   * @param results Result buffer
-   * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
-   */
-  def calculateKVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt): Unit = {
-    val KE = KEWrapper.getKEMatrix()
-
-    val rs1 = instr.rs1.litValue.toInt
-    val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
-    //Zero out results
-    for(i <- 0 until VREG_DEPTH) {
-      results(i) = 0.S(FIXED_WIDTH.W)
-    }
-    for(i <- 0 until KE_SIZE) {
-      for(j <- 0 until KE_SIZE) {
-        val a = double2fixed(KE(i)(j)).S
-        val b = vReg(rs1*VREG_SLOT_WIDTH + rdOffset)(0)(j)
-        results(i) = fixedAdd(results(i), fixedMul(a, b))
-      }
-    }
-  }
-
   /**
    * Calculates the result of a dot product (mac.vv)
    * @note Should only be used when this instruction is the only instruction in the mix. Does not take into account
@@ -293,13 +135,13 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   def expectVREG(dut: DecExWb, instr: RtypeInstruction, results: Array[SInt]): Unit = {
     val mod = instr.mod.litValue
     if(instr.op.litValue() == MAC.litValue && mod == RtypeMod.KV.litValue) {
-      calculateKVresult(instr, results, dut.io.wb.rd.reg.peek)
+      calculateKVresult(instr, results, dut.io.wb.rd.reg.peek, vReg)
     } else if(mod == RtypeMod.VV.litValue) {
-      calculateVVresult(instr, results, dut.io.wb.rd.reg.peek)
+      calculateVVresult(instr, results, dut.io.wb.rd.reg.peek, vReg)
     } else if (mod == RtypeMod.XV.litValue) {
-      calculateXVresult(instr, results, dut.io.wb.rd.reg.peek)
+      calculateXVresult(instr, results, dut.io.wb.rd.reg.peek, xReg, vReg)
     } else if (mod == RtypeMod.SV.litValue) {
-      calculateSVresult(instr, results, dut.io.wb.rd.reg.peek)
+      calculateSVresult(instr, results, dut.io.wb.rd.reg.peek, sReg, vReg)
     } else {
       throw new IllegalArgumentException("Unknown Rtype modifier")
     }
@@ -310,18 +152,6 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  /**
-   * Updates the simulation vector register file with the values calculated in the instruction
-   * @param instr The instruction that spawned these values
-   * @param results The results buffer, holding the output of the instruction
-   */
-  def updateVREG(dut: DecExWb, instr: RtypeInstruction, results: Array[SInt]): Unit = {
-    val rd = instr.rd.litValue.toInt
-    val rdOffset = dut.io.wb.rd.reg.peek.litValue.toInt % VREG_SLOT_WIDTH
-    for (j <- 0 until VREG_DEPTH) {
-      vReg(rd * VREG_SLOT_WIDTH + rdOffset)(0)(j) = results(j)
-    }
-  }
 
   /**
    * Expects the output of an instruction going into x-vector register file
@@ -331,9 +161,9 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
    */
   def expectXREG(dut: DecExWb, instr: RtypeInstruction, results: Array[SInt]): Unit = {
     if(instr.mod.litValue == RtypeMod.SX.litValue) {
-      calculateSXresult(instr, results)
+      calculateSXresult(instr, results, sReg, xReg)
     } else if (instr.mod.litValue == RtypeMod.XX.litValue) {
-      calculateXXresult(instr, results)
+      calculateXXresult(instr, results, xReg)
     } else {
       throw new IllegalArgumentException("Cannot decode modtype with result being xreg")
     }
@@ -348,27 +178,9 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  /**
-   * Updates the simulation register file with the values calculated in the instruction
-   * @param instr The instruction that spawned these values
-   * @param results The results buffer, holding the output of the instruction
-   */
-  def updateXREG(instr: RtypeInstruction, results: Array[SInt]): Unit = {
-    val rd = instr.rd.litValue.toInt
-    for(i <- 0 until NUM_PROCELEM) {
-      xReg(rd)(0)(i) = results(i)
-    }
-  }
 
-  /**
-   * Updates the simulation register file with the values calculated in the instruction
-   * @param instr The instruction that spawned these values
-   * @param results The results buffer, holding the output of the instruction
-   */
-  def updateSREG(instr: RtypeInstruction, results: Array[SInt]): Unit = {
-    val rd = instr.rd.litValue.toInt
-    if(rd != 0) { sReg(rd) = results(0) }
-  }
+
+
 
   /**
    * Expects the output of an instruction going into scalar register file
@@ -379,7 +191,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   def expectSREG(dut: DecExWb, instr: RtypeInstruction, results: Array[SInt]): Unit = {
     val mod = instr.mod.litValue
     if(mod == RtypeMod.SS.litValue) {
-      calculateSSresult(instr, results)
+      calculateSSresult(instr, results, sReg)
     } else if(mod == RtypeMod.VV.litValue) {
       calculateDOTresult(instr, results)
     } else if(mod == RtypeMod.SV.litValue) {
@@ -413,16 +225,16 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       for(i <- 0 until VREG_SLOT_WIDTH) { //We need to update all vreg slots
         waitForResult(dut, instr)
         expectVREG(dut, instr, results)
-        updateVREG(dut, instr, results)
+        updateVREG(instr, results, dut.io.wb.rd.reg.peek, vReg)
         if (i < VREG_SLOT_WIDTH-1) dut.clock.step() //Don't step after final result, this happens in test()
       }
     } else if (rf == XREG.litValue) {
       expectXREG(dut, instr, results)
-      updateXREG(instr, results)
+      updateXREG(instr, results, xReg)
 
     } else if (rf == SREG.litValue) {
       expectSREG(dut, instr, results)
-      updateSREG(instr, results)
+      updateSREG(instr, results, sReg)
     } else {
       throw new IllegalArgumentException("Unknown register file type")
     }
@@ -492,9 +304,8 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     test(new DecExWb) { dut =>
       seed("DecExWb dot product")
       val instrs = Array(genRtype(MAC, RtypeMod.VV))
-      val len = NDOF
-      val ops = wrapInstructions(instrs, len)
-      MAClength = if (len % ELEMS_PER_VSLOT == 0) len else (math.floor(len.toDouble/ELEMS_PER_VSLOT).toInt+1)*ELEMS_PER_VSLOT
+      val ops = wrapInstructions(instrs, OtypeLen.NDOF)
+      MAClength = NDOFLENGTH
       loadInstructions(ops, dut)
       setRegisters(dut)
       val results = Array.fill(VREG_DEPTH)(0.S(FIXED_WIDTH.W))
@@ -515,7 +326,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       seed("DecExWb dot product")
       val instrs = Array(genRtype(MAC, RtypeMod.SV))
       val len = NDOF
-      val ops = wrapInstructions(instrs, len)
+      val ops = wrapInstructions(instrs, OtypeLen.NDOF)
       MAClength = if (len % ELEMS_PER_VSLOT == 0) len else (math.floor(len.toDouble/ELEMS_PER_VSLOT).toInt+1)*ELEMS_PER_VSLOT
       loadInstructions(ops, dut)
       setRegisters(dut)

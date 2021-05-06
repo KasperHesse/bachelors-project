@@ -9,8 +9,9 @@ import chisel3.util.Cat
  * definitions in R-type instruction fields. They will be parsed as signed.
  */
 class ImmGenIO extends Bundle {
-  val int = Input(UInt(4.W))
-  val frac = Input(UInt(7.W))
+  val instr = Input(new RtypeInstruction)
+//  val int = Input(UInt(4.W))
+//  val frac = Input(UInt(7.W))
   val imm = Output(SInt(FIXED_WIDTH.W))
 }
 
@@ -25,10 +26,13 @@ class ImmediateGenerator extends Module {
   val topPadding = (INT_WIDTH + 1) - 3 //-3 because we have three bits of integer value when using 4 bits of imm1
   val bottomPadding = FRAC_WIDTH - 7 //-7 because we have three bits remaining from imm1 + 4 bits from rs2
 
-  val sign = io.int(3)
+  val int = io.instr.rs2
+  val frac = io.instr.immfrac
+
+  val sign = int(3)
   val top = Mux(sign, ((1 << topPadding) - 1).U(topPadding.W), 0.U(topPadding.W))
   val bot = 0.U(bottomPadding.W)
-  val imm = Cat(Seq(top, io.int, io.frac, bot))
+  val imm = Cat(Seq(top, int, frac, bot))
 
   io.imm := imm.asSInt()
 }

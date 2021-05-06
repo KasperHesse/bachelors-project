@@ -150,7 +150,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       //Expect output values. Start doing this on the first clock cycle of each instruction
       //Currently pretty ugly, but that's what we have to work with, I guess
       //We need the final check since IP is kept constant for one cycle before moving to sLoad, and we should not expect in that cycle
-      if(dut.io.stateOutUint.peek.litValue == sExec.litValue && dut.io.ctrl.firstCycle.peek.litToBoolean && dut.io.ex.newDest.peek.litToBoolean /*&& resCnt < numRes */) {
+      if(dut.io.stateOutUint.peek.litValue == sExec.litValue && dut.io.ctrl.firstCycle.peek.litToBoolean && dut.io.ex.valid.peek.litToBoolean /*&& resCnt < numRes */) {
         expectValues(dut, instrs(ip).toUInt())
         resCnt += 1
       } else {

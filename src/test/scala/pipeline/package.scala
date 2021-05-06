@@ -5,6 +5,7 @@ import utils.Config._
 import utils.Fixed._
 import vector.{KEWrapper, Opcode}
 import vector.Opcode._
+import org.scalatest.{FlatSpec, Matchers}
 
 package object pipeline {
   /**
@@ -77,18 +78,9 @@ package object pipeline {
   /**
    * Takes a number of Rtype instructions and wraps them with an istart,estart,{instrs},eend,iend block
    * @param instrs The instructions to wrap
-   * @param len The length of the instruction (single, Ndof or Nelem operations)
+   * @param length The length of the instruction (single, Ndof or Nelem operations)
    */
-  def wrapInstructions(instrs: Array[RtypeInstruction], len: Int): Array[Bundle with Instruction] = {
-    var length = OtypeLen.SINGLE
-    if(len == NDOF) {
-      length = OtypeLen.NDOF
-    } else if (len == NELEM) {
-      length = OtypeLen.NELEM
-    } else if (len != 1) {
-      throw new IllegalArgumentException("length must be 1, NELEM or NDOF")
-    }
-
+  def wrapInstructions(instrs: Array[RtypeInstruction], length: OtypeLen.Type): Array[Bundle with Instruction] = {
     val istart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.INSTR, length)
     val estart = OtypeInstruction(OtypeSE.START, iev = OtypeIEV.EXEC)
     val eend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.EXEC)
@@ -102,7 +94,7 @@ package object pipeline {
   }
 
   def wrapInstructions(instrs: Array[RtypeInstruction]): Array[Bundle with Instruction] = {
-    wrapInstructions(instrs, 1)
+    wrapInstructions(instrs, OtypeLen.SINGLE)
   }
 
   /**
@@ -162,6 +154,225 @@ package object pipeline {
     }
     res
   }
+
+  /**
+   * Calculates the outcome of a branch instruction
+   * @param a The first operand
+   * @param b The second operand
+   * @param comp The comparison to perform
+   * @return The result of a COMP b
+   */
+  def branchOutcome(a: SInt, b: SInt, comp: BranchComp.Type): Boolean = {
+    import BranchComp._
+    if(comp.litValue == EQUAL.litValue) {
+      fixed2double(a) == fixed2double(b)
+    } else if(comp.litValue == NEQ.litValue) {
+      fixed2double(a) != fixed2double(b)
+    } else if (comp.litValue() == GEQ.litValue()) {
+      fixed2double(a) >= fixed2double(b)
+    } else if (comp.litValue() == LT.litValue()) {
+      fixed2double(a) < fixed2double(b)
+    } else {
+      throw new IllegalArgumentException("Unable to perform comparison")
+    }
+  }
+
+  /**
+   * Returns the [[RegisterFileType]] of the destination of the given instruction
+   * @param instr The instruction to be parsed
+   * @return The register file type of the register file where the result will be stored
+   */
+  def getResultRegisterType(instr: RtypeInstruction): RegisterFileType.Type = {
+    import RtypeMod._
+    import RegisterFileType._
+    import Opcode._
+    val mod = instr.mod.litValue
+    if(mod == SS.litValue || (mod == SV.litValue && instr.op.litValue == MAC.litValue)) {
+      SREG
+    } else if (Seq(SX.litValue, XX.litValue).contains(mod)) {
+      XREG
+    } else if (Seq(XV.litValue, SV.litValue, KV.litValue).contains(mod)) {
+      VREG
+    } else if (mod == VV.litValue) {
+      if(instr.op.litValue == MAC.litValue) {
+        SREG
+      } else {
+        VREG
+      }
+    } else {
+      throw new IllegalArgumentException("Could not calculate result register type")
+    }
+  }
+
+  /**
+   * Calculates the result of an instruction with R-type modifier KV
+   * @param instr The instruction
+   * @param results Result buffer
+   * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
+   */
+  def calculateKVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
+                        vReg: Array[Array[Array[SInt]]]): Unit = {
+    val KE = KEWrapper.getKEMatrix()
+    val rs1 = instr.rs1.litValue.toInt
+    val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
+    //Zero out results
+    for(i <- 0 until VREG_DEPTH) {
+      results(i) = 0.S(FIXED_WIDTH.W)
+    }
+    for(i <- 0 until KE_SIZE) {
+      for(j <- 0 until KE_SIZE) {
+        val a = double2fixed(KE(i)(j)).S
+        val b = vReg(rs1*VREG_SLOT_WIDTH + rdOffset)(0)(j)
+        results(i) = fixedAdd(results(i), fixedMul(a, b))
+      }
+    }
+  }
+
+  /**
+   * Calculates the result of an instruction with R-type modifier SS
+   * @param instr The instruction
+   * @param results Result buffer
+   */
+  def calculateSSresult(instr: RtypeInstruction, results: Array[SInt],
+                        sReg: Array[SInt]): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val imm = getImmediate(instr)
+    for (i <- 0 until NUM_PROCELEM) {
+      val a = sReg(rs1)
+      val b = if(instr.immflag.litToBoolean) imm else sReg(rs2)
+      results(i) = calculateRes(instr, a, b)
+    }
+  }
+
+  /**
+   * Calculates the result of an instruction with R-type modifier SX
+   * @param instr The instruction
+   * @param results Result buffer
+   */
+  def calculateSXresult(instr: RtypeInstruction, results: Array[SInt],
+                        sReg: Array[SInt], xReg: Array[Array[Array[SInt]]]): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val imm = getImmediate(instr)
+    for (i <- 0 until NUM_PROCELEM) {
+      val a = sReg(rs1)
+      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(0)(i)
+      results(i) = calculateRes(instr, a, b)
+    }
+  }
+
+  /**
+   * Calculates the result of an instruction with R-type modifier XX
+   * @param instr The instruction
+   * @param results Result buffer
+   */
+  def calculateXXresult(instr: RtypeInstruction, results: Array[SInt],
+                        xReg: Array[Array[Array[SInt]]]): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val imm = getImmediate(instr)
+    for (i <- 0 until NUM_PROCELEM) {
+      val a = xReg(rs1)(0)(i)
+      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(0)(i)
+      results(i) = calculateRes(instr, a, b)
+    }
+  }
+
+  /**
+   * Calculates the result of an instruction with R-type modifier SV. Does not calculate summations (mac.sv).
+   * @param instr The instruction
+   * @param results Result buffer
+   * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
+   */
+  def calculateSVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
+                        sReg: Array[SInt], vReg: Array[Array[Array[SInt]]]): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
+    val imm = getImmediate(instr)
+    for(i <- 0 until VREG_DEPTH) {
+      val a = sReg(rs1)
+      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
+      results(i) = calculateRes(instr, a, b)
+    }
+  }
+  /**
+   * Calculates the result of an instruction with R-type modifier VV. Does not calculate dot products (mac.vv)
+   * @param instr The instruction
+   * @param results Result buffer
+   * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
+   */
+  def calculateVVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
+                        vReg: Array[Array[Array[SInt]]]): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
+    val imm = getImmediate(instr)
+    for(i <- 0 until VREG_DEPTH) {
+      val a = vReg(rs1*VREG_SLOT_WIDTH+rdOffset)(0)(i)
+      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
+      results(i) = calculateRes(instr, a, b)
+    }
+  }
+
+  /**
+   * Calculates the result of an instruction with R-type modifier XV
+   * @param instr The instruction
+   * @param results Result buffer
+   * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
+   */
+  def calculateXVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
+                        xReg: Array[Array[Array[SInt]]], vReg: Array[Array[Array[SInt]]]): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
+    val a = xReg(rs1)(0)(rdOffset)
+    val imm = getImmediate(instr)
+    for(i <- 0 until VREG_DEPTH) {
+      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
+      results(i) = calculateRes(instr, a, b)
+    }
+  }
+
+
+  /**
+   * Updates the simulation vector register file with the values calculated in the instruction
+   * @param instr The instruction that spawned these values
+   * @param results The results buffer, holding the output of the instruction
+   * @param rdDUT Destination register, as peeked from the DUT
+   */
+  def updateVREG(instr: RtypeInstruction, results: Array[SInt], rdDUT: UInt, vReg: Array[Array[Array[SInt]]]): Unit = {
+    val rd = instr.rd.litValue.toInt
+    //    val rdOffset = dut.io.wb.rd.reg.peek.litValue.toInt % VREG_SLOT_WIDTH
+    val rdOffset = rdDUT.litValue.toInt % VREG_SLOT_WIDTH
+    for (j <- 0 until VREG_DEPTH) {
+      vReg(rd * VREG_SLOT_WIDTH + rdOffset)(0)(j) = results(j)
+    }
+  }
+
+  /**
+   * Updates the simulation register file with the values calculated in the instruction
+   * @param instr The instruction that spawned these values
+   * @param results The results buffer, holding the output of the instruction
+   */
+  def updateXREG(instr: RtypeInstruction, results: Array[SInt], xReg: Array[Array[Array[SInt]]]): Unit = {
+    val rd = instr.rd.litValue.toInt
+    for(i <- 0 until NUM_PROCELEM) {
+      xReg(rd)(0)(i) = results(i)
+    }
+  }
+
+  /**
+   * Updates the simulation register file with the values calculated in the instruction
+   * @param instr The instruction that spawned these values
+   * @param results The results buffer, holding the output of the instruction
+   */
+  def updateSREG(instr: RtypeInstruction, results: Array[SInt], sReg: Array[SInt]): Unit = {
+    val rd = instr.rd.litValue.toInt
+    if(rd != 0) { sReg(rd) = results(0) }
+  }
+
 
 
 

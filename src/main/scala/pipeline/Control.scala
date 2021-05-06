@@ -32,7 +32,7 @@ class Control extends Module {
   io.id.threadCtrl(1).stall := false.B
   io.id.stall := false.B
 
-  io.fe.stall := false.B
+  io.fe.iload := false.B
   io.id.iload := false.B
 
   execThread.stall := execStall
@@ -45,18 +45,27 @@ class Control extends Module {
   val isInstr: Bool = Oinst.iev === OtypeIEV.INSTR
   val isEnd = Oinst.se === OtypeSE.END
   val isOtype: Bool = Oinst.fmt === InstructionFMT.OTYPE
+  val isBtype: Bool = Oinst.fmt === InstructionFMT.BTYPE
   val isStart: Bool = Oinst.se === OtypeSE.START
 
   // --- INSTRUCTION FETCH/DECODE CONTROL SIGNALS ---
   //When idling and instructions are available, load them in
   when((isStart && isInstr && isOtype && io.id.state === DecodeState.sIdle) || iload) {
     io.id.iload := true.B
+    io.fe.iload := true.B
     iload := true.B
   }
+
   //When we read the final instruction, stop loading after this one
   when(isEnd && isInstr && isOtype && io.id.state === DecodeState.sLoad) {
     iload := false.B
   }
+
+  //When branch instructions are encountered, toggle iload in fetch stage but don't keep high
+  when(io.id.state === DecodeState.sIdle && isBtype) {
+    io.fe.iload := true.B
+  }
+
 
   // --- EXECUTE STAGE STALLS ---
   //These stall signals are active if the upcoming instruction relies on data that is currently being computed but not yet finished (data hazards)

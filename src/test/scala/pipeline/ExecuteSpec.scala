@@ -60,28 +60,28 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     var i = 0
     var resultCnt = 0
     for(j <- 0 until nelem) {
-      dut.io.in.a(j).poke(as(j).S)
-      dut.io.in.b(j).poke(bs(j).S)
+      dut.io.id.a(j).poke(as(j).S)
+      dut.io.id.b(j).poke(bs(j).S)
     }
-    dut.io.in.op.poke(op)
+    dut.io.id.op.poke(op)
     val dest = (new RegisterBundle).Lit(_.reg -> 3.U, _.subvec -> 1.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U)
-    dut.io.in.dest.poke(dest)
-    dut.io.in.newDest.poke(true.B)
+    dut.io.id.dest.poke(dest)
+    dut.io.id.valid.poke(true.B)
     dut.io.ctrl.stall.poke(false.B) //Accept new inputs
     dut.clock.step()
     dut.io.ctrl.stall.poke(true.B) //Don't accept them anymore
-    dut.io.in.newDest.poke(false.B)
-    dut.io.in.op.poke(Opcode.NOP)
+    dut.io.id.valid.poke(false.B)
+    dut.io.id.op.poke(Opcode.NOP)
     dut.clock.step()
     while(i < 200 && resultCnt < 1) {
 //      dut.io.ctrl.count.expect(1.U)
       i += 1
-      if(dut.io.out.valid.peek.litToBoolean) {
+      if(dut.io.wb.valid.peek.litToBoolean) {
         for(j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(j)) - fixed2double(dut.io.out.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(j)) - fixed2double(dut.io.wb.res(j).peek)) < 1E-4)
         }
         resultCnt += 1
-        dut.io.out.dest.expect(dest)
+        dut.io.wb.dest.expect(dest)
       }
       dut.clock.step()
     }
@@ -114,26 +114,26 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
 
     var i = 0
     var resultCnt = 0
-    dut.io.in.op.poke(op)
+    dut.io.id.op.poke(op)
     dut.io.ctrl.stall.poke(false.B)
-    dut.io.in.newDest.poke(true.B)
+    dut.io.id.valid.poke(true.B)
     while(i < 200 && resultCnt < count) {
       if(i < count) {
         for(j <- 0 until nelem) {
-          dut.io.in.a(j).poke(as(i)(j).S)
-          dut.io.in.b(j).poke(bs(i)(j).S)
+          dut.io.id.a(j).poke(as(i)(j).S)
+          dut.io.id.b(j).poke(bs(i)(j).S)
         }
-        dut.io.in.dest.poke(destinations(i))
+        dut.io.id.dest.poke(destinations(i))
       } else {
         dut.io.ctrl.stall.poke(true.B)
       }
       i += 1
 
-      if(dut.io.out.valid.peek.litToBoolean) {
+      if(dut.io.wb.valid.peek.litToBoolean) {
         for(j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(resultCnt)(j)) - fixed2double(dut.io.out.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(resultCnt)(j)) - fixed2double(dut.io.wb.res(j).peek)) < 1E-4)
         }
-        dut.io.out.dest.expect(destinations(resultCnt))
+        dut.io.wb.dest.expect(destinations(resultCnt))
         resultCnt += 1
       }
       dut.clock.step()
@@ -172,30 +172,30 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     var i = 0
     var resultCnt = 0
     //Input poke
-    dut.io.in.dest.poke(dest)
-    dut.io.in.macLimit.poke(macLimit.U)
-    dut.io.in.op.poke(Opcode.MAC)
+    dut.io.id.dest.poke(dest)
+    dut.io.id.macLimit.poke(macLimit.U)
+    dut.io.id.op.poke(Opcode.MAC)
     dut.io.ctrl.stall.poke(false.B)
-    dut.io.in.newDest.poke(true.B)
+    dut.io.id.valid.poke(true.B)
     while (i < 200 && resultCnt < 1) {
       if (i < macLimit) {
         for (j <- 0 until nelem) {
-          dut.io.in.a(j).poke(as(i)(j).S)
-          dut.io.in.b(j).poke(bs(i)(j).S)
+          dut.io.id.a(j).poke(as(i)(j).S)
+          dut.io.id.b(j).poke(bs(i)(j).S)
         }
       } else {
         dut.io.ctrl.stall.poke(true.B)
       }
       //Only first operation should have newDest true
       if(i > 0) {
-        dut.io.in.newDest.poke(false.B)
+        dut.io.id.valid.poke(false.B)
       }
       i += 1
-      if (dut.io.out.valid.peek.litToBoolean) {
+      if (dut.io.wb.valid.peek.litToBoolean) {
         for (j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(j)) - fixed2double(dut.io.out.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(j)) - fixed2double(dut.io.wb.res(j).peek)) < 1E-4)
         }
-        dut.io.out.dest.expect(dest)
+        dut.io.wb.dest.expect(dest)
         resultCnt += 1
       }
       dut.clock.step()
@@ -239,29 +239,29 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     while(i < 200 && resultCnt < iters) {
       iter = i/iters
       if(iter < iters) {
-        dut.io.in.dest.poke(dest(iter))
-        dut.io.in.macLimit.poke(macLimit.U)
-        dut.io.in.op.poke(Opcode.MAC)
+        dut.io.id.dest.poke(dest(iter))
+        dut.io.id.macLimit.poke(macLimit.U)
+        dut.io.id.op.poke(Opcode.MAC)
         val s = i % macLimit
         //Only poke newDest true on the first cycle of each mac operation
         if(s == 0) {
-          dut.io.in.newDest.poke(true.B)
+          dut.io.id.valid.poke(true.B)
         } else {
-          dut.io.in.newDest.poke(false.B)
+          dut.io.id.valid.poke(false.B)
         }
         for(j <- 0 until nelem) {
-          dut.io.in.a(j).poke(as(iter)(s)(j).S)
-          dut.io.in.b(j).poke(bs(iter)(s)(j).S)
+          dut.io.id.a(j).poke(as(iter)(s)(j).S)
+          dut.io.id.b(j).poke(bs(iter)(s)(j).S)
         }
       } else {
         dut.io.ctrl.stall.poke(true.B)
       }
       i += 1
-      if(dut.io.out.valid.peek.litToBoolean) {
+      if(dut.io.wb.valid.peek.litToBoolean) {
         for(j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(resultCnt)(j)) - fixed2double(dut.io.out.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(resultCnt)(j)) - fixed2double(dut.io.wb.res(j).peek)) < 1E-4)
         }
-        dut.io.out.dest.expect(dest(resultCnt))
+        dut.io.wb.dest.expect(dest(resultCnt))
         resultCnt += 1
       }
       dut.clock.step()
@@ -349,34 +349,34 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       while(i < 100 && resCnt < 2) {
         if(r == 2 && !performedAdd) { //Addition
           for(n <- 0 until NUM_PROCELEM) {
-            dut.io.in.a(n).poke(double2fixed(as(0)(n)).S)
-            dut.io.in.b(n).poke(double2fixed(bs(0)(n)).S)
+            dut.io.id.a(n).poke(double2fixed(as(0)(n)).S)
+            dut.io.id.b(n).poke(double2fixed(bs(0)(n)).S)
           }
-          dut.io.in.op.poke(Opcode.ADD)
-          dut.io.in.newDest.poke(true.B)
-          dut.io.in.dest.poke((new RegisterBundle).Lit(_.reg -> 0.U, _.subvec -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
+          dut.io.id.op.poke(Opcode.ADD)
+          dut.io.id.valid.poke(true.B)
+          dut.io.id.dest.poke((new RegisterBundle).Lit(_.reg -> 0.U, _.subvec -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
           performedAdd = true
         } else if (r < 4) {
           for(n <- 0 until NUM_PROCELEM) {
-            dut.io.in.a(n).poke(double2fixed(as(r)(n)).S)
-            dut.io.in.b(n).poke(double2fixed(bs(r)(n)).S)
+            dut.io.id.a(n).poke(double2fixed(as(r)(n)).S)
+            dut.io.id.b(n).poke(double2fixed(bs(r)(n)).S)
           }
-          dut.io.in.macLimit.poke((NDOF/NUM_PROCELEM).U)
-          dut.io.in.newDest.poke((i == 0).B)
-          dut.io.in.dest.poke((new RegisterBundle).Lit(_.reg -> 1.U, _.subvec -> 1.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
-          dut.io.in.op.poke(Opcode.MAC)
+          dut.io.id.macLimit.poke((NDOF/NUM_PROCELEM).U)
+          dut.io.id.valid.poke((i == 0).B)
+          dut.io.id.dest.poke((new RegisterBundle).Lit(_.reg -> 1.U, _.subvec -> 1.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
+          dut.io.id.op.poke(Opcode.MAC)
           r += 1
         }
 
-        if(dut.io.out.valid.peek.litToBoolean) {
+        if(dut.io.wb.valid.peek.litToBoolean) {
           if (resCnt == 0) { //Result of add
-            dut.io.out.res(0).expect(double2fixed(8).S)
-            dut.io.out.res(1).expect(double2fixed(8).S)
-            dut.io.out.dest.expect((new RegisterBundle).Lit(_.reg -> 0.U, _.subvec -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
+            dut.io.wb.res(0).expect(double2fixed(8).S)
+            dut.io.wb.res(1).expect(double2fixed(8).S)
+            dut.io.wb.dest.expect((new RegisterBundle).Lit(_.reg -> 0.U, _.subvec -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
           } else { //Result of MAC
-            dut.io.out.res(0).expect(double2fixed(40).S)
-            dut.io.out.res(1).expect(double2fixed(44).S)
-            dut.io.in.dest.poke((new RegisterBundle).Lit(_.reg -> 1.U, _.subvec -> 1.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
+            dut.io.wb.res(0).expect(double2fixed(40).S)
+            dut.io.wb.res(1).expect(double2fixed(44).S)
+            dut.io.id.dest.poke((new RegisterBundle).Lit(_.reg -> 1.U, _.subvec -> 1.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U))
           }
           resCnt += 1
         }

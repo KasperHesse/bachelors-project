@@ -77,7 +77,11 @@ object RtypeInstruction {
     //Beware, ugly code below. May be possible to optimize in some way, but it's what we have to work with
     import RtypeMod._
     val opval = v(5,0)
-    val modval = v(12,8)
+    val modval = v(11,8)
+    val immfrac = v(31,25)
+    val rd = v(16,13)
+    val rs1 = v(20,17)
+    val rs2 = v(24,21)
 
     val op: Opcode.Type = if(opval.litValue == ADD.litValue()) {
       ADD
@@ -94,7 +98,9 @@ object RtypeInstruction {
     }else if (opval.litValue == MIN.litValue()) {
       MIN
     } else {
-      throw new IllegalArgumentException("Unable to decode op")
+      print("ERR: Unable to decode op")
+//      throw new IllegalArgumentException("Unable to decode op")
+      ADD
     }
 
     val fmt = InstructionFMT.RTYPE
@@ -113,9 +119,11 @@ object RtypeInstruction {
     } else if(modval.litValue() == SX.litValue()) {
       SX
     } else {
-      throw new IllegalArgumentException("Unable to decode mod")
+      print("ERR: Unable to decode mod")
+//      throw new IllegalArgumentException("Unable to decode op")
+      VV
     }
-    (new RtypeInstruction).Lit(_.op -> op, _.fmt -> fmt, _.mod -> mod, _.rs1 -> v(21,18), _.rs2 -> v(25,22), _.rd -> v(29,26), _.immflag -> v(12).asBool())
+    (new RtypeInstruction).Lit(_.op -> op, _.fmt -> fmt, _.mod -> mod, _.rs1 -> rs1, _.rs2 -> rs2, _.rd -> rd, _.immflag -> v(12), _.immfrac -> immfrac)
   }
 
 }
@@ -209,6 +217,33 @@ object OtypeInstruction extends Bundle {
     o |= (v.fmt.litValue().toInt << 6)
     o.U(32.W)
   }
+
+  def apply(v: UInt): OtypeInstruction = {
+    val seval = v(0).litToBoolean
+    val ievval = v(2,1).litValue.toInt
+    val lenval = v(4,3).litValue.toInt
+    val it = v(5)
+
+    val se = seval match {
+      case false => OtypeSE.END
+      case true => OtypeSE.START
+    }
+
+    val iev = ievval match {
+      case 1 => OtypeIEV.INSTR
+      case 2 => OtypeIEV.EXEC
+      case _ => OtypeIEV.INSTR //This shouldn't happen
+    }
+
+    val len = lenval match {
+      case 0 => OtypeLen.NDOF
+      case 1 => OtypeLen.NELEM
+      case 2 => OtypeLen.SINGLE
+      case _ => OtypeLen.SINGLE //This shouldn't happen
+    }
+
+    (new OtypeInstruction).Lit(_.fmt -> InstructionFMT.OTYPE, _.se -> se, _.iev -> iev, _.len -> len, _.it -> it)
+  }
 }
 
 class BtypeInstruction extends Bundle with Instruction {
@@ -223,7 +258,7 @@ class BtypeInstruction extends Bundle with Instruction {
   /** Instruction format */
   val fmt = InstructionFMT() //7:6
   /** Branch comparsion operation */
-  val branch = BranchComp() //5:0
+  val comp = BranchComp() //5:0
 
   override def toUInt(): UInt = {
     BtypeInstruction.apply(this)
@@ -232,16 +267,16 @@ class BtypeInstruction extends Bundle with Instruction {
 
 object BtypeInstruction {
   /** Generates a B-type instruction from the given parameters */
-  def apply(branch: BranchComp.Type, rs1: Int, rs2: Int, target: Int): BtypeInstruction = {
+  def apply(comp: BranchComp.Type, rs1: Int, rs2: Int, offset: Int): BtypeInstruction = {
     //Convert branch target to correct representation
-    require(-math.pow(2,17)<= target && target < math.pow(2,17)-4, "Target must be in range (-1)*2^17 : 2^17-4")
-    require(target % 4 == 0, "Branch target must be a multiple of 4")
+    require(-math.pow(2,17)<= offset && offset < math.pow(2,17)-4, "Offset must be in range (-1)*2^17 : 2^17-4")
+    require(offset % 4 == 0, "Branch target offset must be a multiple of 4")
     require(rs1 < NUM_SREG)
     require(rs2 < NUM_SREG)
     //Extract bits of target
-    val targetl = (target & 0x7fc) >> 2
-    val targeth = (target & 0x3f800) >> 11
-    (new BtypeInstruction).Lit(_.fmt -> InstructionFMT.BTYPE, _.rs1 -> rs1.U, _.rs2 -> rs2.U, _.targetl -> targetl.U, _.targeth -> targeth.U)
+    val targetl = (offset & 0x7fc) >> 2
+    val targeth = (offset & 0x3f800) >> 11
+    (new BtypeInstruction).Lit(_.fmt -> InstructionFMT.BTYPE, _.comp -> comp, _.rs1 -> rs1.U, _.rs2 -> rs2.U, _.targetl -> targetl.U, _.targeth -> targeth.U)
   }
   /**
    * Converts a B-type instruction to it's UInt representation
@@ -249,14 +284,36 @@ object BtypeInstruction {
    * @return The UInt value of that instruction
    */
   def apply(v: BtypeInstruction): UInt = {
-    var b = 0
-    b |= (v.branch.litValue().toInt)
+    var b: Long = 0
+    b |= (v.comp.litValue().toInt)
     b |= (v.fmt.litValue.toInt << 6)
     b |= (v.targetl.litValue().toInt << 8)
     b |= (v.rs1.litValue.toInt << 17)
     b |= (v.rs2.litValue.toInt << 21)
-    b |= (v.targeth.litValue.toInt << 25)
+    b |= (v.targeth.litValue.toLong << 25)
     b.U(32.W)
+  }
+
+  /**
+   * Converts a UInt to the corresponding B-type instruction
+   * @param v The UInt
+   * @return A B-type instruction with those values
+   */
+  def apply(v: UInt): BtypeInstruction = {
+    val compvalue = v(1,0).litValue.toInt
+    val targetl = v(16,8)
+    val targeth = v(31,25)
+    val rs1 = v(20,17)
+    val rs2 = v(24,21)
+
+    val comp = compvalue match {
+      case 0 => BranchComp.EQUAL
+      case 1 => BranchComp.NEQ
+      case 2 => BranchComp.LT
+      case 3 => BranchComp.GEQ
+      case _ => throw new IllegalArgumentException("Unable to decode comp value")
+    }
+    (new BtypeInstruction).Lit(_.fmt -> InstructionFMT.BTYPE, _.comp -> comp, _.rs1 -> rs1, _.rs2 -> rs2, _.targetl -> targetl, _.targeth -> targeth)
   }
 }
 
@@ -268,6 +325,16 @@ object InstructionFMT extends ChiselEnum {
   val STYPE = Value(1.U)
   val OTYPE = Value(2.U)
   val BTYPE = Value(3.U)
+
+  def apply(v: Int): this.Type = {
+    v match {
+      case 0 => InstructionFMT.RTYPE
+      case 1 => InstructionFMT.STYPE
+      case 2 => InstructionFMT.OTYPE
+      case 3 => InstructionFMT.BTYPE
+      case _ => throw new IllegalArgumentException("Unable to decode instruction format")
+    }
+  }
 }
 
 /**
@@ -318,7 +385,6 @@ object StypeOffset extends ChiselEnum {
 object OtypeIEV extends ChiselEnum {
   val INSTR = Value(1.U)
   val EXEC = Value(2.U)
-  val VEC = Value(3.U)
 }
 
 /**
@@ -343,4 +409,5 @@ object BranchComp extends ChiselEnum {
   val NEQ = Value("b000001".U)
   val LT = Value("b000010".U)
   val GEQ = Value("b000011".U)
+  val WIDTH = Value("b111111".U)
 }

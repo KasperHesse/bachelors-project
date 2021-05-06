@@ -288,30 +288,28 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     import OtypeLen._
     var maxProgress = 0
     var progressIncr = 0
+    //How many thread swaps should we anticipate?
     if(len.litValue == SINGLE.litValue) {
       maxProgress = 1
       progressIncr = 1
     } else if (len.litValue == NDOF.litValue) {
-      maxProgress = dut.decode.NDOFlength
+      maxProgress = NDOFLENGTH
       progressIncr = ELEMS_PER_VSLOT
     } else if (len.litValue() == NELEM.litValue()) {
-      maxProgress = dut.decode.NELEMlength
+      maxProgress = NELEMLENGTH
       progressIncr = ELEMS_PER_VSLOT
     } else {
       throw new IllegalArgumentException("Unable to decode length")
     }
 
-    var progress = 0
+    var progress = 0 //How many elements have been processed
     var i = 0
-    //TODO should the nelem/ndof instructions be called on this one with ndof/nelem as length, or single?
-      // ExpectVVvalues should know when doing mac's whether length is nelem or ndof
     while(progress < maxProgress && i < 200) {
-      var resCnt = 0
+      var resCnt = 0 //How many instructions of the current packet have been processed
       print(s"resCnt(${instrs.length}): ")
       while(resCnt < instrs.length && i < 200) {
-
         if(dut.io.out.valid.peek.litToBoolean) {
-          //MAC.VV instructions only output on the final cycle. Skip them while working towards the final outputs
+          //MAC.VV instructions only output on the final cycle of that packet. Skip them while working towards the final outputs
           if(instrs(resCnt).op.litValue == MAC.litValue && instrs(resCnt).mod.litValue == RtypeMod.VV.litValue && progress != (maxProgress-progressIncr)) {
             resCnt += 1
           }
@@ -323,7 +321,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
         }
         i += 1
       }
-      assert(resCnt == instrs.length)
+      assert(resCnt == instrs.length) //End of loop through packet
       progress += progressIncr
       print(s"\nProgress: $progress/$maxProgress\n")
     }
@@ -376,7 +374,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     test(new DecodeExecute) {dut =>
       seed("Decode/execute sum instruction")
       val instrs = Array(genRtype(MAC, RtypeMod.SV))
-      val ops = wrapInstructions(instrs, NDOF)
+      val ops = wrapInstructions(instrs, OtypeLen.NDOF)
       MAClength = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else ((NDOF/ELEMS_PER_VSLOT)+1)*ELEMS_PER_VSLOT
       loadInstructions(ops, dut)
       test(dut, instrs)
@@ -390,10 +388,10 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       seed("Decode/execute postpone MAC results")
       scala.util.Random.setSeed(2)
       val instrs = Array(genRtype(MAC, RtypeMod.VV), genRtype(DIV, RtypeMod.VV))
-      val ops = wrapInstructions(instrs, NDOF)
-      MAClength = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else ((NDOF/ELEMS_PER_VSLOT)+1)*ELEMS_PER_VSLOT
+      val ops = wrapInstructions(instrs, OtypeLen.NELEM)
+      MAClength = NELEMLENGTH
       loadInstructions(ops, dut)
-      test(dut, instrs,  OtypeLen.NDOF)
+      test(dut, instrs, OtypeLen.NELEM)
     }
   }
 
@@ -401,13 +399,11 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     genericConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("Decode/execute dot product")
-      scala.util.Random.setSeed(1)
       val instrs = Array(genRtype(MAC, RtypeMod.VV))
-      val len = NELEM
-      val ops = wrapInstructions(instrs, len)
-      MAClength = if (len % ELEMS_PER_VSLOT == 0) len else (math.floor(len.toDouble/ELEMS_PER_VSLOT).toInt+1)*ELEMS_PER_VSLOT
+      val ops = wrapInstructions(instrs, OtypeLen.NELEM)
+      MAClength = NELEMLENGTH
       loadInstructions(ops, dut)
-      test(dut, instrs)
+      test(dut, instrs) //Testing with length SINGLE since we only expect one output. It will stall swap threads
     }
   }
 
@@ -418,7 +414,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       // On each thread swap, progress counter should increment by that amount
       seed("Decode/execute NELEM long instruction")
       val instrs = Array(genRtype(MAC, RtypeMod.KV), genRtype(MUL, RtypeMod.XX))
-      val ops = wrapInstructions(instrs, NELEM)
+      val ops = wrapInstructions(instrs, OtypeLen.NELEM)
       loadInstructions(ops, dut)
       test(dut, instrs, OtypeLen.NELEM)
     }
@@ -476,7 +472,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     genericConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("VV decode execute")
-      scala.util.Random.setSeed(5347764876420400419L)
+//      scala.util.Random.setSeed(5347764876420400419L)
       val instrs = genAndPoke(dut, RtypeMod.VV)
       test(dut, instrs)
     }

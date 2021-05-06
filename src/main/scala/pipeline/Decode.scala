@@ -28,10 +28,13 @@ class Decode extends Module {
     Module(new Thread(i))
   }
   val sRegFile = Module(new ScalarRegisterFile())
+  val branchTargetGen = Module(new BranchTargetGenerator)
 
   // --- REGISTERS ---
   /** Pipeline stage register */
-  val in = RegNext(io.fe)
+//  val in = RegNext(io.fe)
+  val fe_instr = RegNext(io.fe.instr)
+  val fe_pc = RegNext(io.fe.pc)
   /** State register */
   val state = RegInit(DecodeState.sIdle)
   /** Instruction buffer */
@@ -60,21 +63,24 @@ class Decode extends Module {
   // --- WIRES AND SIGNALS ---
   /** Length of the current instruction */ //iBuffer(0) always holds an O-type instruction indicating packet length
   val instrLen = iBuffer(0).asTypeOf(new OtypeInstruction).len
+
   private val VV = VREG_SLOT_WIDTH*VREG_DEPTH
-  val NDOFlength = if(NDOF % VV == 0) NDOF else (NDOF/VV+1)*VV
-  val NELEMlength = if(NELEM % VV == 0) NELEM else (NELEM/VV+1)*VV
   /** LUT to decode vector lengths given in istart */
-  val lenDecode = VecInit(Array(NDOFlength.U, NELEMlength.U, 1.U))
+  val lenDecode = VecInit(Array(NDOFLENGTH.U, NELEMLENGTH.U, 1.U))
   /** LUT mapping instruction length to progress increment */
   val incrDecode = VecInit(Array(VV.U, VV.U, 1.U))
   //When performing NDOF loads, we access VREG_DEPTH*VREG_SLOT_WIDTH elements per thread.
   //When performing i,j,k-based loads, we only load VREG_SLOT_WIDTH elements per thread.
-  /** Current state of our  threads */
+  /** Current state of our threads */
   val threadStates = Wire(Vec(2, ThreadState()))
-  /** Asserted when the current instruction packet is finished */
+  /** Asserted to threads when the current instruction packet is finished */
   val fin = WireDefault(false.B)
   /** Asserted when threads should start executing */
   val start = WireDefault(false.B)
+  /** Instruction at pipeline register, interpreted as B-type instruction */
+  val Binst = fe_instr.asTypeOf(new BtypeInstruction)
+  /** Branch signal going into fetch stage and control module */
+  val branch = WireDefault(false.B)
 
   for(i <- 0 until 2) {
     threadStates(i) := threads(i).io.stateOut
@@ -103,11 +109,20 @@ class Decode extends Module {
   //Control module connections
   io.ctrl.state := state
   io.ctrl.execThread := execThread
+  io.ctrl.branch := branch
 
-  //Default connections to shared scalar register file
+  //Default connections to shared resources
   sRegFile.io.rd := io.wb.rd.reg
   sRegFile.io.wrData := io.wb.wrData(0)
   sRegFile.io.we := io.wb.we && io.wb.rd.rf === RegisterFileType.SREG
+
+  branchTargetGen.io.instr := Binst
+  branchTargetGen.io.pc := fe_pc
+  io.fe.branchTarget := branchTargetGen.io.target
+  io.fe.branch := branch
+
+  //Debug connections. TODO: Remove these
+  io.ctrl.stateUint := state.asUInt()
 
   //Assign shared resources to threads
   when(execThread === 0.U) {
@@ -142,12 +157,12 @@ class Decode extends Module {
   //Next state logic
   switch(state) {
     is(sIdle) {
-      when(io.ctrl.iload) {
+      when(io.ctrl.iload && !branch) {
         state := sLoad
       }
     }
     is(sLoad) {
-      iBuffer(IP) := in.instr
+      iBuffer(IP) := fe_instr
       IP := IP + 1.U
       when(!io.ctrl.iload) {
         state := sExec
@@ -176,12 +191,24 @@ class Decode extends Module {
         fin := true.B
       }
       when(threadStates(0) === ThreadState.sIdle && threadStates(1) === ThreadState.sIdle) {
-        state := sFinalize //Probably not a necessary state
+        state := sIdle
       }
     }
-    is(sFinalize) {
-      fin := true.B
-      start := false.B
+  }
+
+  //Branch instruction logic
+  when(Binst.fmt === InstructionFMT.BTYPE && state === sIdle) {
+    sRegFile.io.rs1 := Binst.rs1
+    sRegFile.io.rs2 := Binst.rs2
+
+    when(Binst.comp === BranchComp.EQUAL) {
+      branch := sRegFile.io.rdData1 === sRegFile.io.rdData2
+    } .elsewhen(Binst.comp === BranchComp.NEQ) {
+      branch := sRegFile.io.rdData1 =/= sRegFile.io.rdData2
+    } .elsewhen(Binst.comp === BranchComp.GEQ) {
+      branch := sRegFile.io.rdData1 >= sRegFile.io.rdData2
+    } .elsewhen(Binst.comp === BranchComp.LT) {
+      branch := sRegFile.io.rdData1 < sRegFile.io.rdData2
     }
   }
 
