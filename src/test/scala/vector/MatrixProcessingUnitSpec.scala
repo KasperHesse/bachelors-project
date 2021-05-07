@@ -67,8 +67,8 @@ class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with 
 
     for (i <- 0 until nelem ) {
       for (j <- 0 until iters) {
-        val x = getDouble()
-        val y = getDouble()
+        val x = genDouble()
+        val y = genDouble()
         val a = double2fixed(x)
         val b = double2fixed(y)
         val res = op match {

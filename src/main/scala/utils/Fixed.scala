@@ -15,6 +15,11 @@ object Fixed {
   /** Number of bits total that a fixed-point number takes up */
   var FIXED_WIDTH = 54
 
+  /** Number of bits in the integer part of an immediate value (excluding sign bit) */
+  val IMM_INT_WIDTH = 3
+  /** Number of bits in the fractional part of an immediate value */
+  val IMM_FRAC_WIDTH = 7
+
   require(FRAC_WIDTH+INT_WIDTH == FIXED_WIDTH-1, "Width of Fixed-point numbers must be 1(sign) + frac_width+int_width")
 
   /**
@@ -282,6 +287,30 @@ object Fixed {
   }
 
   /**
+   * Converts an immediate value to its Qs3.7 representation as a fixed-point number.
+   * Bits 0:6 are the fractional part, and bits 7:10 are the integer part, with bit 10 being the sign bit
+   * @param imm
+   * @return
+   */
+  def imm2fixed(imm: Double): Long = {
+    val immRounded = math.round(imm.toDouble*math.pow(2,IMM_FRAC_WIDTH))*math.pow(2,-IMM_FRAC_WIDTH)
+    require(immRounded >= -math.pow(2,IMM_INT_WIDTH) && immRounded < math.pow(2, IMM_INT_WIDTH), s"Immediate value must be between ${-math.pow(2,IMM_INT_WIDTH)} and ${math.pow(2,IMM_INT_WIDTH)-math.pow(2,-IMM_FRAC_WIDTH)}")
+    val immfixed = math.round(imm*math.pow(2,IMM_FRAC_WIDTH))
+    immfixed
+  }
+
+  /**
+   * Converts a fixed-point immediate into its constituent parts
+   * @param imm The fixed-point immediate value in Qs3.7 format
+   * @return An array holding two bit patterns. At (0) the integer part of the immediate and at (1) the fractional part
+   */
+  def fixedImm2parts(imm: Long): Array[Int] = {
+    val immfrac = imm & ((1 << IMM_FRAC_WIDTH) -1)
+    val immh = (imm >> IMM_FRAC_WIDTH) & ((1 << IMM_INT_WIDTH+1)-1)
+    Array(immh.toInt, immfrac.toInt)
+  }
+
+  /**
    * Computes the immediate value stored in an Rtype instruction
    * @param instr The instruction
    * @return The immediate value encoded in the instruction
@@ -293,6 +322,7 @@ object Fixed {
     //If negative, we utilize the fact that 16-immh gives the correct negative version of our value
     val high = if(neg) -1*(16-immh) else immh
     val imm: Double = high + immfrac*math.pow(2,-7)
+
     return double2fixed(imm).S
   }
 
@@ -356,11 +386,27 @@ object Fixed {
    * Lowest possible value is -1*2^INT_WIDTH^
    * @return A double
    */
-  def getDouble(): Double = {
+  def genDouble(): Double = {
     val r = scala.util.Random
-    val gen = r.nextDouble() * math.pow(2, INT_WIDTH) * (if (r.nextBoolean()) 1 else -1)
+    var gen = r.nextDouble() * math.pow(2, INT_WIDTH) * (if (r.nextBoolean()) 1 else -1)
     if(gen == math.pow(2,INT_WIDTH)) {
-      gen - math.pow(2,-FRAC_WIDTH)
-    } else gen
+      gen = gen - math.pow(2, -FRAC_WIDTH)
+    }
+    gen
+  }
+
+  /**
+   * Generates a double which can fit inside an R-type instructions immediate field.
+   * Highest possible value is 2^[[IMM_INT_WIDTH^]]^-2^-[[IMM_FRAC_WIDTH]]^.
+   * Lowest possible value is -1*2^[[IMM_INT_WIDTH]]^
+   * @return A double which will fit inside the immediate field
+   */
+  def genImmediate(): Double = {
+    val r = scala.util.Random
+    var gen = r.nextDouble() * math.pow(2,IMM_INT_WIDTH) * (if (r.nextBoolean()) 1 else -1)
+    if(gen == math.pow(2,IMM_INT_WIDTH)) {
+      gen = gen - math.pow(2,-IMM_FRAC_WIDTH)
+    }
+    gen
   }
 }

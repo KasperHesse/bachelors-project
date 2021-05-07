@@ -55,8 +55,8 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
 
     for (i <- 0 until iters ) {
 
-      val x = getDouble()
-      val y = getDouble()
+      val x = genDouble()
+      val y = genDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
       val res = op match {
@@ -81,8 +81,8 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
     val ops = new Array[Opcode.Type](iters)
 
     for (i <- 0 until iters ) {
-      val x = getDouble()
-      val y = getDouble()
+      val x = genDouble()
+      val y = genDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
       val myint = scala.util.Random.nextInt(4)
@@ -116,8 +116,8 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
 
     //We need to scale down the values so they don't explode out of our range
     for (i <- 0 until iters ) {
-      val x = getDouble()*math.pow(2,-(INT_WIDTH-2))
-      val y = getDouble()*math.pow(2,-(INT_WIDTH-2))
+      val x = genDouble()*math.pow(2,-(INT_WIDTH-2))
+      val y = genDouble()*math.pow(2,-(INT_WIDTH-2))
       val a = double2fixed(x)
       val b = double2fixed(y)
       result += fixedMul(a,b)
@@ -154,8 +154,8 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
     //We need to scale down the values so they don't explode out of our range
     for(i <- 0 until iters) {
       for (j <- 0 until macLimit ) {
-        val x = getDouble()*math.pow(2,-(INT_WIDTH-2))
-        val y = getDouble()*math.pow(2,-(INT_WIDTH-2))
+        val x = genDouble()*math.pow(2,-(INT_WIDTH-2))
+        val y = genDouble()*math.pow(2,-(INT_WIDTH-2))
         val a = double2fixed(x)
         val b = double2fixed(y)
         result += fixedMul(a,b)

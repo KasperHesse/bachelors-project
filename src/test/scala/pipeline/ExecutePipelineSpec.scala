@@ -299,7 +299,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       i += 1
       dut.clock.step()
       //Continue until we get iend instruction
-    } while(instr.litValue != OtypeInstruction(OtypeSE.END, OtypeIEV.INSTR).toUInt().litValue())
+    } while(instr.litValue != OtypeInstruction(OtypeSE.END, OtypePE.PACKET).toUInt().litValue())
   }
 
   /**

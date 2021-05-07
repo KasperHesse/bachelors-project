@@ -221,7 +221,7 @@ class Thread(id: Int) extends Module {
   switch(state) {
     is(sIdle) {
       IP := 0.U
-      when(Oinst.iev === OtypeIEV.INSTR && Oinst.se === OtypeSE.START && Oinst.fmt === InstructionFMT.OTYPE && io.start) {
+      when(Oinst.pe === OtypePE.PACKET && Oinst.se === OtypeSE.START && Oinst.fmt === InstructionFMT.OTYPE && io.start) {
         IP := 1.U
         instrLen := lenDecode(Oinst.len.asUInt())
         if(id == 0) {
@@ -233,7 +233,7 @@ class Thread(id: Int) extends Module {
     }
     is(sLoad) {
       //Load data for this instruction, increment pointer as necessary
-      when(Oinst.iev === OtypeIEV.EXEC && Oinst.se === OtypeSE.START) {
+      when(Oinst.pe === OtypePE.EXEC && Oinst.se === OtypeSE.START) {
         finalCycle := false.B //This is funky, but required for correct functionality
         state := sEstart
       }
@@ -247,7 +247,7 @@ class Thread(id: Int) extends Module {
     is(sExec) {
       //Execute instructions, increment IP as necessary
       //When we load the eend instruction, move to that state
-      when(Oinst.iev === OtypeIEV.EXEC && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE ) {
+      when(Oinst.pe === OtypePE.EXEC && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE ) {
         finalCycle := false.B //Deassert to avoid incrementing IP
         state := sEend
       }
@@ -261,7 +261,7 @@ class Thread(id: Int) extends Module {
     }
     is(sStore) {
       //Store data, increment IP as necessary
-      when(Oinst.iev === OtypeIEV.INSTR && Oinst.se === OtypeSE.END) {
+      when(Oinst.pe === OtypePE.PACKET && Oinst.se === OtypeSE.END) {
         state := sIend
       }
     }

@@ -92,10 +92,10 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   def genInstructions(dut: Thread, mod: RtypeMod.Type): Array[Bundle with Instruction] = {
-    val istart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.INSTR)
-    val estart = OtypeInstruction(OtypeSE.START, iev = OtypeIEV.EXEC)
-    val eend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.EXEC)
-    val iend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.INSTR)
+    val istart = OtypeInstruction(se = OtypeSE.START, pe = OtypePE.PACKET)
+    val estart = OtypeInstruction(OtypeSE.START, pe = OtypePE.EXEC)
+    val eend = OtypeInstruction(OtypeSE.END, pe = OtypePE.EXEC)
+    val iend = OtypeInstruction(OtypeSE.END, pe = OtypePE.PACKET)
     val add = genRtype(ADD, mod)
     val sub = genRtype(SUB, mod)
     val mul = genRtype(MUL, mod)
@@ -217,7 +217,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     SIMULATION = true
     Config.checkRequirements()
     test(new Thread(1)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      val istart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.INSTR)
+      val istart = OtypeInstruction(se = OtypeSE.START, pe = OtypePE.PACKET)
 
       dut.io.start.poke(true.B)
       dut.io.fin.poke(true.B)

@@ -16,8 +16,8 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val r = scala.util.Random
     for(i <- 0 to iters) {
       //Generate random doubles which fit in INT_WIDTH bits
-      val x = getDouble()
-      val y = getDouble()
+      val x = genDouble()
+      val y = genDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
       dut.io.in.a.poke(a.S)
@@ -35,8 +35,8 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val r = scala.util.Random
     for (i <- 0 to iters) {
       //Generate random doubles which fit in INT_WIDTH bits
-      val x = getDouble()
-      val y = getDouble()
+      val x = genDouble()
+      val y = genDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
       dut.io.in.a.poke(a.S)
@@ -52,8 +52,8 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   def testMaxMin(dut: FixedPointALU, iters: Int): Unit = {
     val r = scala.util.Random
     for(i <- 0 until iters) {
-      val x = getDouble()
-      val y = getDouble()
+      val x = genDouble()
+      val y = genDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
       val bool = r.nextBoolean()
@@ -70,8 +70,8 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   def testMultiplication(dut: FixedPointMul, iters: Int):Unit = {
     val r = scala.util.Random
     for(i <- 0 until iters) {
-      val x = getDouble()
-      val y = getDouble()
+      val x = genDouble()
+      val y = genDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
       dut.io.in.a.poke(a.S)
@@ -85,8 +85,8 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   def testMultiplicationOverflow(dut: FixedPointMul, iters: Int): Unit = {
     val r = scala.util.Random
     for(i <- 0 until iters) {
-      val x = getDouble()
-      val y = getDouble()
+      val x = genDouble()
+      val y = genDouble()
       val a = BigInt(double2fixed(x))
       val b = BigInt(double2fixed(y))
       val e = (a*b) >> (FRAC_WIDTH+FIXED_WIDTH)

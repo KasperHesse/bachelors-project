@@ -81,10 +81,10 @@ package object pipeline {
    * @param length The length of the instruction (single, Ndof or Nelem operations)
    */
   def wrapInstructions(instrs: Array[RtypeInstruction], length: OtypeLen.Type): Array[Bundle with Instruction] = {
-    val istart = OtypeInstruction(se = OtypeSE.START, iev = OtypeIEV.INSTR, length)
-    val estart = OtypeInstruction(OtypeSE.START, iev = OtypeIEV.EXEC)
-    val eend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.EXEC)
-    val iend = OtypeInstruction(OtypeSE.END, iev = OtypeIEV.INSTR)
+    val istart = OtypeInstruction(se = OtypeSE.START, pe = OtypePE.PACKET, length)
+    val estart = OtypeInstruction(OtypeSE.START, pe = OtypePE.EXEC)
+    val eend = OtypeInstruction(OtypeSE.END, pe = OtypePE.EXEC)
+    val iend = OtypeInstruction(OtypeSE.END, pe = OtypePE.PACKET)
 
     val a1 = Array(istart, estart).asInstanceOf[Array[Bundle with Instruction]]
     val a2 = Array(eend, iend).asInstanceOf[Array[Bundle with Instruction]]

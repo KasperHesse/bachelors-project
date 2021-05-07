@@ -61,8 +61,8 @@ class MPUWrapperSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     for (i <- 0 until VREG_DEPTH) {
 //      val x = getDouble()*math.pow(2,-(INT_WIDTH-2))
 //      val y = getDouble()*math.pow(2,-(INT_WIDTH-2))
-      val x = getDouble()
-      val y = getDouble()
+      val x = genDouble()
+      val y = genDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
       as(i) = a

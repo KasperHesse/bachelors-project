@@ -5,7 +5,8 @@ import chisel3.experimental.ChiselEnum
 import chisel3.experimental.BundleLiterals._
 import vector.Opcode
 import vector.Opcode._
-import utils.Config.{NUM_SREG}
+import utils.Config.NUM_SREG
+import utils.Fixed.{IMM_FRAC_WIDTH, IMM_INT_WIDTH}
 
 /**
  * Defines an instruction. Useful for packaging instructions of different formats inside Scala collections
@@ -19,10 +20,10 @@ trait Instruction {
  * A bundle defining the fields that constitute an R-type instruction
  */
 class RtypeInstruction extends Bundle with Instruction {
-  /** Fractional part of immediate. Only used when immflag = true */
-  val immfrac = UInt(7.W) //31:25
   /** Source register 2 */
-  val rs2 = UInt(4.W) //24:21
+  val rs2 = UInt(4.W) //31:28
+  /** Fractional part of immediate. Only used when immflag = true */
+  val immfrac = UInt(7.W) //21:27
   /** Source register 1 */
   val rs1 = UInt(4.W) //20:17
   /** Destination register */
@@ -42,6 +43,15 @@ class RtypeInstruction extends Bundle with Instruction {
 }
 
 object RtypeInstruction {
+  val OP_OFFSET = 0
+  val FMT_OFFSET = 6
+  val MOD_OFFSET = 8
+  val IMMFLAG_OFFSET = 12
+  val RD_OFFSET = 13
+  val RS1_OFFSET = 17
+  val FRAC_OFFSET = 21
+  val RS2_OFFSET = 28
+
   /** Creates an R-type instruction which takes two register operands */
   def apply(rd: Int, rs1: Int, rs2: Int, op: Opcode.Type, mod: RtypeMod.Type): RtypeInstruction = {
     (new RtypeInstruction).Lit(_.rd -> rd.U, _.rs1 -> rs1.U, _.rs2 -> rs2.U, _.op -> op, _.mod -> mod, _.fmt -> InstructionFMT.RTYPE, _.immflag -> false.B, _.immfrac -> 0.U(7.W))
@@ -58,13 +68,13 @@ object RtypeInstruction {
   def apply(v: RtypeInstruction): UInt = {
     var r: Long = 0
     r |= (v.op.litValue.toInt)
-    r |= (v.fmt.litValue().toInt << 6)
-    r |= (v.mod.litValue.toInt << 8)
-    r |= (v.immflag.litValue.toInt << 12)
-    r |= (v.rd.litValue().toInt << 13)
-    r |= (v.rs1.litValue().toInt << 17)
-    r |= (v.rs2.litValue().toInt << 21)
-    r |= (v.immfrac.litValue.toLong << 25)
+    r |= (v.fmt.litValue().toInt << FMT_OFFSET)
+    r |= (v.mod.litValue.toInt << MOD_OFFSET)
+    r |= (v.immflag.litValue.toInt << IMMFLAG_OFFSET)
+    r |= (v.rd.litValue().toInt << RD_OFFSET)
+    r |= (v.rs1.litValue().toInt << RS1_OFFSET)
+    r |= (v.rs2.litValue().toInt << RS2_OFFSET)
+    r |= (v.immfrac.litValue.toLong << FRAC_OFFSET)
     r.U(32.W)
   }
 
@@ -78,10 +88,10 @@ object RtypeInstruction {
     import RtypeMod._
     val opval = v(5,0)
     val modval = v(11,8)
-    val immfrac = v(31,25)
+    val immfrac = v(27,21)
     val rd = v(16,13)
     val rs1 = v(20,17)
-    val rs2 = v(24,21)
+    val rs2 = v(31,28)
 
     val op: Opcode.Type = if(opval.litValue == ADD.litValue()) {
       ADD
@@ -180,7 +190,7 @@ class OtypeInstruction extends Bundle with Instruction {
   /** Instruction length */
   val len = OtypeLen()        //4:3
   /** Packet/execute flag */
-  val iev = OtypeIEV()        //2:1
+  val pe = OtypePE()        //2:1
   /** Start/end flag */
   val se = OtypeSE()          //0
 
@@ -194,13 +204,18 @@ class OtypeInstruction extends Bundle with Instruction {
 }
 
 object OtypeInstruction extends Bundle {
+  val SE_OFFSET = 0
+  val PE_OFFSET = 1
+  val LEN_OFFSET = 3
+  val IT_OFFSET = 5
+  val FMT_OFFSET = 6
   /** Generates an Otype-instruction with length [[OtypeLen.SINGLE]] */
-  def apply(se: OtypeSE.Type, iev: OtypeIEV.Type): OtypeInstruction = {
-    apply(se, iev, OtypeLen.SINGLE)
+  def apply(se: OtypeSE.Type, pe: OtypePE.Type): OtypeInstruction = {
+    apply(se, pe, OtypeLen.SINGLE)
   }
   /** Generates an Otype instruction with a specified length */
-  def apply(se: OtypeSE.Type, iev: OtypeIEV.Type, len: OtypeLen.Type): OtypeInstruction = {
-    (new OtypeInstruction).Lit(_.se -> se, _.iev -> iev, _.len -> len, _.fmt -> InstructionFMT.OTYPE, _.it -> false.B)
+  def apply(se: OtypeSE.Type, pe: OtypePE.Type, len: OtypeLen.Type): OtypeInstruction = {
+    (new OtypeInstruction).Lit(_.se -> se, _.pe -> pe, _.len -> len, _.fmt -> InstructionFMT.OTYPE, _.it -> false.B, _.nu2 -> 0.U)
   }
 
   /**
@@ -211,10 +226,10 @@ object OtypeInstruction extends Bundle {
   def apply(v: OtypeInstruction): UInt = {
     var o = 0
     o |= (v.se.litValue.toInt)
-    o |= (v.iev.litValue().toInt << 1)
-    o |= (v.len.litValue().toInt << 3)
-    o |= (v.it.litValue.toInt << 5)
-    o |= (v.fmt.litValue().toInt << 6)
+    o |= (v.pe.litValue().toInt << PE_OFFSET)
+    o |= (v.len.litValue().toInt << LEN_OFFSET)
+    o |= (v.it.litValue.toInt << IT_OFFSET)
+    o |= (v.fmt.litValue().toInt << FMT_OFFSET)
     o.U(32.W)
   }
 
@@ -230,9 +245,9 @@ object OtypeInstruction extends Bundle {
     }
 
     val iev = ievval match {
-      case 1 => OtypeIEV.INSTR
-      case 2 => OtypeIEV.EXEC
-      case _ => OtypeIEV.INSTR //This shouldn't happen
+      case 1 => OtypePE.PACKET
+      case 2 => OtypePE.EXEC
+      case _ => OtypePE.PACKET //This shouldn't happen
     }
 
     val len = lenval match {
@@ -242,7 +257,7 @@ object OtypeInstruction extends Bundle {
       case _ => OtypeLen.SINGLE //This shouldn't happen
     }
 
-    (new OtypeInstruction).Lit(_.fmt -> InstructionFMT.OTYPE, _.se -> se, _.iev -> iev, _.len -> len, _.it -> it)
+    (new OtypeInstruction).Lit(_.fmt -> InstructionFMT.OTYPE, _.se -> se, _.pe -> iev, _.len -> len, _.it -> it)
   }
 }
 
@@ -266,6 +281,15 @@ class BtypeInstruction extends Bundle with Instruction {
 }
 
 object BtypeInstruction {
+  val COMP_OFFSET = 0
+  val FMT_OFFSET = 6
+  val TARGETL_OFFSET = 8
+  val RS1_OFFSET = 17
+  val RS2_OFFSET = 21
+  val TARGETH_OFFSET = 25
+  val TARGETL_WIDTH = 9
+  val TARGETH_WIDTH = 7
+
   /** Generates a B-type instruction from the given parameters */
   def apply(comp: BranchComp.Type, rs1: Int, rs2: Int, offset: Int): BtypeInstruction = {
     //Convert branch target to correct representation
@@ -382,8 +406,8 @@ object StypeOffset extends ChiselEnum {
 /**
  * Defines the instrution/element/vector flags for O-type instructions
  */
-object OtypeIEV extends ChiselEnum {
-  val INSTR = Value(1.U)
+object OtypePE extends ChiselEnum {
+  val PACKET = Value(1.U)
   val EXEC = Value(2.U)
 }
 

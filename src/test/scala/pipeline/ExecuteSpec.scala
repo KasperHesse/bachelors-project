@@ -28,8 +28,8 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     val results = Array.ofDim[Long](nelem)
 
     for (i <- 0 until nelem) {
-      val x = getDouble()
-      val y = getDouble()
+      val x = genDouble()
+      val y = genDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
       as(i) = a

@@ -24,8 +24,8 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
    *         [6]=original numerator (Double)
    */
   def generateDenomNumer(): Seq[AnyVal] = {
-    val x = getDouble()
-    val y = getDouble()
+    val x = genDouble()
+    val y = genDouble()
     val denom = double2fixed(x)
     val numer = double2fixed(y)
 //    val denom = -57L

@@ -15,7 +15,7 @@ class ImmGenSpec extends FlatSpec with ChiselScalatestTester with Matchers  {
         INT_WIDTH = 3
         FRAC_WIDTH = 7
         FIXED_WIDTH = 11
-        val a = getDouble() //Original double value
+        val a = genDouble() //Original double value
         val x = double2fixed(a)
         val y1 = fixed2double(x) //Rounded double value
         val immh = x.S(10,7).litValue.toInt

@@ -10,8 +10,6 @@ import chisel3.util.Cat
  */
 class ImmGenIO extends Bundle {
   val instr = Input(new RtypeInstruction)
-//  val int = Input(UInt(4.W))
-//  val frac = Input(UInt(7.W))
   val imm = Output(SInt(FIXED_WIDTH.W))
 }
 
@@ -23,8 +21,8 @@ class ImmediateGenerator extends Module {
   val io = IO(new ImmGenIO)
 
   //Number of bits to add at the top and bottom to pad to correct length
-  val topPadding = (INT_WIDTH + 1) - 3 //-3 because we have three bits of integer value when using 4 bits of imm1
-  val bottomPadding = FRAC_WIDTH - 7 //-7 because we have three bits remaining from imm1 + 4 bits from rs2
+  val topPadding = (INT_WIDTH + 1) - IMM_INT_WIDTH
+  val bottomPadding = FRAC_WIDTH - IMM_FRAC_WIDTH
 
   val int = io.instr.rs2
   val frac = io.instr.immfrac
