@@ -30,6 +30,8 @@ class Control extends Module {
   //We need these assignments or the firrtl checker will be angry
   io.id.threadCtrl(0).stall := false.B
   io.id.threadCtrl(1).stall := false.B
+  io.id.threadCtrl(0).emptyQueues := io.ex.empty && io.ex.macEmpty
+  io.id.threadCtrl(1).emptyQueues := io.ex.empty && io.ex.macEmpty
   io.id.stall := false.B
 
   io.fe.iload := false.B
@@ -96,6 +98,9 @@ class Control extends Module {
   when(isSingleCycleOp && newOp && execThread.state === ThreadState.sExec) {
     singleCycleAwaitStall := true.B
   }
+
+  //When exec thread has entered Eend state but data is still in either destination queue, stall until empty
+
   execStall := dataHazardStall | destQueueStall | singleCycleAwaitStall
 }
 

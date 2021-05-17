@@ -52,13 +52,18 @@ class KEWrapper(val nelem: Int, val sync: Boolean = false, val simulation: Boole
       io.keVals := keMem(readLocation)
     }
   } else {
-    //TODO This should also be using vecs, but should load the actual KE values
-    val keMem = if(sync) {
-      SyncReadMem(numSlices, Vec(nelem, SInt(FIXED_WIDTH.W)))
-    } else {
-      Mem(numSlices, Vec(nelem, SInt(FIXED_WIDTH.W)))
+    //TODO SHould load actual KE values
+    val keMem = Wire(Vec(numSlices, Vec(nelem, SInt(FIXED_WIDTH.W))))
+    for(i <- 0 until numSlices) {
+      for(j <- 0 until nelem) {
+        keMem(i)(j) := double2fixed(KE(i)(j)).S(FIXED_WIDTH.W)
+      }
     }
-    io.keVals := keMem.read(readLocation)
+    if(sync) {
+      io.keVals := RegNext(keMem(readLocation))
+    } else {
+      io.keVals := keMem(readLocation)
+    }
   }
 }
 

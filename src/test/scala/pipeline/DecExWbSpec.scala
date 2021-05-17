@@ -261,13 +261,15 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.clock.step()
     }
     dut.io.exctrl.empty.expect(true.B)
+    dut.clock.step(5)
   }
 
   "DecExWbSpec" should "execute a VREG instruction and store the result" in {
     genericConfig()
-    test(new DecExWb) {dut =>
+    test(new DecExWb).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("DecExWb vreg store result")
       val instrs = Array(RtypeInstruction(1, 1, 3, DIV, RtypeMod.VV), RtypeInstruction(1, 1, 3, DIV, RtypeMod.VV))
+//      val instrs = Array(RtypeInstruction(0, 0, 0, MAC, RtypeMod.KV))
       test(dut, instrs)
     }
   }

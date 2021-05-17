@@ -36,7 +36,7 @@ class VectorRegisterFile(val width: Int, val depth: Int, val portsize: Int) exte
       for(k <- 0 until depth/portsize) {
         a(k) = VecInit(arr(j)(k)) //a(k): Vec[SInt].
       }
-      b(j) = VecInit(a) //b(j): Vec[Vec[UInt]]
+      b(j) = VecInit(a) //b(j): Vec[Vec[SInt]]
     }
     val regFile = RegInit(VecInit(b))
 
@@ -47,22 +47,10 @@ class VectorRegisterFile(val width: Int, val depth: Int, val portsize: Int) exte
       regFile(io.rd)(io.wrMask) := io.wrData
     }
   } else {
-    //Currently implemented with memory, could just as well be implemented with registers
-    val regFile = SyncReadMem(width, Vec(depth / portsize, Vec(portsize, SInt(FIXED_WIDTH.W))))
-
-    io.rdData1 := regFile.read(io.rs1)(io.rdMask1)
-    io.rdData2 := regFile.read(io.rs2)(io.rdMask2)
-
-    //Create a vector of 0's, one subvector of which is taken up by our input vector
-    //This is done to leverage the masked writes that SyncReadMem provides
-    val writeVector = Wire(Vec(depth / portsize, Vec(portsize, SInt(FIXED_WIDTH.W))))
-    for (i <- 0 until depth / portsize) {
-      writeVector(i) := VecInit(Seq.fill(portsize)(0.S(FIXED_WIDTH.W)))
-    }
-    writeVector(io.wrMask) := io.wrData
-    when(io.we) {
-      regFile.write(io.rd, writeVector, UIntToOH(io.wrMask, depth / portsize).asBools())
-    }
+    val regFile = SyncReadMem(width, Vec(depth, SInt(FIXED_WIDTH.W)))
+    regFile.write(io.rd, io.wrData)
+    io.rdData1 := regFile.read(io.rs1)
+    io.rdData2 := regFile.read(io.rs2)
   }
 }
 

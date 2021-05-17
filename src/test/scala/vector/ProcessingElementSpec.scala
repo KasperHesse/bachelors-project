@@ -45,6 +45,7 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
       }
       i += 1
     }
+    assert(resultCnt == itermax)
   }
 
   def generateStimuliSingleOperation(dut: ProcessingElement, op: Opcode.Type, iters: Int): Unit = {
@@ -63,6 +64,7 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
         case ADD => fixedAdd(a, b)
         case SUB => fixedSub(a, b)
         case MUL => fixedMul(a, b)
+        case ABS => fixedAbs(a)
         case DIV => double2fixed(x / y)
         case _ => throw new IllegalArgumentException("Unsupported PE Operation")
       }
@@ -221,6 +223,12 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
     }
   }
 
+  it should "take the abs of a stream of numbers" in {
+    test(new ProcessingElement).withAnnotations(Seq(WriteVcdAnnotation)) {c =>
+      generateStimuliSingleOperation(c, ABS, iters)
+    }
+  }
+
   it should "handle a randomly generated mac instruction" in {
     test(new ProcessingElement) {c =>
       testMacRandom(c, 20)
@@ -231,22 +239,5 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
     test(new ProcessingElement) {c =>
       testMacMultiple(c, 10, 10)
     }
-  }
-
-  //TODO: Check that we can deassert MAC and/or enable during calculations, and the result will stay in resReg
-  //Once reasserted, it should keep calculating
-  it should "stop calculations when MAC is desasserted" in {
-
-  }
-
-  //We should be able to finish a MAC and immediatedly after execute another operation
-  it should "transition smoothly from MAC to all other operations" in {
-
-  }
-
-  //Setting macLimit to another value once started is ok, but it shouldn't latch in until finished with the current accumulate
-  //the new maclimit should be used for the next round of MAC's
-  it should "not allow us to change maclimit once started" in {
-
   }
 }

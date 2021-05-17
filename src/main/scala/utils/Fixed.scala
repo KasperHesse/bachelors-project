@@ -287,6 +287,33 @@ object Fixed {
   }
 
   /**
+   * Returns the absolute value of the input
+   * @param a The input value
+   * @return The absolute value of that value
+   */
+  def fixedAbs(a: Double): Double = {
+    math.abs(a)
+  }
+
+  /**
+   * Returns the absolute value of the input
+   * @param a The input value
+   * @return The absolute value of that value
+   */
+  def fixedAbs(a: Long): Long = {
+    double2fixed(math.abs(fixed2double(a)))
+  }
+
+  /**
+   * Returns the absolute value of the input
+   * @param a The input value
+   * @return The absolute value of that value
+   */
+  def fixedAbs(a: SInt): SInt = {
+    fixedAbs(a.litValue.toLong).S
+  }
+
+  /**
    * Converts an immediate value to its Qs3.7 representation as a fixed-point number.
    * Bits 0:6 are the fractional part, and bits 7:10 are the integer part, with bit 10 being the sign bit
    * @param imm

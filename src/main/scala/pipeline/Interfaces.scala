@@ -129,12 +129,14 @@ class WbIdIO extends Bundle {
 class ExControlIO extends Bundle {
   /** Whether the ordinary destination queue is empty */
   val empty = Output(Bool())
+  /** Whether the MAC destination queue is empty */
+  val macEmpty = Output(Bool())
   /** Whether the pipeline should be stalled. If true, deasserts valid for all operations going into MPU */
   val stall = Input(Bool())
   /** Opcode of the currently executing instruction */
   val op = Output(Opcode())
   /** Values in the ExecuteHazardAvoider, used to prevent execute hazards */
-  val queueHead = Output(Vec(4, new EHAstore))
+  val queueHead = Output(Vec(4, new ValidRegisterBundle))
 }
 
 /**
@@ -187,12 +189,14 @@ class ThreadControlIO extends Bundle {
   val op = Output(Opcode())
   /** R-type mod field of the currently executing instruction */
   val rtypemod = Output(RtypeMod())
-  /** Asserted when the thread  should stall.*/
+  /** Asserted when the thread should stall.*/
   val stall = Input(Bool())
   /** Register bundle for source 1 of the incoming instruction */
   val rs1 = Output(new RegisterBundle)
   /** Register bundle for source 2 of the incoming instruction */
   val rs2 = Output(new RegisterBundle)
+  /** Asserted when both destination queues in the execute stage are empty */
+  val emptyQueues = Input(Bool())
 }
 
 /**
@@ -211,8 +215,10 @@ class RegisterBundle extends Bundle {
   val rfUint = UInt(4.W)
 }
 
-/** Bundle storing the information used in the [[DestinationQueue]] module */
-class EHAstore extends Bundle {
+/** Bundle storing the information used in the [[DestinationQueue]] module.
+ *  Consists of a [[RegisterBundle]] affixed with a valid flag
+ */
+class ValidRegisterBundle extends Bundle {
   /** Destination */
   val dest = new RegisterBundle
   /** Whether this entry is valid */
@@ -220,13 +226,17 @@ class EHAstore extends Bundle {
 }
 
 /**
- * A bundle containing a register indicator, a register file type and a valid flag.
- * Used to avoid exeuction hazards, see [[DestinationQueue]]
+ * A bundle containing information to be used when processing memory load/store operations
  */
-class RegRfValid extends Bundle {
-  val reg = UInt(log2Ceil(NUM_VREG).W)
-  val rf = RegisterFileType()
-  val valid = Bool()
+class MemoryBundle extends Bundle {
+  /** The destination register for this memory operation */
+  val rd = new RegisterBundle
+  /** Whether this instruction is actually valid, or padding zero's should be returned */
+  val pad = Bool()
+  /** The encoded base address for this load/store operation */
+  val baseAddr = StypeOffset()
+  /** Indices in a vector to use when performing direct load/store operations */
+  val indices = Vec(8, UInt(log2Ceil(NDOF+1).W))
 }
 
 object RegisterFileType extends ChiselEnum {

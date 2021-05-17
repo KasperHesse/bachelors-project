@@ -12,6 +12,7 @@ import chiseltest.internal.{FailedExpectException, WriteVcdAnnotation}
 import utils.Config._
 import Opcode._
 import pipeline.BranchComp._
+import utils.Assembler
 
 import scala.collection.mutable.ListBuffer
 
@@ -308,6 +309,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
    */
   def testFun(dut: ExecutePipeline): Unit = {
     setGlobals(dut)
+    assert(dut.io.fectrl.instr.peek.litValue != 0, "Peeked instruction with value 0, did not init memory correctly")
     while(dut.io.fectrl.instr.peek().litValue != 0) {
       //Always snoop on instruction present at fetch stage register, and carry that over to decode stage
       val instr = dut.io.fectrl.instr.peek()
@@ -330,13 +332,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     }
   }
 
-  def writeMemInitFile(memfile: String, instrs: Array[Bundle with Instruction]): Unit = {
-    val writer = new BufferedWriter(new FileWriter(memfile))
-    for(instr <- instrs) {
-      writer.write(("00000000" + instr.toUInt().litValue.toString(16)).takeRight(8) + "\n")
-    }
-    writer.close()
-  }
+
 
   "Execute pipeline" should "execute simple instructions and branch" in {
     genericConfig()
@@ -381,46 +377,43 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
 
   "Execute pipeline" should "use both threads" in {
     genericConfig()
+//    SIMULATION = true
     seed("Execute pipeline both threads")
     val memfile = "src/test/resources/meminit/mem5.hex.txt"
-    /* Instructions
-      istart NDOF
-      estart
-      add.vv (random)
-      eend
-      iend
-     */
-    val instrs = wrapInstructions(Array(genRtype(ADD, RtypeMod.VV)), OtypeLen.NDOF)
+    val program = "" +
+      "pstart ndof\n" +
+      "estart\n" +
+      "abs.vv v0, v1, v2\n" +
+      "eend\n" +
+      "pend"
+    val instrs = Assembler.assemble(program)
     writeMemInitFile(memfile, instrs)
-    test(new ExecutePipeline(memfile=memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    test(new ExecutePipeline(memfile=memfile)) {dut =>
       testFun(dut)
     }
   }
 
-  "Execute pipeline" should "count to 10" in {
+  "Execute pipeline" should "count to 5" in {
     genericConfig()
-    seed("Execute pipeline count to 10")
+    seed("Execute pipeline count to 5")
     val memfile = "src/test/resources/meminit/mem5.hex.txt"
-    /* Instructions
-    istart single
-    estart
-    add.is s1, s0, 5
-    add.ss s2, s0, s0
-    eend
-    iend
-    L1: istart single
-    estart
-    add.is s2, s2, 1
-    eend
-    iend
-    bne s2, s1, L1 (-20)
-     */
-    val p1 = wrapInstructions(Array(RtypeInstruction(1, 0, 5, 0, ADD, RtypeMod.SS), RtypeInstruction(2, 0, 0, ADD, RtypeMod.SS)))
-    val p2 = wrapInstructions(Array(RtypeInstruction(2, 2, 1, 0, ADD, RtypeMod.SS)))
-    val b1 = Array(BtypeInstruction(BranchComp.NEQ, 2, 1, -20)).asInstanceOf[Array[Bundle with Instruction]]
-    val instrs = Array.concat(p1, p2, b1)
+    val program = "" +
+    "pstart single\n" + //0
+      "estart\n" + //4
+      "add.is s1, s0, 5\n" + //8
+      "add.ss s2, s0, s0\n" + //12
+      "eend\n" + //16
+      "pend\n" + //20
+      "L1: \n" +
+      "pstart single\n" + //24
+      "estart\n" + //28
+      "add.is s2, s2, 1\n" + //32
+      "eend\n" + //36
+      "pend\n" + //40
+      "bne s2, s1, L1 //-20" //44
+    val instrs = Assembler.assemble(program)
     writeMemInitFile(memfile, instrs)
-    test(new ExecutePipeline(memfile=memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    test(new ExecutePipeline(memfile=memfile)) {dut =>
       testFun(dut)
     }
   }

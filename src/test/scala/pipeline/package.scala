@@ -1,3 +1,5 @@
+import java.io.{BufferedWriter, FileWriter}
+
 import chisel3._
 import chiseltest._
 import utils.Config
@@ -126,8 +128,10 @@ package object pipeline {
       fixedMin(a, B)
     } else if (ol == MAX.litValue) {
       fixedMax(a, B)
+    } else if (ol == ABS.litValue) {
+      fixedAbs(a)
     } else {
-      throw new IllegalArgumentException("Unknown opcode")
+        throw new IllegalArgumentException("Unknown opcode")
     }
   }
 
@@ -373,8 +377,27 @@ package object pipeline {
     if(rd != 0) { sReg(rd) = results(0) }
   }
 
+  /**
+   * Initializes a memory file
+   * @param memfile Relative path to the memory file to initialize. Existing contents are overwritten, a new file is created if none exists
+   * @param instrs The instructions to write into that file
+   */
+  def writeMemInitFile(memfile: String, instrs: Array[Bundle with Instruction]): Unit = {
+    writeMemInitFile(memfile, instrs.map(_.litValue.toInt))
+  }
 
-
+  /**
+   * Initializes a memory file
+   * @param memfile Relative path to the memory file to initialize. Existing contents are overwritten, a new file is created if none exists
+   * @param instrs Encoded instruction to write into that file
+   */
+  def writeMemInitFile(memfile: String, instrs: Array[Int]): Unit = {
+    val writer = new BufferedWriter(new FileWriter(memfile))
+    for(instr <- instrs) {
+      writer.write(("00000000" + instr.toHexString).takeRight(8) + "\n")
+    }
+    writer.close()
+  }
 
   /**
    * Computes and prints the random seed to be used for this tester.
@@ -395,8 +418,8 @@ package object pipeline {
     VREG_DEPTH = 12
     VREG_SLOT_WIDTH = 4
     ELEMS_PER_VSLOT = VREG_DEPTH*VREG_SLOT_WIDTH
-    NELEM=50 //These values don't follow the requirement that NDOF = (nx+1)*(ny+1)*(nz+1)*3
-    NDOF=100
+    NELEM=100 //These values don't follow the requirement that NDOF = (nx+1)*(ny+1)*(nz+1)*3
+    NDOF=150
     KE_SIZE = 12
     NUM_PROCELEM = 4
     SUBVECTORS_PER_VREG  = VREG_DEPTH/NUM_PROCELEM

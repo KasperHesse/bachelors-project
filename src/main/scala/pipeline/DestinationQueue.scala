@@ -21,7 +21,7 @@ class DestinationQueue extends Module {
     /** Destination information to be stored */
     val destIn = Input(new RegisterBundle)
     /** The four destinations at the head of the queue */
-    val head = Output(Vec(4, new EHAstore))
+    val head = Output(Vec(4, new ValidRegisterBundle))
     /** The destination at the very head of the queue */
     val destOut = Output(new RegisterBundle)
     /** Whether the queue is empty */

@@ -8,6 +8,7 @@ import utils.Fixed.FIXED_WIDTH
 import vector.KEWrapper
 import vector.Opcode._
 import chisel3.experimental.BundleLiterals._
+import memory.IJK
 import pipeline.RegisterFileType._
 
 /**
@@ -30,12 +31,10 @@ class ThreadIO extends Bundle {
   val start = Input(Bool())
   /** Instruction pointer of the current packet. Sent to IM in Decode stage */
   val ip = Output(UInt(4.W))
-  /** State that this thread is currently in */
-  val stateOut = Output(ThreadState())
+  /** Connections to other thread in Decode stage */
+  val thread = new ThreadThreadIO
   /** The literal value of the state. Only used for debugging purposes since we cannot peek enums yet */
   val stateOutUint = Output(UInt(8.W))
-  /** State that the other thread is currently in */
-  val stateIn = Input(ThreadState())
   /** Connections to the execute stage */
   val ex = new IdExIO
   /** Connections to memory stage */
@@ -46,6 +45,18 @@ class ThreadIO extends Bundle {
   val wb = Flipped(new WbIdIO)
   /** Connections to shared register file in Decode stage */
   val sRegFile = Flipped(new ScalarRegFileIO)
+}
+
+class ThreadThreadIO extends Bundle {
+  /** Current state of this thread */
+  val stateIn = Input(ThreadState())
+  /** Current state of the other thread */
+  val stateOut = Output(ThreadState())
+
+//  val swapIn = Input(Bool())
+//  val swapOut = Output(Bool())
+//  val ijkOut = Output(new IJK)
+//  val ijkIn = Input(new IJK)
 }
 
 /**
@@ -94,7 +105,7 @@ class Thread(id: Int) extends Module {
   val lenDecode = VecInit(Array(
     (NDOFlength/NUM_PROCELEM).U,
     (NELEMlength/NUM_PROCELEM).U,
-    1.U
+    (ELEMS_PER_VSLOT/NUM_PROCELEM).U //allows us to perform a single mac instruction on stored values
   ))
 
   val Rinst = currentInstr.asTypeOf(new RtypeInstruction)
@@ -111,12 +122,12 @@ class Thread(id: Int) extends Module {
   val finalCycle = WireDefault(false.B)
 
   //This makes it easier to address subvectors of the output vectors a, b from register file
-  val a_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
-  val b_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
-  for(i <- 0 until SUBVECTORS_PER_VREG) {
-    a_subvec(i) := vRegFile.io.rdData1.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
-    b_subvec(i) := vRegFile.io.rdData2.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
-  }
+//  val a_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
+//  val b_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
+//  for(i <- 0 until SUBVECTORS_PER_VREG) {
+//    a_subvec(i) := vRegFile.io.rdData1.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
+//    b_subvec(i) := vRegFile.io.rdData2.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
+//  }
 
   /** 'a' data subvector going into execute stage */
   val a = WireDefault(VecInit(Seq.fill(NUM_PROCELEM)(0.S(FIXED_WIDTH.W)))) //TODO Change default assignment to a_subvec(0)
@@ -135,16 +146,31 @@ class Thread(id: Int) extends Module {
   /** Signals that the outgoing operation should be added to the destination queue */
   val valid = WireDefault(false.B)
 
+
+  //Declare variables here to allow assignment in if-statement
+  /** Index into vector register file */
+  val v_rs1 = Wire(UInt(log2Ceil(NUM_VREG+1).W))
+  /** Index into vector register file */
+  val v_rs2 = Wire(UInt(log2Ceil(NUM_VREG+1).W))
+  /** Index into vector register file */
+  val v_rd = Wire(UInt(log2Ceil(NUM_VREG+1).W))
   //Generate vector register selects based on slot defined in instruction + slot select
-  val v_rs1 = (slot1 << log2Ceil(VREG_SLOT_WIDTH)).asUInt + slotSelect
-  val v_rs2 = (slot2 << log2Ceil(VREG_SLOT_WIDTH)).asUInt + slotSelect
-  val v_rd = (Rinst.rd << log2Ceil(VREG_SLOT_WIDTH)).asUInt + slotSelect
-
-
-  //This should be done my moving the output logic in here, and updating the FSM in the decode stage
-  //The decoder FSM still loads data from IM into instructionBuffer, and then sends instructions to threads
-  //Has i,j,k registers keeping track of the base i,j,k-pair (and offsets?), which are passed into threads
-  //Should forward writeback-results to the register banks which are currently active
+  //Use lookup tables to avoid multiplications in case we don't have a power of two
+  if(!isPow2(VREG_SLOT_WIDTH)) {
+    val vRegLookup = Wire(Vec(3, Vec(NUM_VREG_SLOTS, UInt(log2Ceil(NUM_VREG+1).W))))
+    for(i <- 0 until NUM_VREG_SLOTS) {
+      vRegLookup(0)(i) := (i*VREG_SLOT_WIDTH).U
+      vRegLookup(1)(i) := (i*VREG_SLOT_WIDTH).U
+      vRegLookup(2)(i) := (i*VREG_SLOT_WIDTH).U
+    }
+    v_rs1 := vRegLookup(0)(slot1) + slotSelect
+    v_rs2 := vRegLookup(1)(slot2) + slotSelect
+    v_rd := vRegLookup(2)(Rinst.rd) + slotSelect
+  } else {
+    v_rs1 := (slot1 << log2Ceil(VREG_SLOT_WIDTH)).asUInt + slotSelect
+    v_rs2 := (slot2 << log2Ceil(VREG_SLOT_WIDTH)).asUInt + slotSelect
+    v_rd := (Rinst.rd << log2Ceil(VREG_SLOT_WIDTH)).asUInt + slotSelect
+  }
 
   // --- OUTPUT & MODULE CONNECTIONS ---
   //Register file and KE connections
@@ -202,7 +228,7 @@ class Thread(id: Int) extends Module {
   io.ctrl.op := op
   io.ctrl.rs1 := rs1
   io.ctrl.rs2 := rs2
-  io.stateOut := state
+  io.thread.stateOut := state
   io.ip := IP
 
   /** Debug values */
@@ -239,22 +265,21 @@ class Thread(id: Int) extends Module {
       }
     }
     is(sEstart) {
-      when(io.stateIn === sEend || io.stateIn === sWait1) {
+      when(io.thread.stateIn === sEend || io.thread.stateIn === sWait1) {
         finalCycle := true.B
         state := sExec
       }
     }
     is(sExec) {
       //Execute instructions, increment IP as necessary
-      //When we load the eend instruction, move to that state
-      when(Oinst.pe === OtypePE.EXEC && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE ) {
+      //When we load the eend instruction, move to that state once execute pipeline is empty
+      when(Oinst.pe === OtypePE.EXEC && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE && io.ctrl.emptyQueues) {
         finalCycle := false.B //Deassert to avoid incrementing IP
         state := sEend
       }
     }
     is(sEend) {
-      //TODO Should not leave eend when instructions are still on their way back from execute stage?
-      when(io.stateIn === sEstart || io.stateIn === sWait2) {
+      when(io.thread.stateIn === sEstart || io.thread.stateIn === sWait2) {
         finalCycle := true.B
         state := sStore
       }
@@ -262,15 +287,15 @@ class Thread(id: Int) extends Module {
     is(sStore) {
       //Store data, increment IP as necessary
       when(Oinst.pe === OtypePE.PACKET && Oinst.se === OtypeSE.END) {
-        state := sIend
+        state := sEnd
       }
     }
-    is(sIend) {
+    is(sEnd) {
       when(!io.fin) {
         state := sLoad
         IP := 1.U
       } .otherwise {
-        when(io.stateIn === sExec || io.stateIn === sEend) {
+        when(io.thread.stateIn === sExec || io.thread.stateIn === sEend) {
           //Other thread is still executing, go to wait until it's finished
           state := sWait2
         } .otherwise {
@@ -280,7 +305,7 @@ class Thread(id: Int) extends Module {
       }
     }
     is(sWait1) {
-      when(io.stateIn === sEstart) {
+      when(io.thread.stateIn === sEstart) {
         when(io.fin) {
           state := sWait2
         } .otherwise {
@@ -289,7 +314,7 @@ class Thread(id: Int) extends Module {
       }
     }
     is(sWait2) {
-      when(io.stateIn === sEend) {
+      when(io.thread.stateIn === sEend) {
         state := sIdle
       }
     }
@@ -310,8 +335,13 @@ class Thread(id: Int) extends Module {
     switch(Rinst.mod) {
       is(RtypeMod.VV) { //This won't work when processing SUM instructions. They are special cases
         //Output connections
-        a := a_subvec(X)
-        b := b_subvec(X)
+
+//        a := a_subvec(X)
+//        b := b_subvec(X)
+        for(i <- 0 until NUM_PROCELEM) {
+          a(i) := vRegFile.io.rdData1(i.U+X*NUM_PROCELEM.U)
+          b(i) := vRegFile.io.rdData2(i.U+X*NUM_PROCELEM.U)
+        }
         op := Rinst.op
 
         dest.reg := Mux(Rinst.op === MAC, Rinst.rd, v_rd) //MAC.VV instructions always end in s-registers
@@ -335,8 +365,9 @@ class Thread(id: Int) extends Module {
         //SlotSelect is used to index into xReg, X is used to index into vReg
         for (i <- 0 until NUM_PROCELEM) {
           a(i) := xRegFile.io.rdData1(slotSelect)
+          b(i) := vRegFile.io.rdData2(i.U+X*NUM_PROCELEM.U)
         }
-        b := b_subvec(X)
+//        b := b_subvec(X)
         op := Rinst.op
         dest.reg := v_rd
         dest.subvec := X
@@ -371,8 +402,9 @@ class Thread(id: Int) extends Module {
       is(RtypeMod.SV) {
         for (i <- 0 until NUM_PROCELEM) {
           a(i) := io.sRegFile.rdData1
+          b(i) := vRegFile.io.rdData2(i.U + X*NUM_PROCELEM.U)
         }
-        b := b_subvec(X)
+//        b := b_subvec(X)
         op := Rinst.op
         dest.reg := Mux(Rinst.op === MAC, Rinst.rd, v_rd)
         dest.subvec := Mux(Rinst.op === MAC, 0.U, X)
@@ -421,7 +453,8 @@ class Thread(id: Int) extends Module {
 
       is(RtypeMod.KV) {
         for (i <- 0 until NUM_PROCELEM) {
-          a(i) := a_subvec(X)(col)
+//          a(i) := a_subvec(X)(col)
+          a(i) := vRegFile.io.rdData1(col + X*NUM_PROCELEM.U)
         }
         b := KE.io.keVals
 
@@ -459,5 +492,4 @@ class Thread(id: Int) extends Module {
     valid := false.B
     state := state
   }
-
 }

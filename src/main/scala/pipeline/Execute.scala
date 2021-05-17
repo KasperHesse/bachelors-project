@@ -78,6 +78,7 @@ class Execute extends Module {
   io.fwd.rs2 := in.rs2
 
   io.ctrl.empty := destinationQueue.io.empty
+  io.ctrl.macEmpty := macDestQueue.io.count === 0.U
   io.ctrl.op := op
   io.ctrl.queueHead := destinationQueue.io.head
 

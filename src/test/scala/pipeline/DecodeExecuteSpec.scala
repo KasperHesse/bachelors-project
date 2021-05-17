@@ -369,6 +369,20 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
     dut.clock.step()
   }
+
+
+  it should "perform a single MAC instruction on stored values" in {
+    genericConfig()
+    test(new DecodeExecute) {dut =>
+      seed("Decode/execute single MAC instruction")
+      val instrs = Array(genRtype(MAC, RtypeMod.VV))
+      val ops = wrapInstructions(instrs)
+      MAClength = ELEMS_PER_VSLOT
+      loadInstructions(ops, dut)
+      test(dut, instrs)
+    }
+  }
+
   it should "calculate a sum (MAC.SV)" in {
     genericConfig()
     test(new DecodeExecute) {dut =>
@@ -468,11 +482,11 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  it should "decode and execute VV instructions" in {
+  "Decode/Execute stage" should "decode and execute VV instructions" in {
     genericConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("VV decode execute")
-//      scala.util.Random.setSeed(5347764876420400419L)
+      scala.util.Random.setSeed(5347764876420400419L)
       val instrs = genAndPoke(dut, RtypeMod.VV)
       test(dut, instrs)
     }
@@ -548,6 +562,8 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       }
     }
   }
+
+
 
 
 

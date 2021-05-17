@@ -2,6 +2,7 @@ package pipeline
 
 import chisel3._
 import chisel3.util.experimental.loadMemoryFromFile
+import chisel3.util.experimental.loadMemoryFromFileInline
 import utils.Config._
 
 import scala.io.Source
@@ -31,6 +32,11 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
     require(src.getLines().length <= memsize, s"Memory file (${src.getLines.length}) too large for memory size ($memsize)")
     src.close()
     loadMemoryFromFile(imem, memfile)
+  } else if (!memfile.isEmpty) {
+    val src = Source.fromFile(memfile)
+    require(src.getLines().length <= memsize, s"Memory file (${src.getLines.length}) too large for memory size ($memsize)")
+    src.close()
+    loadMemoryFromFileInline(imem, memfile)
   }
 
   io.id.instr := instr

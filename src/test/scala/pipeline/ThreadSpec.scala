@@ -121,7 +121,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     dut.io.k.poke(0.U)
     dut.io.fin.poke(false.B)
     dut.io.progress.poke(0.U)
-    dut.io.stateIn.poke(sEstart)
+    dut.io.thread.stateIn.poke(sEstart)
     dut.io.instr.poke(0.U)
     dut.io.start.poke(true.B)
 
@@ -135,14 +135,14 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
       //Assign stateIn to speed through load and store stages
       if(dut.io.stateOutUint.peek.litValue == sLoad.litValue) {
-        dut.io.stateIn.poke(sEend)
+        dut.io.thread.stateIn.poke(sEend)
         dut.io.start.poke(false.B)
       } else if (dut.io.stateOutUint.peek.litValue == sExec.litValue) {
-        dut.io.stateIn.poke(sEstart)
+        dut.io.thread.stateIn.poke(sEstart)
       }
 
       //Assert 'fin' once end state has been reached
-      if(dut.io.stateOutUint.peek.litValue == sIend.litValue && resCnt >= numRes) {
+      if(dut.io.stateOutUint.peek.litValue == sEnd.litValue && resCnt >= numRes) {
         fin = true
       }
       dut.io.fin.poke(fin.B)
@@ -213,7 +213,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  it should "go back to idle when id=2 and fin=true" in {
+  it should "go back to idle when id=1 and fin=true" in {
     SIMULATION = true
     Config.checkRequirements()
     test(new Thread(1)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
@@ -225,13 +225,13 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.clock.step()
 
       assert(dut.io.stateOutUint.peek.litValue == sWait1.litValue)
-      dut.io.stateIn.poke(sEstart)
+      dut.io.thread.stateIn.poke(sEstart)
       dut.clock.step()
 
       assert(dut.io.stateOutUint.peek().litValue() == sWait2.litValue)
       dut.clock.step(5)
       assert(dut.io.stateOutUint.peek().litValue() == sWait2.litValue)
-      dut.io.stateIn.poke(sEend)
+      dut.io.thread.stateIn.poke(sEend)
       dut.clock.step()
 
       assert(dut.io.stateOutUint.peek.litValue() == sIdle.litValue())

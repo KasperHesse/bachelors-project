@@ -38,7 +38,7 @@ class Decode extends Module {
   /** State register */
   val state = RegInit(DecodeState.sIdle)
   /** Instruction buffer */
-  val iBuffer = RegInit(VecInit(Seq.fill(16)(0.U(INSTRUCTION_WIDTH.W))))
+  val iBuffer = RegInit(VecInit(Seq.fill(32)(0.U(INSTRUCTION_WIDTH.W))))
   /** Instruction pointer, used when filling iBuffer */
   val IP = RegInit(0.U(4.W))
   /** Number of instructions in iBuffer */
@@ -83,7 +83,7 @@ class Decode extends Module {
   val branch = WireDefault(false.B)
 
   for(i <- 0 until 2) {
-    threadStates(i) := threads(i).io.stateOut
+    threadStates(i) := threads(i).io.thread.stateOut
   }
 
   // --- OUTPUTS AND CONNECTIONS --- //
@@ -101,8 +101,8 @@ class Decode extends Module {
     thread.io.instr := iBuffer(thread.io.ip)
   }
   //Specific thread connections
-  threads(0).io.stateIn := threads(1).io.stateOut
-  threads(1).io.stateIn := threads(0).io.stateOut
+  threads(0).io.thread.stateIn := threads(1).io.thread.stateOut
+  threads(1).io.thread.stateIn := threads(0).io.thread.stateOut
   io.ctrl.threadCtrl(0) <> threads(0).io.ctrl
   io.ctrl.threadCtrl(1) <> threads(1).io.ctrl
 
