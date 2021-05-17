@@ -37,17 +37,17 @@ object Config {
   var NDOF = 3 * NX * NY * NZ
 
   /** The number of element in the vector register file */
-  var NUM_VREG = 32
+  var NUM_VREG = 24
   /** The number of vector register slots that are adressible from instructions */
   var NUM_VREG_SLOTS = 4
-  /** The number of X-value registers in the x register file. This value is always equal to [[NUM_VREG_SLOTS]] */
-  var NUM_XREG = NUM_VREG_SLOTS
+  /** The number of X-value registers in the x register file. */
+  var NUM_XREG = 8
   /** The number of values stored in each entry in the vector register file */
   var VREG_DEPTH = 24
   /** The number of elements in the scalar register file */
   var NUM_SREG = 16
   /** The number of processing elements used in the design. Determines the width of vectors carrying values between modules. */
-  var NUM_PROCELEM = 8
+  var NUM_PROCELEM = 6
   /** The number of subvectors in each vector register */
   var SUBVECTORS_PER_VREG = VREG_DEPTH/NUM_PROCELEM
   /** The width (number of registers) of each vector register slot */
@@ -75,7 +75,7 @@ object Config {
     require(NUM_VREG % NUM_VREG_SLOTS == 0, "Number of vector registers must me a multiple of vector register slots")
     require(KE_SIZE == VREG_DEPTH, s"KE_SIZE must equal VREG_DEPTH for proper matrix-vector products. They are $KE_SIZE, $VREG_DEPTH")
     require(NRDIV_STAGE3_REPS > 0, "Newton-Raphson division requires at least one iteration in stage 3")
-    require(NUM_XREG == NUM_VREG_SLOTS, s"NUM_X_REG must equal NUM_VREG_SLOTS for easier access. They are $NUM_XREG, $NUM_VREG_SLOTS")
+//    require(NUM_XREG == NUM_VREG_SLOTS, s"NUM_X_REG must equal NUM_VREG_SLOTS for easier access. They are $NUM_XREG, $NUM_VREG_SLOTS")
     require(VREG_SLOT_WIDTH == NUM_VREG/NUM_VREG_SLOTS, s"VREG_SLOT_WIDTH must equal NUM_VREG/NUM_VREG_SLOTS. Got $VREG_SLOT_WIDTH, should be ${NUM_VREG/NUM_VREG_SLOTS}")
     require(SUBVECTORS_PER_VREG == VREG_DEPTH/NUM_PROCELEM, s"SUBVECTORS_PER_VREG must equal VREG_DPETH/NUM_PROCELEM. Got $SUBVECTORS_PER_VREG, should be ${VREG_DEPTH/NUM_PROCELEM}")
     require(NUM_PROCELEM == VREG_SLOT_WIDTH, "NUM_PROCELEM and VREG_SLOT_WIDTH must be the same. VREG_SLOT_WIDTH is a calculated property")
