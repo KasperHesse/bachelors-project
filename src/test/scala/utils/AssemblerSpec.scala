@@ -17,8 +17,8 @@ class AssemblerSpec extends FlatSpec with Matchers {
   behavior of "Assembler"
 
   val rand = scala.util.Random
-  val opStrings = Array("add", "sub", "mul", "div", "max", "min")
-  val opValues = Array(ADD, SUB, MUL, DIV, MAX, MIN)
+  val opStrings = Array("add", "sub", "mul", "div", "max", "min", "abs")
+  val opValues = Array(ADD, SUB, MUL, DIV, MAX, MIN, ABS)
   val modStrings = Array("vv", "xv", "sv", "xx", "sx", "ss")
   val modValues = Array(VV, XV, SV, XX, SX, SS)
   val prefixValues = Array(
@@ -37,16 +37,6 @@ class AssemblerSpec extends FlatSpec with Matchers {
     Array(NUM_XREG, NUM_SREG, NUM_XREG), //SX
     Array(NUM_SREG, NUM_SREG, NUM_SREG) //SS
   )
-
-  /**
-   * Selects a random element from an array
-   * @param arr The array to select an element from
-   * @tparam T The type of the array
-   * @return A random element from [[arr]]
-   */
-  def randomElement[T <: Any](arr: Array[T]): T = {
-    arr(rand.nextInt(arr.length))
-  }
 
   it should "assemble R-type instructions without immediates" in {
     /**
@@ -76,12 +66,14 @@ class AssemblerSpec extends FlatSpec with Matchers {
       val instr = RtypeInstruction(rd, rs1, rs2, opValue, modValue).litValue.toInt
       assert(parsed == instr)
     }
-    test(0)
-    test(1)
-    test(2)
-    test(3)
-    test(4)
-    test(5)
+    for(i <- 0 until 5) {
+      test(0)
+      test(1)
+      test(2)
+      test(3)
+      test(4)
+      test(5)
+    }
   }
 
   it should "assemble R-type instructions with immediates" in {
@@ -155,6 +147,7 @@ class AssemblerSpec extends FlatSpec with Matchers {
     val compStrings = Array("beq", "bne", "blt", "bge")
     //Branch type, registers and offset.
     //Offset should be 2^15 and then multiplied by 4
+    val map = scala.collection.mutable.Map[String, Int]()
     def testFun(compIndex: Int): Unit = {
       val offset = rand.nextInt(math.pow(2,15).toInt) * 4 * (if(rand.nextBoolean()) 1 else -1)
       val rs1 = rand.nextInt(NUM_SREG)
@@ -164,7 +157,7 @@ class AssemblerSpec extends FlatSpec with Matchers {
 
       val line = s"$compString s$rs1, s$rs2, $offset"
       val instr = BtypeInstruction(compValue, rs1, rs2, offset)
-      val parsed = Assembler.parseBtype(Assembler.split(line))
+      val parsed = Assembler.parseBtype(Assembler.split(line), map, 0)
       assert(parsed == instr.litValue().toInt)
     }
 
@@ -178,10 +171,61 @@ class AssemblerSpec extends FlatSpec with Matchers {
 
   it should "throw an error if branch offset is not a multiple of 4" in {
     try {
-      Assembler.parseBtype(Assembler.split("beq s0, s0, 1"))
+      val map = scala.collection.mutable.Map[String, Int]()
+      Assembler.parseBtype(Assembler.split("beq s0, s0, 1"), map, 0)
       assert(false, "Did not correctly throw an exception")
     } catch {
       case e: IllegalArgumentException => assert(true)
+    }
+  }
+
+  it should "use the symbol table to generate branch instructions" in {
+    val program = "" +
+    "L1:\n" +
+      "pstart single\n" + //0
+      "estart\n" + //4
+      "add.is s1, s1, 1\n" + //8
+      "add.is s2, s0, 5\n" + //12
+      "eend\n" + //16
+      "pend\n" + //20
+      "bne s1, s2, L2\n" + //24
+      "beq s0, s0, -28\n" + //28
+      "L2:\n" +
+      "blt s1, s1, L1" //32
+    val parsed = Assembler.assemble(program)
+    val p1 = pipeline.wrapInstructions(Array(RtypeInstruction(1, 1, 1, 0, ADD, SS), RtypeInstruction(2, 0, 5, 0, ADD, SS)))
+    val b1 = Array(BtypeInstruction(NEQ, 1, 2, 8), BtypeInstruction(EQUAL, 0, 0, -28), BtypeInstruction(LT, 1, 1, -32)).asInstanceOf[Array[Bundle with pipeline.Instruction]]
+    val instrs = Array.concat(p1, b1)
+    for(i <- instrs.indices) {
+      assert(parsed(i) == instrs(i).litValue.toInt)
+    }
+  }
+
+  it should "throw an error if symbols are not alone on their line" in {
+    val program = "" +
+    "L1: pstart single\n"
+    try {
+      Assembler.assemble(program)
+      assert(false, "Did not catch a bad label")
+    } catch {
+      case e if e.getMessage.contains("Labels must be on their own line") => assert(true)
+      case _: Exception => assert(false, "Did not catch a bad label")
+    }
+  }
+
+  it should "throw an error on duplicate labels" in {
+    val program = "" +
+    "L1:\n" +
+      "L1:\n" +
+      "pstart single"
+    try {
+      Assembler.assemble(program)
+      assert(false, "Did not catch duplicate label")
+    } catch {
+      case e: Exception => {
+        if (e.getMessage.contains("Duplicate label")) assert(true) else assert(false, "Did not catch duplicate label")
+      }
+      case _: Exception => assert(false, "Did not catch duplicate label")
     }
   }
 

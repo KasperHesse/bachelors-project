@@ -12,12 +12,12 @@ import utils.Fixed._
 import scala.language.implicitConversions
 import vector.Opcode
 
-import scala.collection.mutable.ListBuffer
+//import scala.collection.mutable.ListBuffer
+import scala.collection.mutable._
+import scala.collection.mutable
 
 object Assembler {
   import LitVals._
-
-
 
   def main(args: Array[String]): Unit = {
     val p = "istart\n" +
@@ -86,6 +86,7 @@ object Assembler {
       case "mac" => MAC
       case "max" => MAX
       case "min" => MIN
+      case "abs" => ABS
       case _ => throw new IllegalArgumentException(s"Opcode '$op' not recognized")
     }
   }
@@ -274,11 +275,11 @@ object Assembler {
    * @return An integer representing that instruction
    */
   def parseStype(tokens: Array[String]): Int = {
-    0
+    ???
   }
 
   def parsePseudoInstruction(tokens: Array[String]): Int = {
-    0
+    ???
   }
 
   /**
@@ -286,7 +287,7 @@ object Assembler {
    * @param tokens The tokens representing the currently parsed line
    * @return An integer representing that instruction
    */
-  def parseBtype(tokens: Array[String]): Int = {
+  def parseBtype(tokens: Array[String], symbols: mutable.Map[String, Int], pc: Int): Int = {
     import BtypeInstruction._
 
     /**
@@ -322,10 +323,20 @@ object Assembler {
       Array(targeth, targetl)
     }
 
+    /**
+     * Parses a named branch where the branch target is a label and not a direct reference to the branch amount
+     * @return An array holding at (0) the high bits of the branc htarget and at (1) the low bits
+     */
+    def namedBranch(): Array[Int] = {
+      val target = symbols(tokens(3))
+      val diff = target-pc
+      offset2targets(diff.toString)
+    }
+
     val comp = comparison(tokens(0))
     val rs1 = sReg(tokens(1))
     val rs2 = sReg(tokens(2))
-    val target = offset2targets(tokens(3))
+    val target = if(symbols.contains(tokens(3))) namedBranch() else offset2targets(tokens(3))
     val fmt = BTYPE
 
     var instr = 0
@@ -349,14 +360,35 @@ object Assembler {
   }
 
   /**
+   * Parses a symbol for the symbol table
+   * @param symbols The current symbol table
+   * @param pc The current program counter
+   * @param tokens The tokens for this line
+   */
+  def parseSymbol(symbols: mutable.Map[String, Int], pc: Int, tokens: Array[String]): Unit = {
+    val key = tokens(0).dropRight(1)
+    if(tokens.length == 1) {
+      if(symbols.contains(key)) {
+        throw new IllegalArgumentException(s"Duplicate label '$key' already exists, mapping to PC ${symbols(key)}'")
+      }
+      symbols += (key -> pc)
+    } else {
+      throw new IllegalArgumentException("Labels must be on their own line above the instruction they refer to")
+    }
+  }
+
+  /**
    * Assembles a program for the topological optimizer. Currently has limited error checking
+   *
    * @param program A string holding the program to be assembled
    * @return An array containing the instructions
    */
   def assemble(program: String): Array[Int] = {
     val prog = program.toLowerCase
     val lines: Array[String] = prog.trim.split("\n") //Split at newlines
-    val code = ListBuffer.empty[Int]
+
+    var pc: Int = 0
+    val symbols: scala.collection.mutable.Map[String, Int] = Map[String, Int]()
 
     //TODO Probably need to spot pseudo instructions all the way up here
 
@@ -367,55 +399,69 @@ object Assembler {
     var packetSize = 0
     var mac = false
 
-    for(i <- lines.indices) {
-      val line = lines(i).trim
-      //Detect pseudo-instructions here and perform substitutions?
-      val tokens = split(line)
-      try {
-        performErrorChecks(tokens(0))
+    val code = ListBuffer.empty[Int]
+    assemblerPass(false)
+    code.clear()
+    pc = 0
+    assemblerPass(true)
 
-        val instr = tokens(0) match {
-          case x if x.startsWith("//") => "" //Comment
-          case x if x.trim().equals("") => "" //Blank line
-          case "pstart" => parseOtype(tokens)
-          case "estart" => parseOtype(tokens)
-          case "eend" => parseOtype(tokens)
-          case "pend" => parseOtype(tokens)
+    def assemblerPass(pass2: Boolean): Unit = {
+      for(i <- lines.indices) {
+        val line = lines(i).trim
+        //Detect pseudo-instructions here and perform substitutions?
+        val tokens = split(line)
+        val symbolPattern = "([\\w-]+:)".r//Any characters, followed by a :
+        try {
+          performErrorChecks(tokens(0))
 
-          case x if x.startsWith("st") => parseStype(tokens)
-          case x if x.startsWith("ld") => parseStype(tokens)
+          val instr = tokens(0) match {
+            case x if x.startsWith("//") => "" //Comment
+            case x if x.trim().equals("") => "" //Blank line
+            case symbolPattern(x) => if(!pass2) parseSymbol(symbols, pc, tokens)
+            case "pstart" => parseOtype(tokens)
+            case "estart" => parseOtype(tokens)
+            case "eend" => parseOtype(tokens)
+            case "pend" => parseOtype(tokens)
 
-          case x if x.startsWith("mvp") => parsePseudoInstruction(tokens)
-          case x if x.startsWith("sqrt") => parsePseudoInstruction(tokens)
+            case x if x.startsWith("st") => parseStype(tokens)
+            case x if x.startsWith("ld") => parseStype(tokens)
 
-          case x if x.startsWith("add.") => parseRtype(tokens)
-          case x if x.startsWith("sub.") => parseRtype(tokens)
-          case x if x.startsWith("mul.") => parseRtype(tokens)
-          case x if x.startsWith("div.") => parseRtype(tokens)
-          case x if x.startsWith("mac.") => parseRtype(tokens)
-          case x if x.startsWith("max.") => parseRtype(tokens)
-          case x if x.startsWith("min.") => parseRtype(tokens)
+            case x if x.startsWith("mvp") => parsePseudoInstruction(tokens)
+            case x if x.startsWith("sqrt") => parsePseudoInstruction(tokens)
 
-          case x if x.startsWith("beq") => parseBtype(tokens)
-          case x if x.startsWith("bne") => parseBtype(tokens)
-          case x if x.startsWith("blt") => parseBtype(tokens)
-          case x if x.startsWith("bge") => parseBtype(tokens)
+            case x if x.startsWith("add.") => parseRtype(tokens)
+            case x if x.startsWith("sub.") => parseRtype(tokens)
+            case x if x.startsWith("mul.") => parseRtype(tokens)
+            case x if x.startsWith("div.") => parseRtype(tokens)
+            case x if x.startsWith("mac.") => parseRtype(tokens)
+            case x if x.startsWith("max.") => parseRtype(tokens)
+            case x if x.startsWith("min.") => parseRtype(tokens)
+            case x if x.startsWith("abs.") => parseRtype(tokens)
 
-          case _ => throw new IllegalArgumentException(s"'${tokens(0)}' was not recognized as a valid instruction")
+            case x if x.startsWith("beq") => if(pass2) parseBtype(tokens, symbols, pc) else 0
+            case x if x.startsWith("bne") => if(pass2) parseBtype(tokens, symbols, pc) else 0
+            case x if x.startsWith("blt") => if(pass2) parseBtype(tokens, symbols, pc) else 0
+            case x if x.startsWith("bge") => if(pass2) parseBtype(tokens, symbols, pc) else 0
+
+            case _ => throw new IllegalArgumentException(s"'${tokens(0)}' was not recognized as a valid instruction")
+          }
+
+          instr match {
+            case a: Int => {
+              code += a
+              if(pstart) packetSize += 1
+              pc += 4
+            } //Add instruction to list of instructions
+            case a: String => //Empty string is given here on comments or blank lines
+            case _ => // Something else
+          }
+        } catch {
+          case e: Exception => throw new IllegalArgumentException(s"Error at line $i ($line): ${e.getMessage}")
         }
-
-        instr match {
-          case a: Int => {
-            code += a
-            if(pstart) packetSize += 1
-          } //Add instruction to list of instructions
-          case a: String => //Empty string is given here on comments or blank lines
-          case _ => throw new IllegalArgumentException("Unable to parse instruction to a valid integer")
-        }
-      } catch {
-        case e: Exception => throw new IllegalArgumentException(s"Error at line $i ($line): ${e.getMessage}")
       }
     }
+
+
 
     /**
      * Performs error checking to ensure that the given instruction was placed in an allowed position
@@ -450,10 +496,8 @@ object Assembler {
           mac = false
           packetSize = 0
         }
+        case "//" => return
         case x: String =>
-          if(x.equals("//")) {
-            return
-          }
           if(Seq("add","sub", "mul", "div", "max", "min", "mac").contains(x.substring(0,3)) && (!estart || eend)) {
             throw new IllegalArgumentException("R-type instructions only allowed between estart and eend")
           } else if (x.startsWith("ld") && (!pstart || estart)) {
@@ -465,7 +509,7 @@ object Assembler {
           }
           if(x.contains("mac") && mac) {
             throw new IllegalArgumentException("There can only be one mac instruction in each instruction packet")
-          } else {
+          } else if(x.contains("mac")) {
             mac = true
           }
       }
@@ -489,7 +533,8 @@ object LitVals {
   val SUB = 0x05 //000101
   val MAX = 0x06 //000110
   val MIN = 0x07 //000111
-  val MUL = 0x08 //001000
+  val ABS = 0x08 //001000
+  val MUL = 0x10 //010000
   val MAC = 0x18 //011000
   val DIV = 0x20 //100000
 
