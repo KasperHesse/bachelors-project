@@ -105,12 +105,14 @@ object RtypeInstruction {
       MAC
     } else if (opval.litValue == MAX.litValue()) {
       MAX
-    }else if (opval.litValue == MIN.litValue()) {
+    } else if (opval.litValue == MIN.litValue()) {
       MIN
+    } else if (opval.litValue == ABS.litValue()) {
+      ABS
     } else {
-      print("ERR: Unable to decode op")
-//      throw new IllegalArgumentException("Unable to decode op")
-      ADD
+//      print("ERR: Unable to decode op")
+      throw new IllegalArgumentException("Unable to decode op")
+//      ADD
     }
 
     val fmt = InstructionFMT.RTYPE
@@ -129,9 +131,9 @@ object RtypeInstruction {
     } else if(modval.litValue() == SX.litValue()) {
       SX
     } else {
-      print("ERR: Unable to decode mod")
-//      throw new IllegalArgumentException("Unable to decode op")
-      VV
+//      print("ERR: Unable to decode mod")
+      throw new IllegalArgumentException("Unable to decode op")
+//      VV
     }
     (new RtypeInstruction).Lit(_.op -> op, _.fmt -> fmt, _.mod -> mod, _.rs1 -> rs1, _.rs2 -> rs2, _.rd -> rd, _.immflag -> v(12), _.immfrac -> immfrac)
   }

@@ -55,14 +55,14 @@ class ProcessingElement extends Module {
   asu.io.in.a := asu_a
   asu.io.in.b := asu_b
   asu.io.in.op := tmp.op //All operations not SUB, MAX, MIn will add the operands
-  asu.io.in.valid := Mux(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN, tmp.valid, mulDivValidReg)
+  asu.io.in.valid := Mux(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN || tmp.op === ABS, tmp.valid, mulDivValidReg)
   val resReg = RegEnable(asu.io.out.res, asu.io.out.valid && tmp.op === MAC)
   val macLimit = RegInit(0.U(32.W))
   val macCnt = RegInit(0.U(32.W))
 
 
   //Signal multiplexers for asu and result reg
-  when(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN) {
+  when(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN || tmp.op === ABS) {
     asu_a := tmp.a
     asu_b := tmp.b
   } .elsewhen(tmp.op === MAC) {
