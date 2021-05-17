@@ -2,54 +2,91 @@ package memory
 
 import chisel3._
 import chisel3.util._
+import utils.Config._
+
+
+/**
+ * Interface between an IJK generator inside a Thread and the EDOF generator located before the memory stage
+ * Instantiate as-is in the IJK-generator/thread, use Flipped() in the edof generator
+ */
+class IJKgeneratorEdofIO extends Bundle {
+  /** Element index in the x-direction */
+  val i = UInt(log2Ceil(NDOF+1).W)
+  /** Element index in the y-direction */
+  val j = UInt(log2Ceil(NDOF+1).W)
+  /** Element index in the z-direction */
+  val k = UInt(log2Ceil(NDOF+1).W)
+  /** Flag transmitted through to memory stage. */
+  val pad = Bool()
+}
+
+/**
+ * Interface between the EDOF generator and memory stage.
+ * Instntiate as-is in the EDOF generator, use Flipped() in the memory stage
+ */
+class EdofMemoryIO extends Bundle {
+  /** The indices used as offsets from the base memory address */
+  val indices = Vec(8, UInt(log2Ceil(NDOF+1).W))
+  /** Flag transmitted through to memory stage */
+  val pad = Bool()
+}
+
+/**
+ * I/O ports for [[EdofGenerator]]
+ */
+class EdofGeneratorIO extends Bundle {
+  val prod = Flipped(Decoupled(new IJKgeneratorEdofIO))
+  val cons = Decoupled(new EdofMemoryIO)
+}
 
 /**
  * Generates the 24 element DOF-indices, used for accessing node DOF's in vectors.
- * Latches in the values when they are supplied and valid is asserted. Outputs the values in three consecutive clock cycles,
- * each with valid asserted on the output, once computation is finished. Implements [[EdofGeneratorIO]].
- * @param nx Number of nodes in the x-direction of the grid (nelx + 1)
- * @param ny Number of nodes in the y-direction of the grid (nely + 1)
- * @param nz Number of nodes in the z-direction of the grid (nelz + 1)
- * @param width The number of values to output on each clock cycle
+ * Latches in the values when the ready/valid handshake is performed.
+ * Outputs the indices in 3 rounds of 8 values, outputting the next bundle whenever the consumer signals 'ready'.
+ * When the final round is output, it is immediatedly ready to receive new ijk-values on the input. Implements [[EdofGeneratorIO]].
  */
-class EdofGenerator(val nx: Int, val ny: Int, val nz: Int, val width: Int) extends Module {
-  val ndof: Int = 3*ny*nx*nz
-  val io: EdofGeneratorIO = IO(new EdofGeneratorIO(ndof))
+class EdofGenerator extends Module {
+  val io: EdofGeneratorIO = IO(new EdofGeneratorIO)
 
+  //--- REGISTERS ---
+  /** Which section of indices is currently being output */
   val outputStep = RegInit(0.U(2.W)) //Which part-of-8 of the indices is currently being output?
+  /** Flag indicating whether the generator is currently processing or not. Also used as output valid bit */
+  val processing = RegInit(false.B)
+  /** Vector holding index output values */
+  val nIndex = Wire(Vec(8, UInt(log2Ceil(NDOF+1).W)))
+  /** Asserted when this module is ready to receive new data */
+  val readyInternal = WireDefault(false.B)
+  /** Asserted when the output from this module is valid */
+  /** Pipeline register holding input values */
+  val in = RegEnable(io.prod.bits, io.prod.valid && readyInternal)
 
-  val nIndex = Wire(Vec(8, UInt(log2Ceil(ndof).W)))
 
-  //Only latch in values if we're not currently processing, or if we're ready to process next segment
-  val validReg = RegInit(false.B)
-  val ready = (outputStep === 0.U && !validReg) || outputStep === 2.U
-  val nIndexReg = RegEnable(nIndex, ready)
-
-  val in = RegEnable(io.in, ready)
-
+  // --- SIGNALS AND WIRES ---
+  //Shorthand acceeses
   val i = in.i
   val j = in.j
   val k = in.k
 
-  //Handle initial multiplications. Currently implemented with a lookup table
+  //Handle initial multiplications. Implemented with a LUT to make our life easier. Given x,y-value, we output x*NY*NZ and y*NY
   val nynzLookup: Seq[Vec[UInt]] = for (i <- 0 until 2) yield {
-    Wire(Vec(nx, UInt(log2Ceil(ndof).W)))
+    Wire(Vec(NX, UInt(log2Ceil(NDOF+1).W)))
   }
   val nyLookup: Seq[Vec[UInt]] = for(i <- 0 until 2) yield {
-    Wire(Vec(ny, UInt(log2Ceil(ndof).W)))
+    Wire(Vec(NY, UInt(log2Ceil(NDOF+1).W)))
   }
 
   //Fill up lookup tables
-  for(i <- 0 until nx) {
-    nynzLookup(0)(i) := (i * ny*nz).U
-    nynzLookup(1)(i) := (i * ny*nz).U
+  for(i <- 0 until NX) {
+    nynzLookup(0)(i) := (i * NY*NZ).U
+    nynzLookup(1)(i) := (i * NY*NZ).U
   }
-  for(i <- 0 until ny) {
-    nyLookup(0)(i) := (i*ny).U
-    nyLookup(1)(i) := (i*ny).U
+  for(i <- 0 until NY) {
+    nyLookup(0)(i) := (i*NY).U
+    nyLookup(1)(i) := (i*NY).U
   }
 
-  //See top.c, getEdof for calculations that spawned this
+  //See top.c, getEdof for calculations that spawned this monstrosity
   val nx1 = i
   val nx2 = i + 1.U
   val ny1 = j
@@ -72,56 +109,23 @@ class EdofGenerator(val nx: Int, val ny: Int, val nz: Int, val width: Int) exten
   nIndex(6) := nynz_p2 + ny_p2 + ny1
   nIndex(7) := nynz_p1 + ny_p2 + ny1
 
-  //Output stage
-  validReg := Mux(ready, in.valid, validReg)
-  outputStep := Mux(validReg, Mux(outputStep === 2.U, 0.U, outputStep + 1.U), outputStep)
+  // -- CONNECTIONS AND UPDATE LOGIC
+  //ready is entirely combinational logic
+  readyInternal := (outputStep === 0.U && !processing) || (outputStep === 2.U && io.cons.ready)
+
+  when(readyInternal && io.prod.valid) {
+    processing := true.B
+  } .elsewhen(outputStep === 2.U && io.cons.ready) {
+    processing := false.B
+  }
+  outputStep := Mux(processing && io.cons.ready, Mux(outputStep === 2.U, 0.U, outputStep + 1.U), outputStep)
 
   for(i <- 0 until 8) {
-    io.out.offsets(i) := (nIndexReg(i) << 1.U).asUInt() + nIndexReg(i) + outputStep
+    //3*nIndex(i) + (0,1,2)
+    io.cons.bits.indices(i) := (nIndex(i) << 1.U).asUInt() + nIndex(i) + outputStep
   }
-  io.out.valid := validReg
-  io.out.ready := ready
-
-
-
+  io.cons.valid := processing
+  io.prod.ready := readyInternal
+  io.cons.bits.pad := in.pad
 }
 
-/**
- * I/O ports for [[EdofGenerator]]
- * @param ndof The total number of element DOF's in the design
- */
-class EdofGeneratorIO(val ndof: Int) extends Bundle {
-  val in = Input(new EdofGeneratorInput(ndof))
-  val out = Output(new EdofGeneratorOutput(ndof))
-
-  /**
-   * Input ports for element DOF generator
-   * @param ndof The total number of element DOF's in the design
-   */
-  class EdofGeneratorInput(val ndof: Int) extends Bundle {
-    /** Element index in the x-direction */
-    val i = UInt(log2Ceil(ndof).W)
-    /** Element index in the y-direction */
-    val j = UInt(log2Ceil(ndof).W)
-    /** Element index in the z-direction */
-    val k = UInt(log2Ceil(ndof).W)
-    /** Indicates that inputs i,j,k are valid */
-    val valid = Bool()
-  }
-
-  /**
-   * Output ports for element DOF generator
-   * @param ndof The total number of element DOF's in the design
-   */
-  class EdofGeneratorOutput(val ndof: Int) extends Bundle {
-    /** A number of address offsets, used to select the correct memory locations */
-    val offsets = Vec(8, UInt(log2Ceil(ndof).W))
-    /** Indicates that output offset values are valid */
-    val valid = Bool()
-    /** If high, a new set of i,j,k values will be latched in when next 'valid' is asserted */
-    val ready = Bool()
-  }
-
-
-
-}
