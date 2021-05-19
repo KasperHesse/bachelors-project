@@ -7,7 +7,7 @@ class MemoryIO extends Bundle {
 }
 
 class Memory extends Module {
-  val io = IO(new MemoryIO)
+  val io = IO(new OnChipMemoryIO)
 
 
 }

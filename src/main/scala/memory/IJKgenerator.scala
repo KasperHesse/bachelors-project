@@ -5,19 +5,28 @@ import chisel3.util._
 import utils.Config._
 
 class IJKgeneratorIO extends Bundle {
-  val in = Input(new IJK)
-  val out = Output(new IJK)
+  val in = Input(new IJKBundle)
+  val out = Output(new IJKBundle)
   val load = Input(Bool())
   val restart = Input(Bool())
   val valid = Output(Bool())
   val ready = Input(Bool())
+  /** Current iteration of the other IJK generator */
+  val iterationIn = UInt(4.W)
+  /** Current iteration of this IJK generator */
+  val iterationOut = UInt(4.W)
 }
 
-class IJK extends Bundle {
+/**
+ * A bundle holding an i,j,k-value pair
+ */
+class IJKBundle extends Bundle {
+  /** Element index in the x-direction */
   val i = UInt(log2Ceil(GDIM+3).W)
+  /** Element index in the y-direction */
   val j = UInt(log2Ceil(GDIM+3).W)
+  /** Element index in the z-direction */
   val k = UInt(log2Ceil(GDIM+3).W)
-  val iteration = UInt(4.W)
 }
 
 class IJKgenerator extends Module {
@@ -82,11 +91,11 @@ class IJKgenerator extends Module {
     i := io.in.i
     j := io.in.j
     k := io.in.k
-    iteration := io.in.iteration
+    iteration := io.iterationIn
     iSaved := io.in.i
     jSaved := io.in.j
     kSaved := io.in.k
-    iterationSaved := io.in.iteration
+    iterationSaved := io.iterationOut
   }. elsewhen(io.ready) {
     i := iNext
     j := jNext
@@ -97,6 +106,6 @@ class IJKgenerator extends Module {
   io.out.i := i
   io.out.j := j
   io.out.k := k
-  io.out.iteration := iteration
+  io.iterationOut := iteration
   io.valid := !invalidFlag
 }

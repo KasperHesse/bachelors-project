@@ -35,14 +35,14 @@ class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers
         dut.clock.step()
       }
       expectIJK(dut, 0,0,0)
-      dut.io.out.iteration.expect(8.U)
+      dut.io.iterationOut.expect(8.U)
 
       pokeIJK(dut, 0,0,0)
-      dut.io.in.iteration.poke(0.U)
+      dut.io.iterationIn.poke(0.U)
       dut.io.load.poke(true.B)
       dut.clock.step()
       expectIJK(dut, 0,0,0)
-      dut.io.out.iteration.expect(0.U)
+      dut.io.iterationOut.expect(0.U)
     }
   }
 
@@ -71,12 +71,12 @@ class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers
   "IJK generator" should "reassert valid when restarted" in {
     test(new IJKgenerator) { dut =>
       pokeIJK(dut, 5,1,5)
-      dut.io.in.iteration.poke(7.U)
+      dut.io.iterationIn.poke(7.U)
       dut.io.load.poke(true.B)
       dut.clock.step()
 
       expectIJK(dut, 5,1,5)
-      dut.io.out.iteration.expect(7.U)
+      dut.io.iterationOut.expect(7.U)
       dut.io.load.poke(false.B)
       dut.io.ready.poke(true.B)
       while(dut.io.valid.peek.litToBoolean) {
@@ -87,7 +87,7 @@ class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers
       dut.clock.step()
 
       expectIJK(dut, 5,1,5)
-      dut.io.out.iteration.expect(7.U)
+      dut.io.iterationOut.expect(7.U)
       dut.io.valid.expect(true.B)
 
     }

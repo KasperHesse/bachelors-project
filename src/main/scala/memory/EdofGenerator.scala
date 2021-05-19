@@ -2,41 +2,18 @@ package memory
 
 import chisel3._
 import chisel3.util._
+import pipeline.{RegisterBundle, StypeBaseAddress, StypeMod}
 import utils.Config._
 
 
-/**
- * Interface between an IJK generator inside a Thread and the EDOF generator located before the memory stage
- * Instantiate as-is in the IJK-generator/thread, use Flipped() in the edof generator
- */
-class IJKgeneratorEdofIO extends Bundle {
-  /** Element index in the x-direction */
-  val i = UInt(log2Ceil(NDOF+1).W)
-  /** Element index in the y-direction */
-  val j = UInt(log2Ceil(NDOF+1).W)
-  /** Element index in the z-direction */
-  val k = UInt(log2Ceil(NDOF+1).W)
-  /** Flag transmitted through to memory stage. */
-  val pad = Bool()
-}
 
-/**
- * Interface between the EDOF generator and memory stage.
- * Instntiate as-is in the EDOF generator, use Flipped() in the memory stage
- */
-class EdofMemoryIO extends Bundle {
-  /** The indices used as offsets from the base memory address */
-  val indices = Vec(8, UInt(log2Ceil(NDOF+1).W))
-  /** Flag transmitted through to memory stage */
-  val pad = Bool()
-}
 
 /**
  * I/O ports for [[EdofGenerator]]
  */
 class EdofGeneratorIO extends Bundle {
-  val prod = Flipped(Decoupled(new IJKgeneratorEdofIO))
-  val cons = Decoupled(new EdofMemoryIO)
+  val prod = Flipped(Decoupled(new IJKgeneratorConsumerIO))
+  val cons = Decoupled(new AddressGenProducerIO)
 }
 
 /**
@@ -64,9 +41,9 @@ class EdofGenerator extends Module {
 
   // --- SIGNALS AND WIRES ---
   //Shorthand acceeses
-  val i = in.i
-  val j = in.j
-  val k = in.k
+  val i = in.ijk.i
+  val j = in.ijk.j
+  val k = in.ijk.k
 
   //Handle initial multiplications. Implemented with a LUT to make our life easier. Given x,y-value, we output x*NY*NZ and y*NY
   val nynzLookup: Seq[Vec[UInt]] = for (i <- 0 until 2) yield {
@@ -123,9 +100,10 @@ class EdofGenerator extends Module {
   for(i <- 0 until 8) {
     //3*nIndex(i) + (0,1,2)
     io.cons.bits.indices(i) := (nIndex(i) << 1.U).asUInt() + nIndex(i) + outputStep
+    io.cons.bits.validIndices(i) := !in.pad
   }
+  io.cons.bits.baseAddr := in.baseAddr
   io.cons.valid := processing
   io.prod.ready := readyInternal
-  io.cons.bits.pad := in.pad
 }
 

@@ -195,8 +195,10 @@ class ThreadControlIO extends Bundle {
   val rs1 = Output(new RegisterBundle)
   /** Register bundle for source 2 of the incoming instruction */
   val rs2 = Output(new RegisterBundle)
-  /** Asserted when both destination queues in the execute stage are empty */
-  val emptyQueues = Input(Bool())
+  /** Asserted when the ordinary destination queue in the execute stage is empty */
+  val empty = Input(Bool())
+  /** Asserted when the MAC destination queue is empty */
+  val macEmpty = Input(Bool())
 }
 
 /**
@@ -234,7 +236,7 @@ class MemoryBundle extends Bundle {
   /** Whether this instruction is actually valid, or padding zero's should be returned */
   val pad = Bool()
   /** The encoded base address for this load/store operation */
-  val baseAddr = StypeOffset()
+  val baseAddr = StypeBaseAddress()
   /** Indices in a vector to use when performing direct load/store operations */
   val indices = Vec(8, UInt(log2Ceil(NDOF+1).W))
 }

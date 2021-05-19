@@ -6,7 +6,6 @@ import chisel3.experimental.BundleLiterals._
 import vector.Opcode
 import vector.Opcode._
 import utils.Config.NUM_SREG
-import utils.Fixed.{IMM_FRAC_WIDTH, IMM_INT_WIDTH}
 
 /**
  * Defines an instruction. Useful for packaging instructions of different formats inside Scala collections
@@ -93,6 +92,11 @@ object RtypeInstruction {
     val rs1 = v(20,17)
     val rs2 = v(31,28)
 
+    val fmt = v(7,6).litValue().toInt
+    if(fmt != InstructionFMT.RTYPE.litValue.toInt) {
+      throw new IllegalArgumentException(s"Instruction format ($fmt) did not match R-type format")
+    }
+
     val op: Opcode.Type = if(opval.litValue == ADD.litValue()) {
       ADD
     } else if (opval.litValue == SUB.litValue()) {
@@ -115,7 +119,6 @@ object RtypeInstruction {
 //      ADD
     }
 
-    val fmt = InstructionFMT.RTYPE
     val mod = if(modval.litValue == VV.litValue()) {
       VV
     } else if (modval.litValue == XV.litValue()) {
@@ -135,7 +138,7 @@ object RtypeInstruction {
       throw new IllegalArgumentException("Unable to decode op")
 //      VV
     }
-    (new RtypeInstruction).Lit(_.op -> op, _.fmt -> fmt, _.mod -> mod, _.rs1 -> rs1, _.rs2 -> rs2, _.rd -> rd, _.immflag -> v(12), _.immfrac -> immfrac)
+    (new RtypeInstruction).Lit(_.op -> op, _.fmt -> InstructionFMT.RTYPE, _.mod -> mod, _.rs1 -> rs1, _.rs2 -> rs2, _.rd -> rd, _.immflag -> v(12), _.immfrac -> immfrac)
   }
 
 }
@@ -148,14 +151,14 @@ class StypeInstruction extends Bundle with Instruction {
   val nu1 = UInt(15.W) //31:17
   /** Register source (when storing) or destination register (when loading) */
   val rsrd = UInt(4.W) //16:13
-  /** Not used */
-  val nu2 = UInt(1.W) //12
+  /** S-type load/store flag */
+  val ls = StypeLoadStore() //12
   /** S-type modifier */
   val mod = StypeMod() //11:8
   /** Instruction format */
   val fmt = InstructionFMT() //7:6
   /** S-type offset */
-  val offset = StypeOffset() //5:0
+  val baseAddr = StypeBaseAddress() //5:0
 
   override def toUInt(): UInt = {
     StypeInstruction.apply(this)
@@ -163,19 +166,79 @@ class StypeInstruction extends Bundle with Instruction {
 }
 
 object StypeInstruction {
+  import StypeBaseAddress._
+  import StypeMod._
+  import StypeLoadStore._
+  val BASEADDR_OFFSET = 0
+  val FMT_OFFSET = 6
+  val MOD_OFFSET = 8
+  val LS_OFFSET = 12
+  val RSRD_OFFSET =  13
   /** Converts an S-type instruction to it's UInt representation */
   def apply(v: StypeInstruction): UInt = {
     var s = 0
-    s |= (v.offset.litValue().toInt)
-    s |= (v.fmt.litValue().toInt << 6)
-    s |= (v.mod.litValue().toInt << 8)
-    s |= (v.rsrd.litValue().toInt << 13)
+    s |= (v.baseAddr.litValue().toInt)
+    s |= (v.fmt.litValue().toInt << FMT_OFFSET)
+    s |= (v.mod.litValue().toInt << MOD_OFFSET)
+    s |= (v.ls.litValue.toInt << LS_OFFSET)
+    s |= (v.rsrd.litValue().toInt << RSRD_OFFSET)
     s.U(32.W)
   }
 
   /** Constructs an S-type instruction from the given parameters */
-  def apply(rsrd: Int, mod: StypeMod.Type, offset: StypeOffset.Type): StypeInstruction = {
-    (new StypeInstruction).Lit(_.rsrd -> rsrd.U, _.mod -> mod, _.offset -> offset, _.fmt -> InstructionFMT.STYPE)
+  def apply(rsrd: Int, mod: StypeMod.Type, offset: StypeBaseAddress.Type): StypeInstruction = {
+    (new StypeInstruction).Lit(_.rsrd -> rsrd.U, _.mod -> mod, _.baseAddr -> offset, _.fmt -> InstructionFMT.STYPE)
+  }
+
+  /** Converts a UInt to the corresponding Stype instruction */
+  def apply(v: UInt): StypeInstruction = {
+    val baseAddrVal = v(6,0).litValue.toInt
+    val modVal = v(11,8).litValue.toInt
+    val lsVal = v(12).litToBoolean
+    val rsrd = v(16,13)
+    val fmt = v(7,6).litValue.toInt
+
+    if(fmt != InstructionFMT.STYPE.litValue.toInt) {
+      throw new IllegalArgumentException(s"Instruction format ($fmt) did not match S-type format")
+    }
+
+
+
+    val BaseAddr = baseAddrVal match {
+      case 0 => KE
+      case 1 => X
+      case 2 => XPHYS
+      case 3 => XNEW
+      case 4 => DC
+      case 5 => DV
+      case 6 => F
+      case 7 => U
+      case 8 => R
+      case 9 => Z
+      case 10 => P
+      case 11 => Q
+      case 12 => INVD
+      case 13 => TMP
+      case _ => throw new IllegalArgumentException(s"Unable to decode S-type base address (got $baseAddrVal)")
+    }
+
+    val mod = modVal match {
+      case 0x0 => VEC
+      case 0x1 => DOF
+      case 0x2 => ELEM
+      case 0x4 => EDN1
+      case 0x5 => EDN2
+      case 0x6 => FCN
+      case 0x7 => SEL
+      case _ => throw new IllegalArgumentException(s"Unable to decode S-type modifier (got $modVal)")
+    }
+
+    val ls = lsVal match {
+      case false => LOAD
+      case true => STORE
+    }
+
+    (new StypeInstruction).Lit(_.mod -> mod, _.baseAddr -> BaseAddr, _.ls -> ls, _.rsrd -> rsrd, _.fmt -> InstructionFMT.STYPE)
   }
 }
 
@@ -240,6 +303,11 @@ object OtypeInstruction extends Bundle {
     val ievval = v(2,1).litValue.toInt
     val lenval = v(4,3).litValue.toInt
     val it = v(5)
+
+    val fmt = v(7,6).litValue().toInt
+    if(fmt != InstructionFMT.OTYPE.litValue.toInt) {
+      throw new IllegalArgumentException(s"Instruction format ($fmt) did not match O-type format")
+    }
 
     val se = seval match {
       case false => OtypeSE.END
@@ -332,6 +400,11 @@ object BtypeInstruction {
     val rs1 = v(20,17)
     val rs2 = v(24,21)
 
+    val fmt = v(7,6).litValue().toInt
+    if(fmt != InstructionFMT.BTYPE.litValue.toInt) {
+      throw new IllegalArgumentException(s"Instruction format ($fmt) did not match B-type format")
+    }
+
     val comp = compvalue match {
       case 0 => BranchComp.EQUAL
       case 1 => BranchComp.NEQ
@@ -382,28 +455,51 @@ object RtypeMod extends ChiselEnum {
 }
 
 /**
- * Defines the various modifiers for S-type instructions. These define whether a load/store should be performed,
- * and what kind of load/store operation to do.
+ * Defines the various modifiers for S-type instructions.
+ * These define what kind of load/store operation should be performed
  */
 object StypeMod extends ChiselEnum {
-  val LDVEC =  Value("b0000".U)
-  val LDDOF =  Value("b0001".U)
-  val LDSCA =  Value("b0010".U)
-  val LDELEM = Value("b0011".U)
-  val STVEC =  Value("b1100".U)
-  val STDOF =  Value("b1101".U)
-  val STSCA =  Value("b1110".U)
-  val STELEM = Value("b1111".U)
+  val VEC =   Value("b0000".U)
+  val DOF =   Value("b0001".U)
+  val ELEM =  Value("b0010".U)
+  val EDN1 =  Value("b0100".U)
+  val EDN2 =  Value("b0101".U)
+  val FCN =   Value("b0110".U)
+  val SEL =   Value("b0111".U)
+  val WIDTH = Value("b1111".U)
+}
+
+/**
+ * Defines the S-type load/store flags
+ */
+object StypeLoadStore extends ChiselEnum {
+  val LOAD = Value(0.U)
+  val STORE = Value(1.U)
 }
 
 /**
  * Defines values that make decoding base memory addresses for the various memory regions easier. The actual decoding
  * is performed in hardware
  */
-object StypeOffset extends ChiselEnum {
-  val X, XPHYS, XNEW, DC, DV, F, U, R, Z, P, Q, INVD, TMP = Value
+object StypeBaseAddress extends ChiselEnum {
+  val KE = Value(0.U)
+  val X = Value(1.U)
+  val XPHYS = Value(2.U)
+  val XNEW = Value(3.U)
+  val DC = Value(4.U)
+  val DV = Value(5.U)
+  val F = Value(6.U)
+  val U = Value(7.U)
+  val R = Value(8.U)
+  val Z = Value(9.U)
+  val P = Value(10.U)
+  val Q = Value(11.U)
+  val INVD = Value(12.U)
+  val TMP = Value(13.U)
   val WIDTH = Value("b111111".U)
 }
+
+
 
 /**
  * Defines the instrution/element/vector flags for O-type instructions

@@ -19,9 +19,9 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
   def edofGenTest(dut: EdofGenerator): Unit = {
     val x=3; val y=2; val z=1;
     val edof = getEdof(x,y,z)
-    dut.io.prod.bits.i.poke(x.U)
-    dut.io.prod.bits.j.poke(y.U)
-    dut.io.prod.bits.k.poke(z.U)
+    dut.io.prod.bits.ijk.i.poke(x.U)
+    dut.io.prod.bits.ijk.j.poke(y.U)
+    dut.io.prod.bits.ijk.k.poke(z.U)
     dut.io.prod.valid.poke(true.B)
 
     dut.clock.step() //latch in values
@@ -50,9 +50,9 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
   def testReadyValid(dut: EdofGenerator): Unit = {
     val in = dut.io.prod
     val out = dut.io.cons
-    in.bits.i.poke(0.U)
-    in.bits.j.poke(1.U)
-    in.bits.k.poke(2.U)
+    in.bits.ijk.i.poke(0.U)
+    in.bits.ijk.j.poke(1.U)
+    in.bits.ijk.k.poke(2.U)
     in.valid.poke(true.B)
     //Should be ready but not valid
     out.ready.expect(true.B)
@@ -136,44 +136,13 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
       }
     }
 
-//
-//    edof(0) = 3 * nIndex1 + 0;
-//    edof(1) = 3 * nIndex1 + 1;
-//    edof(2) = 3 * nIndex1 + 2;
-//    edof(3) = 3 * nIndex2 + 0;
-//    edof(4) = 3 * nIndex2 + 1;
-//    edof(5) = 3 * nIndex2 + 2;
-//    edof(6) = 3 * nIndex3 + 0;
-//    edof(7) = 3 * nIndex3 + 1;
-//    edof(8) = 3 * nIndex3 + 2;
-//    edof(9) = 3 * nIndex4 + 0;
-//    edof(10) = 3 * nIndex4 + 1;
-//    edof(11) = 3 * nIndex4 + 2;
-//    edof(12) = 3 * nIndex5 + 0;
-//    edof(13) = 3 * nIndex5 + 1;
-//    edof(14) = 3 * nIndex5 + 2;
-//    edof(15) = 3 * nIndex6 + 0;
-//    edof(16) = 3 * nIndex6 + 1;
-//    edof(17) = 3 * nIndex6 + 2;
-//    edof(18) = 3 * nIndex7 + 0;
-//    edof(19) = 3 * nIndex7 + 1;
-//    edof(20) = 3 * nIndex7 + 2;
-//    edof(21) = 3 * nIndex8 + 0;
-//    edof(22) = 3 * nIndex8 + 1;
-//    edof(23) = 3 * nIndex8 + 2;
     edof
-
-    /*
-
-     */
-
-    //Need to reorder these bitches ...
   }
 
   def pokeIJK(dut: EdofGenerator, i: Int, j: Int, k: Int): Unit = {
-    dut.io.prod.bits.i.poke(i.U)
-    dut.io.prod.bits.j.poke(j.U)
-    dut.io.prod.bits.k.poke(k.U)
+    dut.io.prod.bits.ijk.i.poke(i.U)
+    dut.io.prod.bits.ijk.j.poke(j.U)
+    dut.io.prod.bits.ijk.k.poke(k.U)
   }
 
   def expectIndices(dut: EdofGenerator, indices: Array[Int]): Unit = {
