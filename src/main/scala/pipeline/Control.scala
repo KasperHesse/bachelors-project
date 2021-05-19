@@ -30,8 +30,10 @@ class Control extends Module {
   //We need these assignments or the firrtl checker will be angry
   io.id.threadCtrl(0).stall := false.B
   io.id.threadCtrl(1).stall := false.B
-  io.id.threadCtrl(0).emptyQueues := io.ex.empty && io.ex.macEmpty
-  io.id.threadCtrl(1).emptyQueues := io.ex.empty && io.ex.macEmpty
+  io.id.threadCtrl(0).empty := io.ex.empty
+  io.id.threadCtrl(1).empty := io.ex.empty
+  io.id.threadCtrl(0).macEmpty := io.ex.macEmpty
+  io.id.threadCtrl(1).macEmpty := io.ex.macEmpty
   io.id.stall := false.B
 
   io.fe.iload := false.B

@@ -7,7 +7,9 @@ import utils.Config._
 import utils.Fixed._
 import chisel3.experimental.BundleLiterals._
 
-
+/**
+ * I/O ports for the decode stage
+ */
 class DecodeIO extends Bundle {
   val ex = new IdExIO
   val mem = new IdMemIO
@@ -18,7 +20,7 @@ class DecodeIO extends Bundle {
 
 /**
  * Main class for the decode stage. Contains two threads which take turns accessing memory and the execution stage.
- * Implements [[DecodeOldIO]].
+ * Implements [[DecodeIO]]
  */
 class Decode extends Module {
   val io = IO(new DecodeIO())
@@ -192,6 +194,8 @@ class Decode extends Module {
       }
       when(threadStates(0) === ThreadState.sIdle && threadStates(1) === ThreadState.sIdle) {
         state := sIdle
+        execThread := 1.U
+        memThread := 0.U
       }
     }
   }
