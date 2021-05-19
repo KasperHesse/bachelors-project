@@ -64,6 +64,11 @@ object Config {
   /** Number of elements parsed when performing an operation over NDOF-long vectors */
   var NDOFLENGTH = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else (NDOF/ELEMS_PER_VSLOT+1)*ELEMS_PER_VSLOT
 
+  /** The number of memory banks used / the number of values that can be loaded from memory at once */
+  var NUM_MEMORY_BANKS = 8
+  /** Width of memory addresses */
+  var MEM_ADDR_WIDTH = 32
+
   /** Simulation flag. Assert inside of a tester to use simulation-specific functionality */
   var SIMULATION = false
 

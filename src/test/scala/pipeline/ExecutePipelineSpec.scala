@@ -440,7 +440,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     val p2 = wrapInstructions(Array(RtypeInstruction(0, 1, 2, MAC, RtypeMod.VV)), OtypeLen.NELEM)
     val instrs = Array.concat(p1,p2)
     writeMemInitFile(memfile, instrs)
-    test(new ExecutePipeline(memfile=memfile)) {dut =>
+    test(new ExecutePipeline(memfile=memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       testFun(dut)
     }
   }

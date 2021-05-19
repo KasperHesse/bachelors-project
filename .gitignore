@@ -13,3 +13,4 @@ quartus
 project/target
 
 src/main/scala/test
+src/test/scala/test

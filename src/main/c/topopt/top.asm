@@ -21,23 +21,26 @@
     pstart nelem (ijk)
     ld.fcn x1, X  //x1 = face neighbour values
     ld.edn1 x2, X //x2 = edge neighbour value
-	 ld.edn2 x3, X //x3 = edge neighbour values
-    ld.sel s1, X	//x1 = central element value
+    ld.edn2 x3, X //x3 = edge neighbour values
+    ld.sel x4, X	//x1 = central element value
     estart
-    mul.ix x1, x1, FW_FACE //multiply face-neighbours with filterweights
-    mul.ix x2, x2, FW_EDGE //multiply edge-neighbours with filterweights
-	 mul.ix x3, x3, FW_EDGE //multiply edge-neighbours with filterweights
-    mul.is s1, s1, FW_CENTRAL //multiply central element with filterweight
-    mac.ix s2, x1, 1 //sum all face neighbours
-    mac.ix s3, x2, 1 //sum all edge neighbours
-	 mac.ix s4, x3, 1 //sum more edge neighbours
-    add.ss s3, s2, s3 //sum face and some edge neighbours
-	 add.ss s3, s3, s4 //add remaining edge neighbours
-    add.ss s3, s3, s1 //add central element, s3=out[e1]
-    uns.ss s4, x1 //s4 = unityScale[x1]
-    div.ss s3, s3, s4 // out[e1] /= unityScale
+        mul.ix x1, x1, FW_FACE //multiply face-neighbours with filterweights
+        mul.ix x2, x2, FW_EDGE //multiply edge-neighbours with filterweights
+        mul.ix x3, x3, FW_EDGE //multiply more edge-neighbours with filterweights
+        mul.ix x4, x4, FW_CENTRAL //multiply central element with filterweight
+        mac.ix s2, x1, 1 //sum all face neighbours
+        mac.ix s3, x2, 1 //sum all edge neighbours
+        mac.ix s4, x3, 1 //sum more edge neighbours
+        mac.ix s5, x4, 1 //Sum central cell
+        add.ss s3, s2, s3 //sum face and some edge neighbours
+        add.ss s3, s3, s4 //add remaining edge neighbours
+        add.ss s3, s3, s5 //add central element, s3=out[e1]
+        uns.ss s4, x1 //s4 = unityScale[x1]
+        div.ss s3, s3, s4 // out[e1] /= unityScale
+        mul.sx x1, s0, x1 //Zero out x1
+        add.sx x1, x3, x1 //Copy s-value into x1 for storage
     eend
-    st.sel s3, XPHYS
+    st.sel x1, XPHYS
     pend
 }
 
@@ -64,7 +67,7 @@
     uns.ss s4, x1 //s4 = unityScale
     div.ss s1, s1, s4 //tmp[e1] = v[e1] / unityScale
     eend
-    st.sca s1, TMP
+    st.sel s1, TMP
 
     //perform computation 2
     pstart nelem (ijk)
@@ -80,7 +83,7 @@
     add.ss s3, s2, s3 //sum all neighbours
     add.ss s3, s3, s1 //add central element, s3=v[e1]
     eend
-    st.sca s3, V
+    st.sel s3, V
 }
 
 //applystateoperator

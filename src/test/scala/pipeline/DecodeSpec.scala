@@ -332,9 +332,9 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
   "Decode stage" should "Decode a random mix for multiple iterations" in {
     genericConfig()
-    seed("Random mix decode")
+    seed("Random mix decode multiple iterations")
     test(new Decode) { dut =>
-      val iters = (if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else ((NDOF/ELEMS_PER_VSLOT)+1)*ELEMS_PER_VSLOT)/ELEMS_PER_VSLOT
+      val iters = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else ((NDOF/ELEMS_PER_VSLOT)+1)*ELEMS_PER_VSLOT/ELEMS_PER_VSLOT
       val instrs = genAndPoke(dut, OtypeLen.NDOF)
       var i = 0
       while(i < iters) {

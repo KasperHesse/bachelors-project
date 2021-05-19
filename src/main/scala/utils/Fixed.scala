@@ -81,7 +81,7 @@ object Fixed {
    * @return a+b, within in the limits of the addition hardware
    */
   def fixedAdd(x: Double, y: Double): Double = {
-    fixed2double(fixedAdd(double2fixed(x), double2fixed((y))))
+    fixed2double(fixedAdd(double2fixed(x), double2fixed(y)))
   }
   /**
    * Adds two longs representing fixed-point numbers

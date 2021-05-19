@@ -16,6 +16,9 @@ import vector.Opcode
 import scala.collection.mutable._
 import scala.collection.mutable
 
+/**
+ * This object is the singleton object used to invoke the assembler to generate programming files for the topological optimizer.
+ */
 object Assembler {
   import LitVals._
 
