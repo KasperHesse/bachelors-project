@@ -8,7 +8,7 @@ import utils.Fixed.FIXED_WIDTH
 import vector.KEWrapper
 import vector.Opcode._
 import chisel3.experimental.BundleLiterals._
-import memory.IJK
+import memory.IJKBundle
 import pipeline.RegisterFileType._
 
 /**
@@ -82,29 +82,29 @@ class Thread(id: Int) extends Module {
   /** Instruction pointer into the instruction buffer */
   val IP = RegInit(0.U(4.W))
   /** Current index into subvectors. Also gives the x-coordinate of the submatrix in the KE matrix */
-  val X = RegInit(0.U(log2Ceil(VREG_DEPTH).W))
+//  val X = RegInit(0.U(log2Ceil(VREG_DEPTH).W))
+  val X = RegInit(0.U)
   /** Current y-coordinate used to index into KE matrix */
-  val Y = RegInit(0.U(log2Ceil(KE_SIZE/NUM_PROCELEM).W))
+//  val Y = RegInit(0.U(log2Ceil(KE_SIZE/NUM_PROCELEM).W))
+  val Y = RegInit(0.U)
   /** Current column of submatrix (x,y) in the KE matrix */
-  val col = RegInit(0.U(log2Ceil(NUM_PROCELEM).W))
+//  val col = RegInit(0.U(log2Ceil(NUM_PROCELEM).W))
+  val col = RegInit(0.U)
   /** Used to select which vector from a vector slot is output */
-  val slotSelect = RegInit(0.U(log2Ceil(VREG_SLOT_WIDTH).W))
+//  val slotSelect = RegInit(0.U(log2Ceil(VREG_SLOT_WIDTH).W))
+  val slotSelect = RegInit(0.U)
   /** State register */
   val state = RegInit(sIdle)
 
   // --- WIRES AND SIGNALS ---
-  private val VV = ELEMS_PER_VSLOT
-  private val NDOFlength = if(NDOF % VV == 0) NDOF else (math.floor(NDOF.toDouble/VV).toInt+1)*VV
-  private val NELEMlength = if(NELEM % VV == 0) NELEM else (math.floor(NELEM.toDouble/VV)+1).toInt*VV
-
   /** Handle to the current instruction */
   val currentInstr: UInt = io.instr
   /** Length of the instruction being decoded */
-  val instrLen = RegInit(1.U(log2Ceil(NDOFlength+1).W))
+  val instrLen = RegInit(1.U(log2Ceil(NDOFLENGTH+1).W))
   /** LUT to decode vector lengths (for setting macLimit) */
   val lenDecode = VecInit(Array(
-    (NDOFlength/NUM_PROCELEM).U,
-    (NELEMlength/NUM_PROCELEM).U,
+    (NDOFLENGTH/NUM_PROCELEM).U,
+    (NELEMLENGTH/NUM_PROCELEM).U,
     (ELEMS_PER_VSLOT/NUM_PROCELEM).U //allows us to perform a single mac instruction on stored values
   ))
 
@@ -122,12 +122,12 @@ class Thread(id: Int) extends Module {
   val finalCycle = WireDefault(false.B)
 
   //This makes it easier to address subvectors of the output vectors a, b from register file
-//  val a_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
-//  val b_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
-//  for(i <- 0 until SUBVECTORS_PER_VREG) {
-//    a_subvec(i) := vRegFile.io.rdData1.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
-//    b_subvec(i) := vRegFile.io.rdData2.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
-//  }
+  val a_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
+  val b_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
+  for(i <- 0 until SUBVECTORS_PER_VREG) {
+    a_subvec(i) := vRegFile.io.rdData1.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
+    b_subvec(i) := vRegFile.io.rdData2.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
+  }
 
   /** 'a' data subvector going into execute stage */
   val a = WireDefault(VecInit(Seq.fill(NUM_PROCELEM)(0.S(FIXED_WIDTH.W)))) //TODO Change default assignment to a_subvec(0)
@@ -273,7 +273,9 @@ class Thread(id: Int) extends Module {
     is(sExec) {
       //Execute instructions, increment IP as necessary
       //When we load the eend instruction, move to that state once execute pipeline is empty
-      when(Oinst.pe === OtypePE.EXEC && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE && io.ctrl.emptyQueues) {
+      //Only the ordinary destination queue has to be empty. If mac dest queue is non-empty and fin is not asserted, that's also OK
+      when(Oinst.pe === OtypePE.EXEC && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE
+        && io.ctrl.empty && (io.ctrl.macEmpty || !io.fin)) {
         finalCycle := false.B //Deassert to avoid incrementing IP
         state := sEend
       }
@@ -336,12 +338,12 @@ class Thread(id: Int) extends Module {
       is(RtypeMod.VV) { //This won't work when processing SUM instructions. They are special cases
         //Output connections
 
-//        a := a_subvec(X)
-//        b := b_subvec(X)
-        for(i <- 0 until NUM_PROCELEM) {
-          a(i) := vRegFile.io.rdData1(i.U+X*NUM_PROCELEM.U)
-          b(i) := vRegFile.io.rdData2(i.U+X*NUM_PROCELEM.U)
-        }
+        a := a_subvec(X)
+        b := b_subvec(X)
+//        for(i <- 0 until NUM_PROCELEM) {
+//          a(i) := vRegFile.io.rdData1(i.U+X*NUM_PROCELEM.U)
+//          b(i) := vRegFile.io.rdData2(i.U+X*NUM_PROCELEM.U)
+//        }
         op := Rinst.op
 
         dest.reg := Mux(Rinst.op === MAC, Rinst.rd, v_rd) //MAC.VV instructions always end in s-registers
@@ -365,9 +367,9 @@ class Thread(id: Int) extends Module {
         //SlotSelect is used to index into xReg, X is used to index into vReg
         for (i <- 0 until NUM_PROCELEM) {
           a(i) := xRegFile.io.rdData1(slotSelect)
-          b(i) := vRegFile.io.rdData2(i.U+X*NUM_PROCELEM.U)
+//          b(i) := vRegFile.io.rdData2(i.U+X*NUM_PROCELEM.U)
         }
-//        b := b_subvec(X)
+        b := b_subvec(X)
         op := Rinst.op
         dest.reg := v_rd
         dest.subvec := X
@@ -402,9 +404,9 @@ class Thread(id: Int) extends Module {
       is(RtypeMod.SV) {
         for (i <- 0 until NUM_PROCELEM) {
           a(i) := io.sRegFile.rdData1
-          b(i) := vRegFile.io.rdData2(i.U + X*NUM_PROCELEM.U)
+//          b(i) := vRegFile.io.rdData2(i.U + X*NUM_PROCELEM.U)
         }
-//        b := b_subvec(X)
+        b := b_subvec(X)
         op := Rinst.op
         dest.reg := Mux(Rinst.op === MAC, Rinst.rd, v_rd)
         dest.subvec := Mux(Rinst.op === MAC, 0.U, X)
@@ -453,8 +455,8 @@ class Thread(id: Int) extends Module {
 
       is(RtypeMod.KV) {
         for (i <- 0 until NUM_PROCELEM) {
-//          a(i) := a_subvec(X)(col)
-          a(i) := vRegFile.io.rdData1(col + X*NUM_PROCELEM.U)
+          a(i) := a_subvec(X)(col)
+//          a(i) := vRegFile.io.rdData1(col + X*NUM_PROCELEM.U)
         }
         b := KE.io.keVals
 
