@@ -186,7 +186,7 @@ class NeighbourGeneratorSpec extends FlatSpec with ChiselScalatestTester with Ma
     }
   }
 
-  "Neighbour generator" should "test when happens when on an edge/corner" in {
+  "Neighbour generator" should "test what happens when on an edge/corner" in {
     test(new NeighbourGenerator) { dut =>
       //Setup values
       dut.io.in.ready.expect(true.B)

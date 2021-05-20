@@ -8,16 +8,13 @@ import utils.Config._
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import memory.membankinit.InitMemBanks
 import pipeline.StypeBaseAddress
 
 class OnChipMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers {
-  behavior of "On-chip memory"
 
   //We'll attempt to read some values at subsequent locations 0-7, 8-15 etc. Each bank holds 8 words in this test
   "On-chip memory" should "support read operations" in {
     SIMULATION = true
-    InitMemBanks()
     test(new OnChipMemory(8)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
 
       //Poke read addr and setup handshake signals
@@ -28,6 +25,7 @@ class OnChipMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
         dut.io.addrGen.bits.validAddress(i).poke(true.B)
       }
       dut.clock.step()
+      //Expect output values
       for(i <- 0 until NUM_MEMORY_BANKS) {
         dut.io.wb.bits.rdData(i).expect((i+8).S)
       }
@@ -36,7 +34,6 @@ class OnChipMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
 
   "On-chip memory" should "keep output values when ready is deasserted" in {
     SIMULATION = true
-    InitMemBanks()
     test(new OnChipMemory(8)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       //Poke read addr and setup handshake signals
       dut.io.wb.ready.poke(true.B)
@@ -75,7 +72,6 @@ class OnChipMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
 
   "On-chip memory" should "accept writes when we is asserted" in {
     SIMULATION = true
-    InitMemBanks()
     test(new OnChipMemory(8)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       //Setup handshake and values
       dut.io.addrGen.valid.poke(true.B)
@@ -112,7 +108,6 @@ class OnChipMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
 
   "On-chip memory" should "only write the indices that are valid" in {
     SIMULATION = true
-    InitMemBanks()
     test(new OnChipMemory(8)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       //Setup handshake and values
       dut.io.addrGen.valid.poke(true.B)
@@ -141,7 +136,6 @@ class OnChipMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
 
   "On-chip memory" should "read 0 when indices are not valid" in {
     SIMULATION = true
-    InitMemBanks()
     test(new OnChipMemory(8)) {dut =>
       dut.io.addrGen.valid.poke(true.B)
       dut.io.wb.ready.poke(true.B)
