@@ -1,5 +1,6 @@
 package utils
 
+import java.io.{BufferedWriter, FileWriter}
 import java.util.NoSuchElementException
 
 import chisel3._
@@ -39,6 +40,19 @@ object Assembler {
     code.foreach(a =>
       print(s"0x${(z + a.toHexString).takeRight(8)} / ${(z + a.toBinaryString).takeRight(32)}\n")
     )
+  }
+
+  /**
+   * Initializes a memory file
+   * @param memfile Relative path to the memory file to initialize. Existing contents are overwritten, a new file is created if none exists
+   * @param instrs Encoded instruction to write into that file
+   */
+  def writeMemInitFile(memfile: String, instrs: Array[Int]): Unit = {
+    val writer = new BufferedWriter(new FileWriter(memfile))
+    for(instr <- instrs) {
+      writer.write(("00000000" + instr.toHexString).takeRight(8) + "\n")
+    }
+    writer.close()
   }
 
   /**
