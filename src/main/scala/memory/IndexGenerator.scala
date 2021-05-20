@@ -68,15 +68,20 @@ class IndexGenerator(val pipe: Boolean = true) extends Module {
   }
 
   //ready-valid signal handling
-  readyInternal := io.addrGen.ready
   if(pipe) {
     when(!validInternal && io.in.valid && readyInternal) {
       validInternal := true.B
     } .elsewhen(validInternal & io.addrGen.ready & !io.in.valid) {
       validInternal := false.B
     }
+    when(!validInternal) {
+      readyInternal := true.B
+    } .otherwise {
+      readyInternal := io.addrGen.ready
+    }
   } else {
     validInternal := io.in.valid
+    readyInternal := io.addrGen.ready
   }
 
   //Outputs

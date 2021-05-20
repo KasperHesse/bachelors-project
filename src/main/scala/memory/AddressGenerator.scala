@@ -24,7 +24,7 @@ class AddressGeneratorIO extends Bundle {
  * @param registered Whether ready/valid signals should be transmitted directly through the module (purely combinational module)
  *                   or values should be registered in the middle. //TODO currently not implemented
  *
- * @note It is up to the user to ensure that all 8 indices are mutually exclusive (do not try to access the same memory banks)
+ * @note It is up to the user/previous hardware to ensure that all 8 indices are mutually exclusive (do not try to access the same memory banks)
  */
 class AddressGenerator(registered: Boolean = false) extends Module {
   val io = IO(new AddressGeneratorIO)
@@ -72,6 +72,8 @@ class AddressGenerator(registered: Boolean = false) extends Module {
  * Performs a pseudo-ordering of vectors by the 3 LSB of their values.
  * If two values with the same 3 LSB are given, the one further "up" the vector is given priority.
  * Eg. if addressIn(1) = 0010 and addressIn(5) = 1010, then addressOut(1) will be 1010.
+ * //TODO must only sort addresses if the corresponding index is valid
+ * (eg if address(0)=x000(valid) and address(1)=x000(!valid), address(0) should be prioritized
  */
 class VectorOrderer extends Module {
   val io = IO(new Bundle {
@@ -83,18 +85,57 @@ class VectorOrderer extends Module {
 
   //Super-duper fugly scala/chisel-mix to generate output
   io.addressOut := io.addressIn
-  io.validsOut := io.validsIn
+  io.validsOut := WireDefault(VecInit(Seq.fill(NUM_MEMORY_BANKS)(false.B)))
 
   for(i <- 0 until NUM_MEMORY_BANKS) {
     switch(io.addressIn(i)(2,0)) {
-      is(0.U) {io.addressOut(0) := io.addressIn(i); io.validsOut(0) := io.validsIn(i)}
-      is(1.U) {io.addressOut(1) := io.addressIn(i); io.validsOut(1) := io.validsIn(i)}
-      is(2.U) {io.addressOut(2) := io.addressIn(i); io.validsOut(2) := io.validsIn(i)}
-      is(3.U) {io.addressOut(3) := io.addressIn(i); io.validsOut(3) := io.validsIn(i)}
-      is(4.U) {io.addressOut(4) := io.addressIn(i); io.validsOut(4) := io.validsIn(i)}
-      is(5.U) {io.addressOut(5) := io.addressIn(i); io.validsOut(5) := io.validsIn(i)}
-      is(6.U) {io.addressOut(6) := io.addressIn(i); io.validsOut(6) := io.validsIn(i)}
-      is(7.U) {io.addressOut(7) := io.addressIn(i); io.validsOut(7) := io.validsIn(i)}
+      is(0.U) { when(io.validsIn(i)) {
+        io.addressOut(0) := io.addressIn(i)
+        io.validsOut(0) := io.validsIn(i)
+        }
+      }
+      is(1.U) { when(io.validsIn(i)) {
+        io.addressOut(1) := io.addressIn(i)
+        io.validsOut(1) := io.validsIn(i)
+        }
+      }
+      is(2.U) { when(io.validsIn(i)) {
+        io.addressOut(2) := io.addressIn(i)
+        io.validsOut(2) := io.validsIn(i)
+        }
+      }
+      is(3.U) { when(io.validsIn(i)) {
+        io.addressOut(3) := io.addressIn(i)
+        io.validsOut(3) := io.validsIn(i)
+        }
+      }
+      is(4.U) { when(io.validsIn(i)) {
+        io.addressOut(4) := io.addressIn(i)
+        io.validsOut(4) := io.validsIn(i)
+        }
+      }
+      is(5.U) { when(io.validsIn(i)) {
+        io.addressOut(5) := io.addressIn(i)
+        io.validsOut(5) := io.validsIn(i)
+        }
+      }
+      is(6.U) { when(io.validsIn(i)) {
+        io.addressOut(6) := io.addressIn(i)
+        io.validsOut(6) := io.validsIn(i)
+        }
+      }
+      is(7.U) { when(io.validsIn(i)) {
+        io.addressOut(7) := io.addressIn(i)
+        io.validsOut(7) := io.validsIn(i)
+        }
+      }
+//      is(1.U) {io.addressOut(1) := io.addressIn(i); io.validsOut(1) := io.validsIn(i)}
+//      is(2.U) {io.addressOut(2) := io.addressIn(i); io.validsOut(2) := io.validsIn(i)}
+//      is(3.U) {io.addressOut(3) := io.addressIn(i); io.validsOut(3) := io.validsIn(i)}
+//      is(4.U) {io.addressOut(4) := io.addressIn(i); io.validsOut(4) := io.validsIn(i)}
+//      is(5.U) {io.addressOut(5) := io.addressIn(i); io.validsOut(5) := io.validsIn(i)}
+//      is(6.U) {io.addressOut(6) := io.addressIn(i); io.validsOut(6) := io.validsIn(i)}
+//      is(7.U) {io.addressOut(7) := io.addressIn(i); io.validsOut(7) := io.validsIn(i)}
     }
   }
 }

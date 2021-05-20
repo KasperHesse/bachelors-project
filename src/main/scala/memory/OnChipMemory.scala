@@ -4,6 +4,7 @@ import chisel3._
 import chisel3.util.experimental.loadMemoryFromFile
 import chisel3.util.experimental.loadMemoryFromFileInline
 import chisel3.util._
+import utils.Assembler.writeMemInitFile
 import utils.Fixed._
 import utils.Config._
 
@@ -26,9 +27,9 @@ class OnChipMemoryIO extends Bundle {
  * A class representing the memory accessible directly on-board the FPGA. See [[OnChipMemoryIO]] for IO details.
  *
  * @param wordsPerBank The number of data words to store in *each* memory bank. The total amount of memory allotted
- *                     is numBanks*wordsPerBank, each of which is [[utils.Fixed.FIXED_WIDTH]] bits wide.
+ *                     is NUM_MEMORY_BANKS*wordsPerBank, each of which is [[utils.Fixed.FIXED_WIDTH]] bits wide.
  * @param memInitFileLocation Location of memory initialization file. Each file must be named 'membank_x.txt', where 'x'
- *                            is a number [0;7]. The parameter is the relative path to these files, to which the filename is appended.
+ *                            is a number [0;NUM_MEMORY_BANKS[. The parameter is the relative path to these files, to which the filename is appended.
  *                            If eg memInitFileLocation = "resources/meminit/", one file would be "resources/meminit/membank_0.txt"
  */
 class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src/test/scala/memory/membankinit/") extends Module {
@@ -36,7 +37,7 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
   val io = IO(new OnChipMemoryIO)
 
   // --- MODULES ---
-  //memory banks holding N elements each
+  /** Memory banks holding N elements each  */
   val membank = for(i <- 0 until NUM_MEMORY_BANKS) yield {
     SyncReadMem(wordsPerBank, SInt(FIXED_WIDTH.W))
   }
@@ -56,7 +57,8 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
   // are all represented as address 'x' in their respective banks. The lower 3 bits are thus used to select the relevant banks
   for(i <- membank.indices) {
     //Set up read accessors. If address it not valid, we replace the read data with 0's
-        rdData(i) := Mux(io.addrGen.bits.validAddress(i), membank(i).read((io.addrGen.bits.addr(i) >> log2Ceil(NUM_MEMORY_BANKS)).asUInt(), validOp), 0.S(FIXED_WIDTH.W))
+//    rdData(i) := Mux(io.addrGen.bits.validAddress(i), membank(i).read((io.addrGen.bits.addr(i) >> log2Ceil(NUM_MEMORY_BANKS)).asUInt(), validOp), 0.S(FIXED_WIDTH.W))
+    rdData(i) := membank(i).read((io.addrGen.bits.addr(i) >> log2Ceil(NUM_MEMORY_BANKS)).asUInt(), validOp)
 
     //Set up write accessors. Only write if address is valid
     we(i) := io.addrGen.bits.we && io.addrGen.bits.validAddress(i) && io.addrGen.valid
@@ -75,6 +77,7 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
         memInitFileLocation + "/membank_" + i + ".txt"
       }
       if(SIMULATION) {
+        InitMemBanks(wordsPerBank, memInitFileLocation)
         loadMemoryFromFile(membank(i), file)
       } else {
         loadMemoryFromFileInline(membank(i), file)
@@ -87,6 +90,36 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
   //We are ready whenever the writeback builder signals ready
   io.addrGen.ready := io.wb.ready
   io.wb.valid := RegNext(validOp)
-  io.wb.bits.rdData := rdData
+  for(i <- 0 until NUM_MEMORY_BANKS) {
+    io.wb.bits.rdData(i) := Mux(io.addrGen.bits.validAddress(i), rdData(i), 0.S)
+  }
+//  io.wb.bits.rdData := Mu
   io.writeQueue.ready := io.addrGen.bits.we && io.addrGen.valid
+}
+
+/**
+ * Module that initializes the memory banks to some standard values that are easy to operate on.
+ * Only used when simulation.
+ */
+object InitMemBanks {
+
+  /**
+   * Initializes memory banks to some standard values that are easy to operate on
+   * @param wordsPerBank The number of words stored in each memory bank / the number of values to write into the init file
+   *
+   * @param memInitFileLocation The relative path to the file where the memory initialization file should be written
+   */
+  def apply(wordsPerBank: Int, memInitFileLocation: String): Unit = {
+    for(i <- 0 until NUM_MEMORY_BANKS) {
+      val file = if (memInitFileLocation.takeRight(1).equals("/")) {
+        memInitFileLocation + "membank_" + i + ".txt"
+      } else {
+        memInitFileLocation + "/membank_" + i + ".txt"
+      }
+      val values = for(j <- 0 until wordsPerBank) yield {
+        j*NUM_MEMORY_BANKS+i
+      }
+      writeMemInitFile(file, values.toArray)
+    }
+  }
 }
