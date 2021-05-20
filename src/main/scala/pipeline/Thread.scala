@@ -38,7 +38,7 @@ class ThreadIO extends Bundle {
   /** Connections to the execute stage */
   val ex = new IdExIO
   /** Connections to memory stage */
-  val mem = new IdMemIO
+  val mem = Decoupled(new IdMemIO)
   /** Connections to the control module */
   val ctrl = new ThreadControlIO
   /** Connections to writeback stage */
@@ -237,6 +237,7 @@ class Thread(id: Int) extends Module {
   io.ctrl.stateUint := state.asUInt()
   io.ex.dest.rfUint := dest.rf.asUInt()
   io.ex.opUInt := op.asUInt()
+  io.mem := DontCare
 
 
   // --- LOGIC ---

@@ -11,10 +11,17 @@ import chisel3.experimental.BundleLiterals._
  * I/O ports for the decode stage
  */
 class DecodeIO extends Bundle {
-  val ex = new IdExIO
-  val mem = new IdMemIO
+  /** Connections to fetch stage */
   val fe = Flipped(new IfIdIO)
+  /** Connections to execute stage */
+  val ex = new IdExIO
+  /** Output connections to memory stage */
+  val mem = Decoupled(new IdMemIO)
+  /** Input connections from execute writeback stage */
   val wb = Flipped(new WbIdIO)
+  /** Input connections from memory writeback stage */
+  val memWb = Flipped(new WbIdIO)
+  /** Connections to control module */
   val ctrl = new IdControlIO
 }
 
@@ -97,7 +104,6 @@ class Decode extends Module {
     thread.io.progress := progress
     thread.io.fin := fin
     thread.io.start := start
-    thread.io.mem.rdData := DontCare
     thread.io.sRegFile.rdData1 := sRegFile.io.rdData1
     thread.io.sRegFile.rdData2 := sRegFile.io.rdData2
     thread.io.instr := iBuffer(thread.io.ip)
@@ -125,13 +131,13 @@ class Decode extends Module {
 
   //Debug connections. TODO: Remove these
   io.ctrl.stateUint := state.asUInt()
+  io.mem <> threads(0).io.mem
 
   //Assign shared resources to threads
   when(execThread === 0.U) {
     //Thread 0 accessed execute and wb stage
     threads(0).io.ex <> io.ex
     threads(0).io.wb <> io.wb
-    threads(0).io.mem.rdData := DontCare
     sRegFile.io.rs1 := threads(0).io.sRegFile.rs1
     sRegFile.io.rs2 := threads(0).io.sRegFile.rs2
 
@@ -150,7 +156,6 @@ class Decode extends Module {
     //Thread 1 accesses execute and wb stage
     threads(1).io.ex <> io.ex
     threads(1).io.wb <> io.wb
-    threads(1).io.mem.rdData := DontCare
     sRegFile.io.rs1 := threads(1).io.sRegFile.rs1
     sRegFile.io.rs2 := threads(1).io.sRegFile.rs2
   }

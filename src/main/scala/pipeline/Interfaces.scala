@@ -3,6 +3,7 @@ package pipeline
 import chisel3._
 import chisel3.experimental.ChiselEnum
 import chisel3.util.log2Ceil
+import memory.AddressGenProducerIO
 import utils.Config._
 import utils.Fixed._
 import vector.Opcode
@@ -56,11 +57,15 @@ class IdExIO extends Bundle {
 }
 
 /**
- * Interface between the instruction decode stage and memory.
+ * Interface between the instruction decode stage and memory stage.
  * Instantiate as-is in decode stage and use FLipped() in memory module
  */
 class IdMemIO extends Bundle {
-  val rdData = Input(Vec(VREG_DEPTH, SInt(FIXED_WIDTH.W)))
+  /** Values used when performing .vec operations that go directly to the address generator */
+  val vec = Output(new AddressGenProducerIO)
+
+  /** Data to be written when performing store operations */
+  val wrData = Output(Vec(NUM_MEMORY_BANKS, SInt(FIXED_WIDTH.W)))
 }
 
 /**
