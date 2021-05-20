@@ -14,3 +14,4 @@ project/target
 
 src/main/scala/test
 src/test/scala/test
+src/test/scala/memory/membankinit
