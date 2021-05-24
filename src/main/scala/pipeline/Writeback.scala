@@ -18,7 +18,7 @@ object WritebackState extends ChiselEnum {
 }
 
 class Writeback extends Module {
-  require(SUBVECTORS_PER_VREG > 2, "Writeback stage currently does not support subvectors_per_vreg <= 2")
+  require(SUBVECTORS_PER_VREG > 2, "Writeback stage currently does not support SUBVECTORS_PER_VREG <= 2")
   import WritebackState._
   val io = IO(new WritebackIO)
   val in = RegNext(io.ex)
@@ -35,13 +35,13 @@ class Writeback extends Module {
   val we = WireDefault(false.B)
 
   //This state machine assumes that SUBVECTORS_PER_VREG > 2. Should probably also work for SUBVECTORS_PER_VREG <= 2
+  //Next state logic
   switch(state) {
     is(sBuild) {
       when(in.valid) {
         writeBuffer(ptr) := in.res
         ptr := ptr + 1.U
       }
-
       when(in.valid && ptr === (SUBVECTORS_PER_VREG-2).U) {
         state := sOutput
         ptr := ptr + 1.U
@@ -55,7 +55,12 @@ class Writeback extends Module {
         ptr := ptr + 1.U
         state := sBuild
       }
+    }
+  }
 
+  //Output logic
+  switch(state) {
+    is(sOutput) {
       //Valid, push out vreg output
       when(in.valid && in.dest.rf === VREG && ptr === (SUBVECTORS_PER_VREG-1).U) {
         //Output is a mix of values in writeBuffer and recently arrived result
@@ -99,7 +104,7 @@ class Writeback extends Module {
   io.id.we := we
 
   //Assign outputs to forwarding stage
-  //Position '0' corresponds to ptr=0, position '1' to ptr=1 and final position corresponds to most value on pipeline register
+  //Position '0' corresponds to ptr=0, position '1' to ptr=1 and final position corresponds to most recent value on pipeline register
   for(i <- 0 until writeBuffer.length) {
     io.fwd.wbData(i) := writeBuffer(i)
     io.fwd.rdValids(i) := ptr > i.U

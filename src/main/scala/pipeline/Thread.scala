@@ -182,7 +182,7 @@ class Thread(id: Int) extends Module {
 
   xRegFile.io.rs1 := Rinst.rs1
   xRegFile.io.rs2 := Rinst.rs2
-  xRegFile.io.wrData := io.wb.wrData.slice(0, NUM_PROCELEM)
+  xRegFile.io.wrData := io.wb.wrData.slice(0, XREG_DEPTH)
   xRegFile.io.we := io.wb.we && (io.wb.rd.rf === RegisterFileType.XREG)
   xRegFile.io.rd := io.wb.rd.reg
 
