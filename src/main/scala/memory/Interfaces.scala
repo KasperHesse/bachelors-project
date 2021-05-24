@@ -24,14 +24,15 @@ class IJKgeneratorConsumerIO extends Bundle {
 }
 
 /**
- * Interface between a module producing inputs for the Index Generator, and the index generator itself.
- * Instantiate as-is in the producer module, use Flipped() in the index generator
+ * Interface between the [[NeighbourGenerator]] and the [[IndexGenerator]]
+ * Instantiate as-is in the neighbour generator, use Flipped() in the index generator
  */
-class IndexGeneratorProducerIO extends Bundle {
+class NeighbourGenIndexGenIO extends Bundle {
+  val NUM_PORTS = 3
   /** Vector of ijk-values for which the global indices should be generated */
-  val ijk = Output(Vec(NUM_MEMORY_BANKS, new IJKBundle))
-  /** Valid flags indicating whether a load/store operation should be performed from these indices */
-  val validIjk = Output(Vec(NUM_MEMORY_BANKS, Bool()))
+  val ijk = Output(Vec(NUM_PORTS, new IJKBundle)) //TODO just 3 outputs
+  /** Valid flags indicating whether these indices should be operated on */
+  val validIjk = Output(Vec(NUM_PORTS, Bool()))
   /** Encoded base address to be read/written to */
   val baseAddr = Output(StypeBaseAddress())
   /** Load/store flag */
@@ -67,8 +68,6 @@ class AddressGenMemoryIO extends Bundle {
   val we = Output(Bool())
 }
 
-
-
 /**
  * Interface between the memory module and the memory writeback module.
  * Instantiate as-is in the memory module, use Flipped() in the memory writeback module
@@ -76,4 +75,15 @@ class AddressGenMemoryIO extends Bundle {
 class MemoryWritebackIO extends Bundle {
   /** Data read from memory / to be written into register file */
   val rdData = Output(Vec(NUM_MEMORY_BANKS, SInt(FIXED_WIDTH.W)))
+}
+
+/** A bundle for grouping the values in the read queue inside of the [[MemoryStage]].
+ * Accessed by [[MemoryWriteback]] when writing values back into the register file */
+class ReadQueueBundle extends Bundle {
+  /** Destination register of the incoming read operation */
+  val rd = new RegisterBundle
+  /** IJK-generator iteration, if relevant. Used for easier subelement access */
+  val iteration = UInt(4.W)
+  /** S-type modifier of the load operation being performed, for controlling the internal state machine */
+  val mod = StypeMod()
 }

@@ -72,7 +72,6 @@ class AddressGenerator(registered: Boolean = false) extends Module {
  * Performs a pseudo-ordering of vectors by the 3 LSB of their values.
  * If two values with the same 3 LSB are given, the one further "up" the vector is given priority.
  * Eg. if addressIn(1) = 0010 and addressIn(5) = 1010, then addressOut(1) will be 1010.
- * //TODO must only sort addresses if the corresponding index is valid
  * (eg if address(0)=x000(valid) and address(1)=x000(!valid), address(0) should be prioritized
  */
 class VectorOrderer extends Module {

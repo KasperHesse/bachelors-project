@@ -5,12 +5,12 @@ import chisel3.util._
 import utils.Config._
 
 class IndexGeneratorIO extends Bundle {
-  val in = Flipped(Decoupled(new IndexGeneratorProducerIO))
+  val in = Flipped(Decoupled(new NeighbourGenIndexGenIO))
   val addrGen = Decoupled(new AddressGenProducerIO)
 }
 
 /**
- * This module takes a number of i,j,k-tuples and converts them into the global offset in a vector.
+ * This module takes 3 i,j,k-tuples and converts them into the global offset in a vector.
  * If the given tuple does not represent a valid position in the given vector, the 'validIndices' flag is toggled low,
  * but the output values are *not* changed. Implements [[IndexGeneratorIO]]
  *
@@ -19,6 +19,8 @@ class IndexGeneratorIO extends Bundle {
  */
 class IndexGenerator(val pipe: Boolean = true) extends Module {
   val io = IO(new IndexGeneratorIO)
+  /** Number of input ports. Is 3, since at most 3 indices can be generated in one cycle by the [[NeighbourGenerator]] */
+  val NUM_INPUT_PORTS = 3
 
   //if no data has been received, output is invalid and input is ready
   //When data has been received, output is valid and input is not ready
@@ -35,11 +37,11 @@ class IndexGenerator(val pipe: Boolean = true) extends Module {
 
   // --- SIGNALS AND WIRES ---
   /** Lookup tables for computing i*nely*nelz */
-  val nelxnelyLookup = for(i <- 0 until NUM_MEMORY_BANKS) yield {
+  val nelxnelyLookup = for(i <- 0 until NUM_INPUT_PORTS) yield {
     Wire(Vec(NELX, UInt((log2Ceil(NDOF)+1).W))) //Declared with one additional bit so we can perform arithmetic comparisons
   }
   /** Lookup tables for computing k*nely */
-  val nelyLookup = for(i <- 0 until NUM_MEMORY_BANKS) yield {
+  val nelyLookup = for(i <- 0 until NUM_INPUT_PORTS) yield {
     Wire(Vec(NELY, UInt((log2Ceil(NDOF)+1).W)))
   }
 
@@ -48,20 +50,18 @@ class IndexGenerator(val pipe: Boolean = true) extends Module {
     for(j <- 0 until NELX) {
       nelxnelyLookup(i)(j) := (j * NELY * NELZ).U
     }
-  }
-  for(i <- nelyLookup.indices) {
     for(j <- 0 until NELY) {
       nelyLookup(i)(j) := (j * NELY).U
     }
   }
   /** Vector holding calculated indices */
-  val indices = Wire(Vec(NUM_MEMORY_BANKS, UInt(log2Ceil(NDOF+1).W)))
+  val indices = VecInit(Seq.fill(NUM_MEMORY_BANKS)(0.U(log2Ceil(NDOF+1).W)))
   /** Vector holding valid flags for each calculated index */
-  val validIndices = Wire(Vec(NUM_MEMORY_BANKS, Bool()))
+  val validIndices = VecInit(Seq.fill(NUM_MEMORY_BANKS)(false.B))
 
   // --- LOGIC ---
   //Calculate all indices and set valid flags
-  for(i <- 0 until NUM_MEMORY_BANKS) {
+  for(i <- 0 until NUM_INPUT_PORTS) {
     //i * nely * nelz + k * nely + j
     indices(i) := nelxnelyLookup(i)(in.ijk(i).i) + nelyLookup(i)(in.ijk(i).k) + in.ijk(i).j
     validIndices(i) := Mux(in.ijk(i).i < NELX.U & in.ijk(i).j < NELY.U & in.ijk(i).k < NELZ.U, in.validIjk(i), false.B)
@@ -92,5 +92,4 @@ class IndexGenerator(val pipe: Boolean = true) extends Module {
 
   io.in.ready := readyInternal
   io.addrGen.valid := validInternal
-
 }

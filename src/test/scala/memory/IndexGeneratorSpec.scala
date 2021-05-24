@@ -33,9 +33,6 @@ class IndexGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matche
       pokeIJK(dut, 0, 0, 0, 0)
       pokeIJK(dut, 1, 1, 0, 0)
       pokeIJK(dut, 2, 2, 0, 0)
-      for(i <- 3 until NUM_MEMORY_BANKS) {
-        dut.io.in.bits.validIjk(i).poke(false.B)
-      }
       dut.clock.step()
       expectIJK(dut, 0, 0, 0, 0)
       expectIJK(dut, 1, 1, 0, 0)
@@ -60,9 +57,6 @@ class IndexGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matche
       pokeIJK(dut, 0, 0, 0, 0)
       pokeIJK(dut, 1, 1, 0, 0)
       pokeIJK(dut, 2, 2, 0, 0)
-      for(i <- 3 until NUM_MEMORY_BANKS) {
-        dut.io.in.bits.validIjk(i).poke(false.B)
-      }
       dut.clock.step()
       dut.io.addrGen.valid.expect(true.B)
       dut.io.in.ready.expect(false.B)
@@ -109,16 +103,26 @@ class IndexGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matche
       pokeIJK(dut, 0, 0, 0, NELZ)
       pokeIJK(dut, 1, 0, NELY, 0)
       pokeIJK(dut, 2, 0, NELY, NELZ)
-      pokeIJK(dut, 3, NELX, 0, 0)
-      pokeIJK(dut, 4, NELX, 0, NELZ)
-      pokeIJK(dut ,5, NELX, NELY, 0)
-      pokeIJK(dut, 6, NELX, NELY, NELZ)
-      pokeIJK(dut, 7, NELX-1, NELY-1, NELZ-1)
       dut.clock.step()
-      for(i <- 0 until 7) {
+
+      for(i <- 0 until 2) {
         dut.io.addrGen.bits.validIndices(i).expect(false.B)
       }
-      dut.io.addrGen.bits.validIndices(7).expect(true.B)
+      pokeIJK(dut, 0, NELX, 0, 0)
+      pokeIJK(dut, 1, NELX, 0, NELZ)
+      pokeIJK(dut ,2, NELX, NELY, 0)
+      dut.clock.step()
+      for(i <- 0 until 2) {
+        dut.io.addrGen.bits.validIndices(i).expect(false.B)
+      }
+
+      pokeIJK(dut, 0, NELX, NELY, NELZ)
+      pokeIJK(dut, 1, NELX-1, NELY-1, NELZ-1)
+      pokeIJK(dut, 2, 0, 0, 0)
+      dut.clock.step()
+      dut.io.addrGen.bits.validIndices(0).expect(false.B)
+      dut.io.addrGen.bits.validIndices(1).expect(true.B)
+      dut.io.addrGen.bits.validIndices(2).expect(true.B)
     }
   }
 }

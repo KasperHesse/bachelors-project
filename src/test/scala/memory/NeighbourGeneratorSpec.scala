@@ -40,9 +40,6 @@ class NeighbourGeneratorSpec extends FlatSpec with ChiselScalatestTester with Ma
       expectIJK(dut, 1, i, j+1, k)
       expectIJK(dut, 2, i+1, j, k)
       dut.io.indexGen.valid.expect(true.B)
-      for(i <- 3 until NUM_MEMORY_BANKS) {
-        dut.io.indexGen.bits.validIjk(i).expect(false.B)
-      }
       dut.clock.step()
 
       //Expect next round
@@ -51,13 +48,10 @@ class NeighbourGeneratorSpec extends FlatSpec with ChiselScalatestTester with Ma
       expectIJK(dut, 1, i, j-1, k)
       expectIJK(dut, 2, i-1, j, k)
       dut.io.indexGen.valid.expect(true.B)
-      for(i <- 3 until NUM_MEMORY_BANKS) {
-        dut.io.indexGen.bits.validIjk(i).expect(false.B)
-      }
       dut.clock.step()
 
       //Expect all 0's and output invalid
-      for(i <- 0 until NUM_MEMORY_BANKS) {
+      for(i <- 0 until dut.NUM_OUTPUT_PORTS) {
         dut.io.indexGen.bits.validIjk(i).expect(false.B)
         dut.io.indexGen.bits.ijk(i).expect((new IJKBundle).Lit(_.i -> 0.U, _.j -> 0.U, _.k -> 0.U))
       }
@@ -80,29 +74,23 @@ class NeighbourGeneratorSpec extends FlatSpec with ChiselScalatestTester with Ma
       dut.clock.step()
 
       //Expect first round of face neighbours
-      //Should be at (x,y+1,z+1), (x+1,y,z+1) and (x+1,y,z)
+      //Should be at (x,y+1,z+1), (x+1,y,z+1) and (x+1,y+1,z)
       expectIJK(dut, 0, i, j+1, k+1)
       expectIJK(dut, 1, i+1, j, k+1)
-      expectIJK(dut, 2, i+1, j, k)
+      expectIJK(dut, 2, i+1, j+1, k)
       dut.io.indexGen.valid.expect(true.B)
-      for(i <- 3 until NUM_MEMORY_BANKS) {
-        dut.io.indexGen.bits.validIjk(i).expect(false.B)
-      }
       dut.clock.step()
 
       //Expect next round
-      //Should be at (x,y-1,z+1), (x-1,y,z+1), (x-1,y,z)
+      //Should be at (x,y-1,z+1), (x-1,y,z+1), (x+1,y-1,z)
       expectIJK(dut, 0, i, j-1, k+1)
       expectIJK(dut, 1, i-1, j, k+1)
-      expectIJK(dut, 2, i-1, j, k)
+      expectIJK(dut, 2, i+1, j-1, k)
       dut.io.indexGen.valid.expect(true.B)
-      for(i <- 3 until NUM_MEMORY_BANKS) {
-        dut.io.indexGen.bits.validIjk(i).expect(false.B)
-      }
       dut.clock.step()
 
       //Expect all 0's and output invalid
-      for(i <- 0 until NUM_MEMORY_BANKS) {
+      for(i <- 0 until dut.NUM_OUTPUT_PORTS) {
         dut.io.indexGen.bits.validIjk(i).expect(false.B)
         dut.io.indexGen.bits.ijk(i).expect((new IJKBundle).Lit(_.i -> 0.U, _.j -> 0.U, _.k -> 0.U))
       }
@@ -125,29 +113,23 @@ class NeighbourGeneratorSpec extends FlatSpec with ChiselScalatestTester with Ma
       dut.clock.step()
 
       //Expect first round of face neighbours
-      //Should be at (x,y+1,z-1), (x+1,y,z-1) and (x,y+1,z)
+      //Should be at (x,y+1,z-1), (x+1,y,z-1) and (x-1,y+1,z)
       expectIJK(dut, 0, i, j+1, k-1)
       expectIJK(dut, 1, i+1, j, k-1)
-      expectIJK(dut, 2, i, j+1, k)
+      expectIJK(dut, 2, i-1, j+1, k)
       dut.io.indexGen.valid.expect(true.B)
-      for(i <- 3 until NUM_MEMORY_BANKS) {
-        dut.io.indexGen.bits.validIjk(i).expect(false.B)
-      }
       dut.clock.step()
 
       //Expect next round
       //Should be at (x,y-1,z-1), (x-1,y,z-1), (x,y-1,z)
       expectIJK(dut, 0, i, j-1, k-1)
       expectIJK(dut, 1, i-1, j, k-1)
-      expectIJK(dut, 2, i, j-1, k)
+      expectIJK(dut, 2, i-1, j-1, k)
       dut.io.indexGen.valid.expect(true.B)
-      for(i <- 3 until NUM_MEMORY_BANKS) {
-        dut.io.indexGen.bits.validIjk(i).expect(false.B)
-      }
       dut.clock.step()
 
       //Expect all 0's and output invalid
-      for(i <- 0 until NUM_MEMORY_BANKS) {
+      for(i <- 0 until dut.NUM_OUTPUT_PORTS) {
         dut.io.indexGen.bits.validIjk(i).expect(false.B)
         dut.io.indexGen.bits.ijk(i).expect((new IJKBundle).Lit(_.i -> 0.U, _.j -> 0.U, _.k -> 0.U))
       }
@@ -172,13 +154,13 @@ class NeighbourGeneratorSpec extends FlatSpec with ChiselScalatestTester with Ma
       //Expect itself
       expectIJK(dut, 0, i, j, k)
       dut.io.indexGen.valid.expect(true.B)
-      for(i <- 1 until NUM_MEMORY_BANKS) {
+      for(i <- 1 until dut.NUM_OUTPUT_PORTS) {
         dut.io.indexGen.bits.validIjk(i).expect(false.B)
       }
       dut.clock.step()
 
       //Expect all 0's and output invalid
-      for(i <- 0 until NUM_MEMORY_BANKS) {
+      for(i <- 0 until dut.NUM_OUTPUT_PORTS) {
         dut.io.indexGen.bits.validIjk(i).expect(false.B)
         dut.io.indexGen.bits.ijk(i).expect((new IJKBundle).Lit(_.i -> 0.U, _.j -> 0.U, _.k -> 0.U))
       }
@@ -197,12 +179,12 @@ class NeighbourGeneratorSpec extends FlatSpec with ChiselScalatestTester with Ma
       dut.io.in.bits.mod.poke(StypeMod.FCN)
       dut.clock.step()
 
-      for(i <- 0 to 2) {
+      for(i <- 0 until dut.NUM_OUTPUT_PORTS) {
         print(s"[$i] ${dut.io.indexGen.bits.ijk(i).peek()}\n")
       }
       dut.clock.step()
       println()
-      for(i <- 0 to 2) {
+      for(i <- 0 until dut.NUM_OUTPUT_PORTS) {
         print(s"[$i] ${dut.io.indexGen.bits.ijk(i).peek()}\n")
       }
     }
