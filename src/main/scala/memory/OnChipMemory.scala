@@ -42,8 +42,6 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
     SyncReadMem(wordsPerBank, SInt(FIXED_WIDTH.W))
   }
 
-  // --- REGISTERS ---
-
   // -- SIGNALS AND WIRES ---
   /** Data read from memory banks */
   val rdData = Wire(Vec(NUM_MEMORY_BANKS, SInt(FIXED_WIDTH.W)))
@@ -90,10 +88,13 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
   //We are ready whenever the writeback builder signals ready
   io.addrGen.ready := io.wb.ready
   io.wb.valid := RegNext(validOp)
+  //NOTE: SyncReadMem does not keep the read value until the next read is issued.
+  //If a write is performed to the previously read value, the read data will also update
+  //To fix this, a register is necessary to sample the output data whenever validOp is asserted
+  //See UsingSyncReadMem for implementation ideas.
   for(i <- 0 until NUM_MEMORY_BANKS) {
     io.wb.bits.rdData(i) := Mux(io.addrGen.bits.validAddress(i), rdData(i), 0.S)
   }
-//  io.wb.bits.rdData := Mu
   io.writeQueue.ready := io.addrGen.bits.we && io.addrGen.valid
 }
 
