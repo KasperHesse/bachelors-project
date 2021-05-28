@@ -433,7 +433,7 @@
     pstart nelem (linear) //calculate sum of xphys
     ld.vec v0, XPHYS
     estart
-    mac.sv s4, s1, v0 //sum(xphys)
+    mac.iv s4, v0, 1 //sum(xphys)
     eend
     pend
 
@@ -520,6 +520,9 @@
     mul.sv v2, s0, v2 //v2 = 0
     add.is s12, s0, 1 //s12=1
     add.is s13, s0, (0.02*ELEMS_PER_VSLOT)
+    eend
+    pend
+
     pstart nelem
     ld.vec v0, X
     ld.vec v1, XNEW

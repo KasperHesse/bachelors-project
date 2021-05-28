@@ -2,8 +2,8 @@ package pipeline
 
 import chisel3._
 import chisel3.experimental.ChiselEnum
-import chisel3.util.log2Ceil
-import memory.AddressGenProducerIO
+import chisel3.util.{Decoupled, log2Ceil}
+import memory.{AddressGenProducerIO, IJKgeneratorConsumerIO, ReadQueueBundle}
 import utils.Config._
 import utils.Fixed._
 import vector.Opcode
@@ -62,10 +62,15 @@ class IdExIO extends Bundle {
  */
 class IdMemIO extends Bundle {
   /** Values used when performing .vec operations that go directly to the address generator */
-  val vec = Output(new AddressGenProducerIO)
-
+  val vec = Decoupled(new AddressGenProducerIO)
+  /** Values used when performing .dof, .elem, .fcn, .edn1, .edn2 and .sel operations that go to EDOF generator / neighbour generator */
+  val ijk = Decoupled(new IJKgeneratorConsumerIO)
   /** Data to be written when performing store operations */
-  val wrData = Output(Vec(NUM_MEMORY_BANKS, SInt(FIXED_WIDTH.W)))
+  val wrData = Decoupled(Vec(NUM_MEMORY_BANKS, SInt(FIXED_WIDTH.W)))
+  /** Destination register and auxilliary information, to be used when storing data into register files */
+  val readQueue = Decoupled(new ReadQueueBundle)
+  /** Load/store flag used to toggle we on memory */
+  val ls = Output(StypeLoadStore())
 }
 
 /**

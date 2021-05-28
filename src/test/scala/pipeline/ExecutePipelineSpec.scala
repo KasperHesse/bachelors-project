@@ -335,7 +335,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
 
 
   "Execute pipeline" should "execute simple instructions and branch" in {
-    genericConfig()
+    simulationConfig()
     seed("Execute pipeline payload")
     val memfile = "src/test/resources/meminit/mem4.hex.txt"
 
@@ -376,7 +376,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   }
 
   "Execute pipeline" should "use both threads" in {
-    genericConfig()
+    simulationConfig()
 //    SIMULATION = true
     seed("Execute pipeline both threads")
     val memfile = "src/test/resources/meminit/mem5.hex.txt"
@@ -394,7 +394,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   }
 
   "Execute pipeline" should "count to 5" in {
-    genericConfig()
+    simulationConfig()
     seed("Execute pipeline count to 5")
     val memfile = "src/test/resources/meminit/mem5.hex.txt"
     val program = "" +
@@ -419,7 +419,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   }
 
   "Execute pipeline" should "perform MAC instructions" in {
-    genericConfig()
+    simulationConfig()
     seed("Execute pipeline mac instructions")
     val memfile = "src/test/resources/meminit/mem5.hex.txt"
     /* Instructions

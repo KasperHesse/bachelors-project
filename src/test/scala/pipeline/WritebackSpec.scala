@@ -98,7 +98,7 @@ class WritebackSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "build an output when rf=VREG" in {
-    genericConfig()
+    simulationConfig()
     test(new Writeback).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("Writeback vreg output")
       testVreg(dut)
@@ -106,21 +106,21 @@ class WritebackSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "display the output when rf=XREG" in {
-    genericConfig()
+    simulationConfig()
     test(new Writeback) {dut =>
       testSingle(dut, XREG)
     }
   }
 
   it should "display the output when rf=SREG" in {
-    genericConfig()
+    simulationConfig()
     test(new Writeback) {dut =>
       testSingle(dut, SREG)
     }
   }
 
   it should "reduce the output when rf=SREG" in {
-    genericConfig()
+    simulationConfig()
     test(new Writeback) {dut =>
       testSingle(dut, SREG, true)
     }

@@ -21,7 +21,7 @@ import scala.io.Source
 class IfDecSpec  extends FlatSpec with ChiselScalatestTester with Matchers {
 
   "Fetch/Decode" should "decode instructions and take branches" in {
-    genericConfig()
+    simulationConfig()
     seed("Fetch/Decode decode and branch")
     //Use assembler to generate memory init file
     val memfile = "src/test/resources/meminit/mem3.txt"

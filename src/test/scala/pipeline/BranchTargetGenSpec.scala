@@ -3,11 +3,12 @@ package pipeline
 import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
+import utils.Config._
 
 
 class BranchTargetGenSpec extends FlatSpec with ChiselScalatestTester with Matchers  {
   "Branch target generator" should "generate a branch target" in {
-    genericConfig()
+    simulationConfig()
     test(new BranchTargetGenerator) { dut =>
       val rand = scala.util.Random
       for(i <- 0 until 1) {

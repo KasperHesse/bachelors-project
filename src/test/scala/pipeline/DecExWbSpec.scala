@@ -265,7 +265,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   "DecExWbSpec" should "execute a VREG instruction and store the result" in {
-    genericConfig()
+    simulationConfig()
     test(new DecExWb).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("DecExWb vreg store result")
       val instrs = Array(RtypeInstruction(1, 1, 3, DIV, RtypeMod.VV), RtypeInstruction(1, 1, 3, DIV, RtypeMod.VV))
@@ -275,7 +275,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   "DecExWbSpec" should "execute an XREG instruction and store the result" in {
-    genericConfig()
+    simulationConfig()
     test(new DecExWb).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("DecExWb xreg store result")
       val instrs = Array(RtypeInstruction(1, 2, 1, DIV, RtypeMod.SX),  RtypeInstruction(2, 3, 3, ADD, RtypeMod.XX))
@@ -284,7 +284,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   "DecExWbSpec" should "execute an SREG instruction and store the result" in {
-    genericConfig()
+    simulationConfig()
     test(new DecExWb).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("DecExWb SREG store result")
       val instrs = Array(RtypeInstruction(0, 0, 1, ADD, RtypeMod.SS), RtypeInstruction(0, 0, 1, ADD, RtypeMod.SS))
@@ -293,7 +293,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   "DecExWbSpec" should "execute a random instruction mix" in {
-    genericConfig()
+    simulationConfig()
     test(new DecExWb){dut =>
       seed("DecExWb random mix")
       val instrs = Array.fill(8)(genRtype())
@@ -302,7 +302,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   "DecExWbSpec" should "execute a dot product and store the result" in {
-    genericConfig()
+    simulationConfig()
     test(new DecExWb) { dut =>
       seed("DecExWb dot product")
       val instrs = Array(genRtype(MAC, RtypeMod.VV))
@@ -323,7 +323,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   "DecExWbSpec" should "execute a sum and store the result" in {
-    genericConfig()
+    simulationConfig()
     test(new DecExWb) { dut =>
       seed("DecExWb dot product")
       val instrs = Array(genRtype(MAC, RtypeMod.SV))
@@ -344,7 +344,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   "DecExWbSpec" should "execute immediate instruction" in {
-    genericConfig()
+    simulationConfig()
     test(new DecExWb) {dut =>
       seed("DecExWb immediates")
       val instrs = Array.fill(8)(genRtype(scala.util.Random.nextBoolean()))

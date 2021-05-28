@@ -408,24 +408,4 @@ package object pipeline {
     scala.util.Random.setSeed(seed)
     print(s"$name. Using seed $seed\n")
   }
-
-  /**
-   * Applies a configuration which requires less resources to elaborate, speeding up execution time
-   */
-  def genericConfig(): Unit = {
-    SIMULATION = true
-    NUM_VREG = 16
-    VREG_DEPTH = 12
-    VREG_SLOT_WIDTH = 4
-    ELEMS_PER_VSLOT = VREG_DEPTH*VREG_SLOT_WIDTH
-    NELEM=100 //These values don't follow the requirement that NDOF = (nx+1)*(ny+1)*(nz+1)*3
-    NDOF=150
-    KE_SIZE = 12
-    NUM_PROCELEM = 4
-    SUBVECTORS_PER_VREG  = VREG_DEPTH/NUM_PROCELEM
-    FIXED_WIDTH = 24
-    INT_WIDTH = 8
-    FRAC_WIDTH = 15
-    Config.checkRequirements()
-  }
 }

@@ -372,7 +372,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
 
   it should "perform a single MAC instruction on stored values" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute) {dut =>
       seed("Decode/execute single MAC instruction")
       val instrs = Array(genRtype(MAC, RtypeMod.VV))
@@ -384,7 +384,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "calculate a sum (MAC.SV)" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute) {dut =>
       seed("Decode/execute sum instruction")
       val instrs = Array(genRtype(MAC, RtypeMod.SV))
@@ -397,7 +397,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
   it should "postpone MAC.VV results until they are ready" in {
     //This test ensures that we can delay MAC result generation until the cycle it is actually present
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("Decode/execute postpone MAC results")
       scala.util.Random.setSeed(2)
@@ -410,7 +410,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   "DecodeExecute" should "decode and execute a dot product (MAC.VV)" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("Decode/execute dot product")
       val instrs = Array(genRtype(MAC, RtypeMod.VV))
@@ -422,7 +422,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "operate on an NELEM long vector" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       //When processing element-wise, we can load down ELEMS_PER_VSLOT elements per iteration
       // On each thread swap, progress counter should increment by that amount
@@ -435,7 +435,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "not stall the decoder when like operations are processed" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       //This is a simple test where we first use two like instructions to ensure no stalls,
       //and then use a final, different instruction to check that it stalls
@@ -472,7 +472,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "decode and execute MVP instructions" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("Decode/execute MVP")
       val instrs = Array(genRtype(MAC, RtypeMod.KV))
@@ -483,7 +483,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   "Decode/Execute stage" should "decode and execute VV instructions" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("VV decode execute")
       scala.util.Random.setSeed(5347764876420400419L)
@@ -493,7 +493,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "decode and execute XV instructions" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("XV decode/execute")
       val instrs = genAndPoke(dut, RtypeMod.XV)
@@ -502,7 +502,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "decode and execute XX instructions" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("XX decode/execute")
       val instrs = genAndPoke(dut, RtypeMod.XX)
@@ -511,7 +511,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "decode and execute SV instructions" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("SV decode/execute")
       val instrs = genAndPoke(dut, RtypeMod.SV)
@@ -520,7 +520,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "decode and execute SX instructions" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("SX decode/execute")
       val instrs = genAndPoke(dut, RtypeMod.SX)
@@ -529,7 +529,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "decode and execute SS instructions" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("SV decode/execute")
       val instrs = genAndPoke(dut, RtypeMod.SV)
@@ -538,7 +538,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "decode and execute a random instruction mix" in {
-    genericConfig()
+    simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       //1254595567306819563
       seed("Decode/execute random mix")
@@ -551,7 +551,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
   it should "decode and execute specific VV instructions" in {
     //These seeds have previously made the test fail. Used for regression testing
-    genericConfig()
+    simulationConfig()
     val seeds = Array(6838063735844486541L, -3695747970121693403L)
     for(seed  <- seeds) {
       test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>

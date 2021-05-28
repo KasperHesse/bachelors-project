@@ -266,7 +266,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "test VV instruction load and decode" in {
-    genericConfig()
+    simulationConfig()
     seed("VV Decode")
     test(new Decode).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       testDecode(dut, RtypeMod.VV)
@@ -274,7 +274,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "test XV instruction load and decode" in {
-    genericConfig()
+    simulationConfig()
     seed("XV Decode")
     test(new Decode) { dut =>
       testDecode(dut, RtypeMod.XV)
@@ -282,7 +282,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "test SV instruction load and decode" in {
-    genericConfig()
+    simulationConfig()
     seed("SV Decode")
     test(new Decode) { dut =>
       testDecode(dut, RtypeMod.SV)
@@ -290,14 +290,14 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "test XX instruction load and decode" in {
-    genericConfig()
+    simulationConfig()
     seed("XX Decode")
     test(new Decode) { dut =>
       testDecode(dut, RtypeMod.XX)
     }
   }
   it should "test SX instruction load and decode" in {
-    genericConfig()
+    simulationConfig()
     seed("SX Decode")
     test(new Decode) { dut =>
       testDecode(dut, RtypeMod.SX)
@@ -305,7 +305,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "test SS instruction load and decode" in {
-    genericConfig()
+    simulationConfig()
     seed("SS Decode")
     test(new Decode) { dut =>
       testDecode(dut, RtypeMod.SS)
@@ -315,7 +315,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
   //Generate random instructions of different kinds
   it should "Decode a random instruction mix" in {
-    genericConfig()
+    simulationConfig()
     seed("Random mix decode")
     test(new Decode).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       val instrs = genAndPoke(dut)
@@ -331,7 +331,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   "Decode stage" should "Decode a random mix for multiple iterations" in {
-    genericConfig()
+    simulationConfig()
     seed("Random mix decode multiple iterations")
     test(new Decode) { dut =>
       val iters = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else ((NDOF/ELEMS_PER_VSLOT)+1)*ELEMS_PER_VSLOT/ELEMS_PER_VSLOT
@@ -388,7 +388,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   "Decode stage" should "take a branch when EQUAL" in {
-    genericConfig()
+    simulationConfig()
     seed("Decode branch equal")
     test(new Decode) {dut =>
       testBranchBehavior(dut, BranchComp.EQUAL, 0, 0, -8)
@@ -396,7 +396,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   "Decode stage" should "take a branch when NOT EQUAL" in {
-    genericConfig()
+    simulationConfig()
     seed("Decode branch equal")
     test(new Decode) {dut =>
       testBranchBehavior(dut, BranchComp.NEQ, 1, 0, -8)
@@ -405,7 +405,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
   //This simply attempts a bunch of branches in a row, to test if they work correctly
   "Decode stage" should "test branch behavior" in {
-    genericConfig()
+    simulationConfig()
     seed("Decode branch multiple")
     test(new Decode) {dut =>
       val rand = scala.util.Random

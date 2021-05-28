@@ -193,9 +193,10 @@ object Fixed {
    * Divides two SInts the way the hardware would (to some degree of precision, at least)
    * @param n The numerator
    * @param d The denominator
-   * @return the fixed-point number representing n/d
+   * @return the fixed-point number representing n/d. If d==0, returns 0 instead (as the hardware does)
    */
   def fixedDiv(n: SInt, d: SInt): SInt = {
+    if(d.litValue == 0) return 0.S
     double2fixed(fixed2double(n) / fixed2double(d)).S(FIXED_WIDTH.W)
   }
 
@@ -208,7 +209,7 @@ object Fixed {
     fixed2double(fixedSqrt(double2fixed(v).S))
   }
   /**
-   * Calculates a square root in the same manner that the hardware would
+   * Calculates a square root in the same manner that the hardware would using the Babylonian method
    * @param S The value to calculate the square root of
    * @return The square root of v
    */

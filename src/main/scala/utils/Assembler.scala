@@ -46,11 +46,12 @@ object Assembler {
    * Initializes a memory file
    * @param memfile Relative path to the memory file to initialize. Existing contents are overwritten, a new file is created if none exists
    * @param instrs Encoded instruction to write into that file
+   * @param len The number of decimals to print out for each line (if eg value=8 and figs=4, it will print 0004)
    */
-  def writeMemInitFile(memfile: String, instrs: Array[Int]): Unit = {
+  def writeMemInitFile(memfile: String, instrs: Array[Long], len: Int = 8): Unit = {
     val writer = new BufferedWriter(new FileWriter(memfile))
     for(instr <- instrs) {
-      writer.write(("00000000" + instr.toHexString).takeRight(8) + "\n")
+      writer.write(("0000000000000000" + instr.toHexString).takeRight(len) + "\n")
     }
     writer.close()
   }
