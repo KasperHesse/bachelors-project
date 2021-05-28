@@ -105,10 +105,9 @@ class NRDivStage1 extends Module {
   val numer = Wire(SInt(FIXED_WIDTH.W))
   val denom = Wire(SInt(FIXED_WIDTH.W))
 
-  //When dividing by zero, we'll want to saturate the result instead
-  when(in.denom === 0.S && in.numer =/= 0.S) {
-    //If numerator is negative, set to negative max, otherwise positive max
-    numer := Mux(in.numer(FIXED_WIDTH-1), (1 << FIXED_WIDTH-1).S, ((1 << FIXED_WIDTH-1)-1).S)
+  //When dividing by zero, we override the result and force it to be zero
+  when(in.denom === 0.S) {
+    numer := 0.S
     denom := double2fixed(1).S
   } .otherwise {
     numer := in.numer

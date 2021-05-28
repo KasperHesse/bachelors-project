@@ -28,8 +28,6 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val y = genDouble()
     val denom = double2fixed(x)
     val numer = double2fixed(y)
-//    val denom = -57L
-//    val numer = 77L
     //Count number of leading zeros
     var cntZeros = 0
     val neg = denom < 0
@@ -268,8 +266,8 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  val iters = 200
- /*
+  val iters = 5
+
   it should "shift denominator and numerator" in {
     test(new NRDivStage1()).withAnnotations(Seq(WriteVcdAnnotation)) {c =>
       testStage1(c, iters)
@@ -306,7 +304,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
         NRDivBenchmark(c, iters)
       }
     }
-  } */
+  }
 
   it should "perform 1/3" in {
         FIXED_WIDTH = 16
@@ -326,6 +324,21 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       }
       print(s"Got: ${dut.io.out.res.peek} / ${fixed2double(dut.io.out.res.peek)}\n")
       nrDiv(op1, op2)
+    }
+  }
+
+  it should "return 0 when dividing by zero" in {
+    simulationConfig()
+    test(new NRDiv()) {dut =>
+      val op1 = double2fixed(123).S
+      val op2 = 0.S
+      dut.io.in.numer.poke(op1)
+      dut.io.in.denom.poke(op2)
+      dut.io.in.valid.poke(true.B)
+      while(!dut.io.out.valid.peek.litToBoolean) {
+        dut.clock.step()
+      }
+      dut.io.out.res.expect(fixedDiv(op1, op2))
     }
   }
 }
