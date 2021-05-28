@@ -9,6 +9,7 @@ import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 
 class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+  behavior of "IJK generator"
 
   def expectIJK(dut: IJKgenerator, i: Int, j: Int, k: Int): Unit = {
     dut.io.out.i.expect(i.U)
@@ -22,13 +23,13 @@ class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers
     dut.io.in.k.poke(k.U)
   }
 
-  "IJK generator" should "output a vcd file" in {
+  it should "output a vcd file" in {
     test(new IJKgenerator).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       dut.clock.step(400)
     }
   }
 
-  "IJK generator" should "saturate once invalid" in {
+  it should "saturate once invalid" in {
     test(new IJKgenerator).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       dut.io.ready.poke(true.B)
       while(dut.io.valid.peek.litToBoolean) {
@@ -46,7 +47,7 @@ class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers
     }
   }
 
-  "IJK generator" should "load new values" in {
+  it should "load new values" in {
     test(new IJKgenerator) {dut =>
       expectIJK(dut, 0,0,0)
       dut.io.valid.expect(true.B)
@@ -68,7 +69,7 @@ class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers
     }
   }
 
-  "IJK generator" should "reassert valid when restarted" in {
+  it should "reassert valid when restarted" in {
     test(new IJKgenerator) { dut =>
       pokeIJK(dut, 5,1,5)
       dut.io.iterationIn.poke(7.U)
@@ -93,7 +94,7 @@ class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers
     }
   }
 
-  "IJK generator" should "restart to loaded values" in {
+  it should "restart to loaded values" in {
     test(new IJKgenerator) {dut =>
       pokeIJK(dut, 1,1,1)
       dut.io.load.poke(true.B)
@@ -107,6 +108,22 @@ class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers
       dut.io.restart.poke(true.B)
       dut.clock.step()
       expectIJK(dut, 1,1,1)
+    }
+  }
+  it should "match genIJKmultiple" in {
+    test(new IJKgenerator) {dut =>
+      val ijkVals = genIJKmultiple(start = Some(Array(0,0,0,0)), elems=30)
+      pokeIJK(dut, ijkVals(0)(0), ijkVals(0)(1), ijkVals(0)(2))
+      dut.io.iterationIn.poke(ijkVals(0)(3).U)
+      dut.io.load.poke(true.B)
+      dut.clock.step()
+      dut.io.load.poke(false.B)
+      dut.io.ready.poke(true.B)
+      for(i <- ijkVals.indices) {
+        expectIJK(dut, ijkVals(i)(0), ijkVals(i)(1), ijkVals(i)(2))
+        val out = dut.io.out
+        dut.clock.step()
+      }
     }
   }
 }

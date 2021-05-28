@@ -21,6 +21,8 @@ class OnChipMemoryIO extends Bundle {
   val wb = Decoupled(new MemoryWritebackIO)
   /** Connections to memory write queue */
   val writeQueue = Flipped(Decoupled(Vec(NUM_MEMORY_BANKS, SInt(FIXED_WIDTH.W))))
+  /** Write enable flag. If (1) a write is performed when valid, if (0) reads are performed */
+  val we = Input(Bool())
 }
 
 /**
@@ -55,11 +57,10 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
   // are all represented as address 'x' in their respective banks. The lower 3 bits are thus used to select the relevant banks
   for(i <- membank.indices) {
     //Set up read accessors. If address it not valid, we replace the read data with 0's
-//    rdData(i) := Mux(io.addrGen.bits.validAddress(i), membank(i).read((io.addrGen.bits.addr(i) >> log2Ceil(NUM_MEMORY_BANKS)).asUInt(), validOp), 0.S(FIXED_WIDTH.W))
     rdData(i) := membank(i).read((io.addrGen.bits.addr(i) >> log2Ceil(NUM_MEMORY_BANKS)).asUInt(), validOp)
 
     //Set up write accessors. Only write if address is valid
-    we(i) := io.addrGen.bits.we && io.addrGen.bits.validAddress(i) && io.addrGen.valid
+    we(i) := io.we && io.addrGen.bits.validAddress(i) && io.addrGen.valid
     when(we(i)) {
       membank(i).write((io.addrGen.bits.addr(i) >> log2Ceil(NUM_MEMORY_BANKS)).asUInt(), io.writeQueue.bits(i))
     }
@@ -67,7 +68,7 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
 
 
   //Set up memory contents
-  if(!memInitFileLocation.isEmpty) {
+  if(memInitFileLocation.nonEmpty) {
     for (i <- 0 until NUM_MEMORY_BANKS) {
       val file = if (memInitFileLocation.takeRight(1).equals("/")) {
         memInitFileLocation + "membank_" + i + ".txt"
@@ -75,7 +76,7 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
         memInitFileLocation + "/membank_" + i + ".txt"
       }
       if(SIMULATION) {
-        InitMemBanks(wordsPerBank, memInitFileLocation)
+        initMemBanks(wordsPerBank, memInitFileLocation)
         loadMemoryFromFile(membank(i), file)
       } else {
         loadMemoryFromFileInline(membank(i), file)
@@ -93,32 +94,19 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
   //To fix this, a register is necessary to sample the output data whenever validOp is asserted
   //See UsingSyncReadMem for implementation ideas.
   for(i <- 0 until NUM_MEMORY_BANKS) {
-    io.wb.bits.rdData(i) := Mux(io.addrGen.bits.validAddress(i), rdData(i), 0.S)
+    io.wb.bits.rdData(i) := Mux(RegNext(io.addrGen.bits.validAddress(i)), rdData(i), 0.S)
   }
-  io.writeQueue.ready := io.addrGen.bits.we && io.addrGen.valid
-}
+  io.writeQueue.ready := io.we && io.addrGen.valid
 
-/**
- * Module that initializes the memory banks to some standard values that are easy to operate on.
- * Only used when simulation.
- */
-object InitMemBanks {
-
-  /**
-   * Initializes memory banks to some standard values that are easy to operate on
-   * @param wordsPerBank The number of words stored in each memory bank / the number of values to write into the init file
-   *
-   * @param memInitFileLocation The relative path to the file where the memory initialization file should be written
-   */
-  def apply(wordsPerBank: Int, memInitFileLocation: String): Unit = {
-    for(i <- 0 until NUM_MEMORY_BANKS) {
+  def initMemBanks(wordsPerBank: Int, memInitFileLocation: String): Unit = {
+    for(bank <- 0 until NUM_MEMORY_BANKS) {
       val file = if (memInitFileLocation.takeRight(1).equals("/")) {
-        memInitFileLocation + "membank_" + i + ".txt"
+        memInitFileLocation + "membank_" + bank + ".txt"
       } else {
-        memInitFileLocation + "/membank_" + i + ".txt"
+        memInitFileLocation + "/membank_" + bank + ".txt"
       }
-      val values = for(j <- 0 until wordsPerBank) yield {
-        j*NUM_MEMORY_BANKS+i
+      val values = for(index <- 0 until wordsPerBank) yield {
+        double2fixed(index*NUM_MEMORY_BANKS+bank)
       }
       writeMemInitFile(file, values.toArray)
     }

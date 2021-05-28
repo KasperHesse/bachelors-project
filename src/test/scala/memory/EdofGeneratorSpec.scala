@@ -7,170 +7,97 @@ import utils.Config._
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
+import pipeline.seed
 
 
 class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers {
-  behavior of "Element DOF generator"
+  behavior of "EDOF generator"
 
   /**
-   * Tests whether the element DOF generator follows the same logic as the c-code and outputs values correctly
+   * Tests whether the element DOF generator follows the expected logic and outputs correctly.
+   * Will generate a random ijk-value, and will also randomize the values of NX, NY and NZ to ensure that
+   * everything works as expected every t ime
    * @param dut
    */
   def edofGenTest(dut: EdofGenerator): Unit = {
-    val x=3; val y=2; val z=1;
-    val edof = getEdof(x,y,z)
-    dut.io.prod.bits.ijk.i.poke(x.U)
-    dut.io.prod.bits.ijk.j.poke(y.U)
-    dut.io.prod.bits.ijk.k.poke(z.U)
-    dut.io.prod.valid.poke(true.B)
+    val rand = scala.util.Random
+    val i = rand.nextInt(NELX)
+    val j = rand.nextInt(NELY)
+    val k = rand.nextInt(NELZ)
+    val edof = getEdof(i,j,k)
+
+    println(s"NELX: $NELX.  NELY: $NELY.  NELZ: $NELZ. (i,j,k)=($i,$j,$k)")
+    dut.io.in.bits.ijk.i.poke(i.U)
+    dut.io.in.bits.ijk.j.poke(j.U)
+    dut.io.in.bits.ijk.k.poke(k.U)
+    dut.io.in.valid.poke(true.B)
+    dut.io.in.ready.expect(true.B)
+    dut.io.addrGen.ready.poke(true.B)
 
     dut.clock.step() //latch in values
-    dut.io.cons.valid.expect(false.B)
-
-    dut.clock.step() //Move to output stage
-    dut.io.cons.valid.expect(true.B)
+    dut.io.in.ready.expect(false.B)
+    dut.io.addrGen.valid.expect(true.B)
 
     for(i <- 0 until 8) {
-      dut.io.cons.bits.indices(i).expect(edof(i*3).U)
+      dut.io.addrGen.bits.indices(i).expect(edof(i).U)
     }
     dut.clock.step()
     for(i <- 0 until 8) {
-      dut.io.cons.bits.indices(i).expect(edof(i*3+1).U)
+      dut.io.addrGen.bits.indices(i).expect(edof(i+8).U)
     }
     dut.clock.step()
     for(i <- 0 until 8) {
-      dut.io.cons.bits.indices(i).expect(edof(i*3+2).U)
+      dut.io.addrGen.bits.indices(i).expect(edof(i+16).U)
     }
   }
 
-  /**
-   * Tests whether ready/valid signals are asserted properly. Uses hardcoded timing, so don't rely too much on it
-   * @param dut
-   */
-  def testReadyValid(dut: EdofGenerator): Unit = {
-    val in = dut.io.prod
-    val out = dut.io.cons
-    in.bits.ijk.i.poke(0.U)
-    in.bits.ijk.j.poke(1.U)
-    in.bits.ijk.k.poke(2.U)
-    in.valid.poke(true.B)
-    //Should be ready but not valid
-    out.ready.expect(true.B)
-    out.valid.expect(false.B)
-
-    dut.clock.step()
-    //Should still be ready, still not valid. Outputstep=0
-    out.ready.expect(true.B)
-    out.valid.expect(false.B)
-    dut.clock.step()
-    //Should not be ready, should be valid. Outputstep = 0
-    out.ready.expect(false.B)
-    out.valid.expect(true.B)
-    dut.clock.step()
-    //outputstep = 1
-    out.ready.expect(false.B)
-    out.valid.expect(true.B)
-    dut.clock.step()
-    //Should still be valid, should also be ready. Outputstep = 2
-    out.ready.expect(true.B)
-    out.valid.expect(true.B)
-    dut.clock.step()
-    //Still valid, should not be ready anymore. Outputstep=0
-    out.ready.expect(false.B)
-    out.valid.expect(true.B)
-    in.valid.poke(false.B)
-    dut.clock.step(2) //outputstep = 2
-    out.ready.expect(true.B)
-    out.valid.expect(true.B)
-    dut.clock.step(3) //outputstep 2, second time around
-    out.ready.expect(true.B)
-    out.valid.expect(true.B)
-    dut.clock.step() //outputstep=0
-    out.ready.expect(true.B)
-    out.valid.expect(false.B)
-    dut.clock.step(5) //outputstep=0
-    out.ready.expect(true.B)
-    out.valid.expect(false.B)
-
-
-
-  }
-
-  /**
-   * Compute the indices of the of the 24 degrees of freedom associated with the 8 corners of the element at (i,j,k) in the grid.
-   * Coden taken from top.c and ported to Scala
-   *
-   * @param i Current iteration/coordinate in the x-direction
-   * @param j Current iteration/coordinate in the y-direction
-   * @param k Current iteration/coordinate in the z-direction
-   */
-  def getEdof(i: Int, j: Int, k: Int): Array[Int] = {
-    val edof = Array.ofDim[Int](24)
-    val nx_1 = i
-    val nx_2 = i+1
-    val ny_1 = j
-    val ny_2 = j + 1
-    val nz_1 = k
-    val nz_2 = k + 1
-
-    val nIndex: Array[Int] = Array.fill(8)(0)
-
-    //For (i,j,k)=(0,0,0)
-    //index1=0+0+1=1,		index2=16+0+1=17,		index3=16+0+0=16,		index4=0+0+0=0,
-    //index5=0+4+1=5,		index6=16+4+1=21,		index7=16+4+0=20,		index8=0+4+0=4
-    nIndex(0) = nx_1 * NY * NZ + nz_1 * NY + ny_2;
-    nIndex(1) = nx_2 * NY * NZ + nz_1 * NY + ny_2;
-    nIndex(2)= nx_2 * NY * NZ + nz_1 * NY + ny_1;
-    nIndex(3) = nx_1 * NY * NZ + nz_1 * NY + ny_1;
-    nIndex(4) = nx_1 * NY * NZ + nz_2 * NY + ny_2;
-    nIndex(5) = nx_2 * NY * NZ + nz_2 * NY + ny_2;
-    nIndex(6) = nx_2 * NY * NZ + nz_2 * NY + ny_1;
-    nIndex(7) = nx_1 * NY * NZ + nz_2 * NY + ny_1;
-
-    //nIndex(0) => 0, 8, 16
-    //nIndex(1) => 1, 9, 17
-
-    for(i <- 0 until 8) {
-      for(j <- 0 until 3) {
-        edof(j*8 + i) = 3*nIndex(i) + j
-      }
-    }
-
-    edof
-  }
 
   def pokeIJK(dut: EdofGenerator, i: Int, j: Int, k: Int): Unit = {
-    dut.io.prod.bits.ijk.i.poke(i.U)
-    dut.io.prod.bits.ijk.j.poke(j.U)
-    dut.io.prod.bits.ijk.k.poke(k.U)
+    dut.io.in.bits.ijk.i.poke(i.U)
+    dut.io.in.bits.ijk.j.poke(j.U)
+    dut.io.in.bits.ijk.k.poke(k.U)
   }
 
   def expectIndices(dut: EdofGenerator, indices: Array[Int]): Unit = {
     for(i <- indices.indices) {
-      dut.io.cons.bits.indices(i).expect(indices(i).U)
+      dut.io.addrGen.bits.indices(i).expect(indices(i).U)
     }
   }
 
-  "EDOF generator" should "only deassert ready when valid is asserted" in {
+  it should "test output generation values" in {
+    seed("Edof generator random NX; NY; NZ values")
+    val rand = scala.util.Random
+    NELX = rand.nextInt(6) + 4
+    NELY = rand.nextInt(6) + 4
+    NELZ = rand.nextInt(6) + 4
+    NX = NELX + 1
+    NY = NELY + 1
+    NZ = NELZ + 1
+    test(new EdofGenerator).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      edofGenTest(dut)
+    }
+  }
+
+  it should "only deassert ready when valid is asserted" in {
     test(new EdofGenerator) {dut =>
-      dut.io.prod.valid.poke(false.B)
+      dut.io.in.valid.poke(false.B)
       for(i <- 0 until 5) {
-        dut.io.prod.ready.expect(true.B)
-        dut.io.cons.valid.expect(false.B)
+        dut.io.in.ready.expect(true.B)
+        dut.io.addrGen.valid.expect(false.B)
         dut.clock.step()
       }
-      dut.io.prod.valid.poke(true.B)
+      dut.io.in.valid.poke(true.B)
       dut.clock.step()
-      dut.io.cons.valid.expect(true.B)
-      dut.io.prod.ready.expect(false.B)
+      dut.io.addrGen.valid.expect(true.B)
+      dut.io.in.ready.expect(false.B)
     }
   }
 
-  "EDOF generator" should "change output values when ready is asserted" in {
+  it should "change output values when ready is asserted" in {
     test(new EdofGenerator).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       val edof = getEdof(1,2,3)
 
-      dut.io.prod.valid.poke(true.B)
+      dut.io.in.valid.poke(true.B)
       pokeIJK(dut, 1,2,3)
       dut.clock.step()
 
@@ -179,20 +106,20 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
         expectIndices(dut, edof.slice(0,8))
         dut.clock.step()
       }
-      dut.io.prod.ready.expect(false.B)
-      dut.io.cons.ready.poke(true.B)
+      dut.io.in.ready.expect(false.B)
+      dut.io.addrGen.ready.poke(true.B)
       dut.clock.step()
 
       //Step through outputs when consumer is ready
       expectIndices(dut, edof.slice(8, 16))
-      dut.io.prod.ready.expect(false.B)
+      dut.io.in.ready.expect(false.B)
       dut.clock.step()
 
       expectIndices(dut, edof.slice(16, 24))
       //Verify that producer ready-signal is combinationally coupled to consumer ready-signal
-      dut.io.prod.ready.expect(true.B)
-      dut.io.cons.ready.poke(false.B)
-      dut.io.prod.ready.expect(false.B)
+      dut.io.in.ready.expect(true.B)
+      dut.io.addrGen.ready.poke(false.B)
+      dut.io.in.ready.expect(false.B)
     }
   }
 

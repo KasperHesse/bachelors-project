@@ -45,13 +45,11 @@ class AddressGenerator(registered: Boolean = false) extends Module {
   val addresses = Wire(Vec(NUM_MEMORY_BANKS, UInt(MEM_ADDR_WIDTH.W)))
 
   /** Decoded base address */
-//  val baseAddr = MuxLookup(io.in.bits.baseAddr.asUInt(), 0.U, AddressDecode.getMapping())
   val baseAddr = addrDecode(io.in.bits.baseAddr.asUInt())
 
 
   // --- LOGIC ---
   //Generate global addresses
-//  addresses := VecInit(in.indices.map(a => a + addrDecode(in.baseAddr.asUInt())))
   addresses := VecInit(in.indices.map(a => a + baseAddr))
 
   //Reorder / map them to correct locations
@@ -64,8 +62,6 @@ class AddressGenerator(registered: Boolean = false) extends Module {
 
   io.in.ready := io.mem.ready
   io.mem.valid := io.in.valid
-
-  io.mem.bits.we := false.B
 }
 
 /**
@@ -128,13 +124,6 @@ class VectorOrderer extends Module {
         io.validsOut(7) := io.validsIn(i)
         }
       }
-//      is(1.U) {io.addressOut(1) := io.addressIn(i); io.validsOut(1) := io.validsIn(i)}
-//      is(2.U) {io.addressOut(2) := io.addressIn(i); io.validsOut(2) := io.validsIn(i)}
-//      is(3.U) {io.addressOut(3) := io.addressIn(i); io.validsOut(3) := io.validsIn(i)}
-//      is(4.U) {io.addressOut(4) := io.addressIn(i); io.validsOut(4) := io.validsIn(i)}
-//      is(5.U) {io.addressOut(5) := io.addressIn(i); io.validsOut(5) := io.validsIn(i)}
-//      is(6.U) {io.addressOut(6) := io.addressIn(i); io.validsOut(6) := io.validsIn(i)}
-//      is(7.U) {io.addressOut(7) := io.addressIn(i); io.validsOut(7) := io.validsIn(i)}
     }
   }
 }
@@ -184,27 +173,4 @@ object AddressDecode {
   mapping += (11 -> (mapping(10) + P_WIDTH))
   mapping += (12 -> (mapping(11) + Q_WIDTH))
   mapping += (13 -> (mapping(12) + INVD_WIDTH))
-//
-//  val map2 = scala.collection.mutable.Map[StypeBaseAddress.Type, Int]()
-//  map2 += (KE -> 0)
-//  map2 += (X -> (map2(KE) + KE_WIDTH))
-//  map2 += (XPHYS -> (map2(X) + X_WIDTH))
-//  map2 += (XNEW -> (map2(XPHYS) + XPHYS_WIDTH))
-//  map2 += (DC -> (map2(XNEW) + XNEW_WIDTH))
-//  map2 += (DV -> (map2(DC) + DC_WIDTH))
-//  map2 += (F -> (map2(DV) + DV_WIDTH))
-//  map2 += (U -> (map2(F) + F_WIDTH))
-//  map2 += (R -> (map2(U) + U_WIDTH))
-//  map2 += (Z -> (map2(R)+ R_WIDTH))
-//  map2 += (P -> (map2(Z) + Z_WIDTH))
-//  map2 += (Q -> (map2(P) + P_WIDTH))
-//  map2 += (INVD -> (map2(Q) + Q_WIDTH))
-//  map2 += (TMP -> (map2(INVD) + INVD_WIDTH))
-//
-//  //Map to a seq for use in MuxLookup
-//  private val map3 = map2.map(a => a._1.asUInt() -> a._2.U)
-//
-//  def getMapping(): Seq[(UInt, UInt)] = {
-//    map3.toMap.toSeq
-//  }
 }

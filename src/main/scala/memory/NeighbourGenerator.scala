@@ -31,9 +31,9 @@ class NeighbourGenerator extends Module {
   //Once latched in, output should be valid immediatedly after.
   // --- REGISTERS ---
   /** Current state of the neighbour generator */
-  val state = RegInit(sIdle)
+  val state = RegInit(sIdleOutput)
   /** Pipeline register. Updated whenever producer has valid data and module is in idle state */
-  val in = RegEnable(io.in.bits, io.in.valid && state === sIdle)
+  val in = RegEnable(io.in.bits, io.in.valid && state === sIdleOutput)
 
   // --- SIGNALS AND WIRES ---
   /** IJK values being output to index generator */
@@ -42,7 +42,6 @@ class NeighbourGenerator extends Module {
   )
   /** Valid bits being output to index generator */
   val validIjk = WireDefault(VecInit(Seq.fill(NUM_OUTPUT_PORTS)(false.B)))
-  //TODO this module probably does not use the 'pad' input from IJK generator. Is that correct?
 
   // --- LOGIC ---
   /**
@@ -61,94 +60,107 @@ class NeighbourGenerator extends Module {
     ijk(index).i := (in.ijk.i.asSInt() + di.S).asUInt()
     ijk(index).j := (in.ijk.j.asSInt() + dj.S).asUInt()
     ijk(index).k := (in.ijk.k.asSInt() + dk.S).asUInt()
-    validIjk(index) := true.B
+    validIjk(index) := !in.pad //When pad is true, ijk is always invalid
+    //Index generator will perform checks to verify if values are outside boundaries of design domain
   }
-  //Next state logic
+
+  val valid = io.in.valid
+  val mod = io.in.bits.mod
+
+  val validOut = RegInit(false.B)
+
+
   switch(state) {
-    is(sIdle) {
-      when(io.in.valid) {
-        when(io.in.bits.mod === FCN) {
-          state := sFcn_1
-        } .elsewhen(io.in.bits.mod === EDN1) {
-          state := sEdn1_1
-        } .elsewhen(io.in.bits.mod === EDN2) {
-          state := sEdn2_1
-        } .elsewhen(io.in.bits.mod === SEL || io.in.bits.mod === ELEM) {
-          state := sSel
+    is(sIdleOutput) {
+      when(valid && (mod === SEL || mod === ELEM)) {
+        //No state necessary
+        validOut := true.B
+      } .elsewhen(valid && mod === FCN) {
+        state := sFcn
+        validOut := true.B
+      } .elsewhen(valid && mod === EDN1) {
+        state := sEdn1
+        validOut := true.B
+      } .elsewhen(valid && mod === EDN2) {
+        state := sEdn2
+        validOut := true.B
+      }
+      when(!valid) {
+        validOut := false.B
+      }
+    }
+    is(sFcn) {
+      when(io.indexGen.ready) {
+        state := sIdleOutput
+      }
+    }
+    is(sEdn1) {
+      when(io.indexGen.ready) {
+        state := sIdleOutput
+      }
+    }
+    is(sEdn2) {
+      when(io.indexGen.ready) {
+        state := sIdleOutput
+      }
+    }
+  }
+
+  //Output logic
+  when(validOut) {
+    switch(in.mod) {
+      is(SEL) {
+        IJKoffset(0, 0, 0, 0)
+      }
+      is(ELEM) {
+        IJKoffset(0, 0, 0, 0)
+      }
+      is(FCN) {
+        when(state === sFcn) {
+          IJKoffset(0, 0, 0, 1)
+          IJKoffset(1, 0, 1, 0)
+          IJKoffset(2, 1, 0, 0)
+        } .otherwise {
+          IJKoffset(0, 0, 0, -1)
+          IJKoffset(1, 0, -1, 0)
+          IJKoffset(2, -1, 0, 0)
+        }
+      }
+      is(EDN1) {
+        when(state === sEdn1) {
+          IJKoffset(0, 0, 1, 1)
+          IJKoffset(1, 1, 0, 1)
+          IJKoffset(2, 1, 1, 0)
+        } .otherwise {
+          IJKoffset(0, 0, -1, 1)
+          IJKoffset(1, -1, 0, 1)
+          IJKoffset(2, 1, -1, 0)
+        }
+      }
+      is(EDN2) {
+        when(state === sEdn2) {
+          IJKoffset(0, 0, 1, -1)
+          IJKoffset(1, 1, 0, -1)
+          IJKoffset(2, -1, 1, 0)
+        } .otherwise {
+          IJKoffset(0, 0, -1, -1)
+          IJKoffset(1, -1, 0, -1)
+          IJKoffset(2, -1, -1, 0)
         }
       }
     }
-    is(sFcn_1) {
-      state := Mux(io.indexGen.ready, sFcn_2, state)
-    }
-    is(sFcn_2) {
-      state := Mux(io.indexGen.ready, sIdle, state)
-    }
-    is(sEdn1_1) {
-      state := Mux(io.indexGen.ready, sEdn1_2, state)
-    }
-    is(sEdn1_2) {
-      state := Mux(io.indexGen.ready, sIdle, state)
-    }
-    is(sEdn2_1) {
-      state := Mux(io.indexGen.ready, sEdn2_2, state)
-    }
-    is(sEdn2_2) {
-      state := Mux(io.indexGen.ready, sIdle, state)
-    }
-    is(sSel) {
-      state := Mux(io.indexGen.ready, sIdle, state)
-    }
   }
 
   //Output logic
-  switch(state) {
-    is(sFcn_1) {
-      IJKoffset(0, 0, 0, 1)
-      IJKoffset(1, 0, 1, 0)
-      IJKoffset(2, 1, 0, 0)
-    }
-    is(sFcn_2) {
-      IJKoffset(0, 0, 0, -1)
-      IJKoffset(1, 0, -1, 0)
-      IJKoffset(2, -1, 0, 0)
-    }
-    is(sEdn1_1) {
-      IJKoffset(0, 0, 1, 1)
-      IJKoffset(1, 1, 0, 1)
-      IJKoffset(2, 1, 1, 0)
-    }
-    is(sEdn1_2) {
-      IJKoffset(0, 0, -1, 1)
-      IJKoffset(1, -1, 0, 1)
-      IJKoffset(2, 1, -1, 0)
-    }
-    is(sEdn2_1) {
-      IJKoffset(0, 0, 1, -1)
-      IJKoffset(1, 1, 0, -1)
-      IJKoffset(2, -1, 1, 0)
-    }
-    is(sEdn2_2) {
-      IJKoffset(0, 0, -1, -1)
-      IJKoffset(1, -1, 0, -1)
-      IJKoffset(2, -1, -1, 0)
-    }
-    is(sSel) {
-      IJKoffset(0, 0, 0, 0)
-    }
-  }
+  io.in.ready := state === sIdleOutput
 
-  //Output logic
-  io.in.ready := state === sIdle
-
-  io.indexGen.valid := state =/= sIdle
+  io.indexGen.valid := validOut
   io.indexGen.bits.ijk := ijk
   io.indexGen.bits.validIjk := validIjk
 
   io.indexGen.bits.baseAddr := in.baseAddr
-  io.indexGen.bits.ls := in.ls
 }
 
 object NeighbourGeneratorState extends ChiselEnum {
-  val sIdle, sFcn_1, sFcn_2, sEdn1_1, sEdn1_2, sEdn2_1, sEdn2_2, sSel = Value
+  val sIdleOutput, sFcn, sEdn1, sEdn2 = Value
 }

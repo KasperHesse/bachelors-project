@@ -13,12 +13,10 @@ import utils.Fixed._
 class IJKgeneratorConsumerIO extends Bundle {
   /** Element index bundle */
   val ijk = Output(new IJKBundle)
-  /** Flag indicating whether this set of ijk-value should be seen as padding. If true, the validIndices flag is set low on all outputs */
-  val pad = Output(Bool())
   /** The base address for this operation */
   val baseAddr = Output(StypeBaseAddress())
-  /** Load/store flag */
-  val ls = Output(StypeLoadStore())
+  /** Flag indicating whether this set of ijk-value should be seen as padding. Only used in [[EdofGenerator]] */
+  val pad = Output(Bool())
   /** S-type modifier of current operation. Only used in [[NeighbourGenerator]] */
   val mod = Output(StypeMod())
 }
@@ -35,8 +33,6 @@ class NeighbourGenIndexGenIO extends Bundle {
   val validIjk = Output(Vec(NUM_PORTS, Bool()))
   /** Encoded base address to be read/written to */
   val baseAddr = Output(StypeBaseAddress())
-  /** Load/store flag */
-  val ls = Output(StypeLoadStore())
 }
 
 /**
@@ -50,8 +46,6 @@ class AddressGenProducerIO extends Bundle {
   val indices = Output(Vec(NUM_MEMORY_BANKS, UInt(log2Ceil(NDOF+1).W)))
   /** Valid bits indicating which of the given indices should actually be read/written */
   val validIndices = Output(Vec(NUM_MEMORY_BANKS, Bool()))
-  /** Flag indicating whether the operation to perform is a load or store operation */
-  val ls = Output(StypeLoadStore())
 }
 
 /**
@@ -64,8 +58,6 @@ class AddressGenMemoryIO extends Bundle {
   val addr = Output(Vec(NUM_MEMORY_BANKS, UInt(MEM_ADDR_WIDTH.W)))
   /** Valid bits indicating whether the operation should be performed or not */
   val validAddress = Output(Vec(NUM_MEMORY_BANKS, Bool()))
-  /** Write enable flag. If (1) a write is performed when valid, if (0) reads are performed */
-  val we = Output(Bool())
 }
 
 /**
@@ -82,8 +74,8 @@ class MemoryWritebackIO extends Bundle {
 class ReadQueueBundle extends Bundle {
   /** Destination register of the incoming read operation */
   val rd = new RegisterBundle
-  /** IJK-generator iteration, if relevant. Used for easier subelement access */
-  val iteration = UInt(4.W)
+  /** Global element index modulo 8. Used to access correct indices when executing ELEM, SEL, FCN and EDN1/2 operations */
+  val index = UInt(3.W)
   /** S-type modifier of the load operation being performed, for controlling the internal state machine */
   val mod = StypeMod()
 }

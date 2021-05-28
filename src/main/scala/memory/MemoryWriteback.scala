@@ -33,7 +33,7 @@ class MemoryWriteback extends Module {
   /** Read data vector from memory */
   val rdData = io.mem.bits.rdData
   /** Iteration number from read queue */
-  val iteration = io.readQueue.bits.iteration
+  val iteration = io.readQueue.bits.index
   /** Valid flag from memory */
   val valid = io.mem.valid
   /** S-type modifier from read queue */
@@ -78,7 +78,6 @@ class MemoryWriteback extends Module {
   val ednLookup = VecInit(edn)
 
   //Next state logic
-
   switch(state) {
     is(sIdleOutput) {
       when(valid && (mod === VEC || mod === DOF)) {

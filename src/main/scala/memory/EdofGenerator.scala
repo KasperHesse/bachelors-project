@@ -2,18 +2,16 @@ package memory
 
 import chisel3._
 import chisel3.util._
-import pipeline.{RegisterBundle, StypeBaseAddress, StypeMod}
 import utils.Config._
-
-
-
 
 /**
  * I/O ports for [[EdofGenerator]]
  */
 class EdofGeneratorIO extends Bundle {
-  val prod = Flipped(Decoupled(new IJKgeneratorConsumerIO))
-  val cons = Decoupled(new AddressGenProducerIO)
+  /** Input ports from IJK generator */
+  val in = Flipped(Decoupled(new IJKgeneratorConsumerIO))
+  /** Outputs to address generator */
+  val addrGen = Decoupled(new AddressGenProducerIO)
 }
 
 /**
@@ -25,9 +23,18 @@ class EdofGeneratorIO extends Bundle {
 class EdofGenerator extends Module {
   val io: EdofGeneratorIO = IO(new EdofGeneratorIO)
 
+  // --- CONSTANTS ---
+  //xxH corresponds to math.ceil(xx/2). xxL corresponds to math.floor(xx/2)
+  val NXH = (NX + 1)/2
+  val NXL = NX/2
+  val NYH = (NY + 1)/2
+  val NYL = NY/2
+  val NZH = (NZ+1)/2
+  val NZL = NZ/2
+
   //--- REGISTERS ---
   /** Which section of indices is currently being output */
-  val outputStep = RegInit(0.U(2.W)) //Which part-of-8 of the indices is currently being output?
+  val outputStep = RegInit(0.U(2.W))
   /** Flag indicating whether the generator is currently processing or not. Also used as output valid bit */
   val processing = RegInit(false.B)
   /** Vector holding index output values */
@@ -36,7 +43,15 @@ class EdofGenerator extends Module {
   val readyInternal = WireDefault(false.B)
   /** Asserted when the output from this module is valid */
   /** Pipeline register holding input values */
-  val in = RegEnable(io.prod.bits, io.prod.valid && readyInternal)
+  val in = RegEnable(io.in.bits, io.in.valid && readyInternal)
+
+
+  // --- MODULES ---
+  val nz0Lookup = Module(new NzLookup(NZL))
+  val nz1Lookup = Module(new NzLookup(NZH))
+
+  val nx0lookup = Module(new NxLookup(NXL))
+  val nx1lookup = Module(new NxLookup(NXH))
 
 
   // --- SIGNALS AND WIRES ---
@@ -45,65 +60,110 @@ class EdofGenerator extends Module {
   val j = in.ijk.j
   val k = in.ijk.k
 
-  //Handle initial multiplications. Implemented with a LUT to make our life easier. Given x,y-value, we output x*NY*NZ and y*NY
-  val nynzLookup: Seq[Vec[UInt]] = for (i <- 0 until 2) yield {
-    Wire(Vec(NX, UInt(log2Ceil(NDOF+1).W)))
-  }
-  val nyLookup: Seq[Vec[UInt]] = for(i <- 0 until 2) yield {
-    Wire(Vec(NY, UInt(log2Ceil(NDOF+1).W)))
-  }
+  val nx0 = (i >> 1).asUInt
+  val nx1 = (i >> 1).asUInt + i(0) //adding i(0) corresponds math.ceil(i/2)
+  val ny0 = (j >> 1).asUInt
+  val ny1 = (j >> 1).asUInt + j(0)
+  val nz0 = (k >> 1).asUInt
+  val nz1 = (k >> 1).asUInt + k(0)
 
-  //Fill up lookup tables
-  for(i <- 0 until NX) {
-    nynzLookup(0)(i) := (i * NY*NZ).U
-    nynzLookup(1)(i) := (i * NY*NZ).U
-  }
-  for(i <- 0 until NY) {
-    nyLookup(0)(i) := (i*NY).U
-    nyLookup(1)(i) := (i*NY).U
-  }
+  nx0lookup.io.in := nx0
+  nx1lookup.io.in := nx1
+  nz1Lookup.io.in := nz1
+  nz0Lookup.io.in := nz0
 
-  //See top.c, getEdof for calculations that spawned this monstrosity
-  val nx1 = i
-  val nx2 = i + 1.U
-  val ny1 = j
-  val ny2 = j + 1.U
-  val nz1 = k
-  val nz2 = k + 1.U
-
-  val nynz_p1: UInt = nynzLookup(0)(nx1)
-  val nynz_p2: UInt = nynzLookup(1)(nx2)
-
-  val ny_p1: UInt = nyLookup(0)(nz1)
-  val ny_p2: UInt = nyLookup(1)(nz2)
-
-  nIndex(0) := nynz_p1 + ny_p1 + ny2
-  nIndex(1) := nynz_p2 + ny_p1 + ny2
-  nIndex(2) := nynz_p2 + ny_p1 + ny1
-  nIndex(3) := nynz_p1 + ny_p1 + ny1
-  nIndex(4) := nynz_p1 + ny_p2 + ny2
-  nIndex(5) := nynz_p2 + ny_p2 + ny2
-  nIndex(6) := nynz_p2 + ny_p2 + ny1
-  nIndex(7) := nynz_p1 + ny_p2 + ny1
+  nIndex(0) := nx1lookup.io.nyhnzh + nz1Lookup.io.nyh + ny1
+  nIndex(1) := nx1lookup.io.nylnzh + nz1Lookup.io.nyl + ny0
+  nIndex(2) := nx1lookup.io.nyhnzl + nz0Lookup.io.nyh + ny1
+  nIndex(3) := nx1lookup.io.nylnzl + nz0Lookup.io.nyl + ny0
+  nIndex(4) := nx0lookup.io.nyhnzh + nz1Lookup.io.nyh + ny1
+  nIndex(5) := nx0lookup.io.nylnzh + nz1Lookup.io.nyl + ny0
+  nIndex(6) := nx0lookup.io.nyhnzl + nz0Lookup.io.nyh + ny1
+  nIndex(7) := nx0lookup.io.nylnzl + nz0Lookup.io.nyl + ny0
 
   // -- CONNECTIONS AND UPDATE LOGIC
-  //ready is entirely combinational logic
-  readyInternal := (outputStep === 0.U && !processing) || (outputStep === 2.U && io.cons.ready)
-
-  when(readyInternal && io.prod.valid) {
+  readyInternal := (outputStep === 0.U && !processing) || (outputStep === 2.U && io.addrGen.ready)
+  when(readyInternal && io.in.valid) {
     processing := true.B
-  } .elsewhen(outputStep === 2.U && io.cons.ready) {
+  } .elsewhen(outputStep === 2.U && io.addrGen.ready) {
     processing := false.B
   }
-  outputStep := Mux(processing && io.cons.ready, Mux(outputStep === 2.U, 0.U, outputStep + 1.U), outputStep)
+  outputStep := Mux(processing && io.addrGen.ready, Mux(outputStep === 2.U, 0.U, outputStep + 1.U), outputStep)
 
   for(i <- 0 until 8) {
-    //3*nIndex(i) + (0,1,2)
-    io.cons.bits.indices(i) := (nIndex(i) << 1.U).asUInt() + nIndex(i) + outputStep
-    io.cons.bits.validIndices(i) := !in.pad
+    //24*nIndex(i) + outputStep*8 + i
+    //Performed as (nIndex(i)*3 + outputStep)*8, where *8 is performed by a later bitshift
+    //That bitshift is performed by concatenating the i value into the lower 3 bits
+    val indexX3 = (nIndex(i) << 1).asUInt + nIndex(i)
+    val offset = i.U(3.W)
+    val out = Cat(indexX3 + outputStep, offset) //Defined as separate value to make VCD outputs nicer
+    io.addrGen.bits.indices(i) := out
+    io.addrGen.bits.validIndices(i) := !in.pad
   }
-  io.cons.bits.baseAddr := in.baseAddr
-  io.cons.valid := processing
-  io.prod.ready := readyInternal
+  io.addrGen.bits.baseAddr := in.baseAddr
+  io.addrGen.valid := processing
+  io.in.ready := readyInternal
 }
 
+/**
+ * A module implementing a lookup table for calculating {@code nz*NYH} and {@code nz*NYL}
+ * @param entries The number of entries in the lookup table. If {@code nz0} is to be used as input, use {@code NZL}.
+ *                For {@code nz1} as input, use {@code NZH}
+ */
+class NzLookup(entries: Int) extends Module {
+  val NYL = NY/2
+  val NYH = (NY+1)/2
+
+  val io = IO(new Bundle {
+    /** The input value to be handled in the LUT */
+    val in = Input(UInt(log2Ceil(GDIM+1).W))
+    /** The result of calculating in * NYH */
+    val nyh = Output(UInt(log2Ceil(NDOF+1).W))
+    /** The result of calculating in * NYL */
+    val nyl = Output(UInt(log2Ceil(NDOF+1).W))
+  })
+
+  val lookup = Wire(Vec(entries, Vec(2, UInt(log2Ceil(NDOF+1).W))))
+  for(nz <- 0 until entries) {
+    lookup(nz)(0) := (nz * NYH).U
+    lookup(nz)(1) := (nz * NYL).U
+  }
+  io.nyh := lookup(io.in)(0)
+  io.nyl := lookup(io.in)(1)
+}
+/**
+ * A module implementing a lookup table for calculating {@code nx*NYH*NZH, nx*NYH*NZL, nx*NYL*NZH},  {@code nx*NYL*NZL}
+ * @param entries The number of entries in the lookup table. If {@code nx0} is to be used as input, use {@code NXL}.
+ *                For {@code nx1} as input, use {@code NXH}
+ */
+class NxLookup(entries: Int) extends Module {
+  val NYL = NY/2
+  val NZL = NZ/2
+  val NYH = (NY+1)/2
+  val NZH = (NZ+1)/2
+  val io = IO(new Bundle {
+    /** The input value to be mapped in the lookup table */
+    val in = Input(UInt(log2Ceil(GDIM+1).W))
+    /** The result of computing in * NYH * NZH */
+    val nyhnzh = Output(UInt(log2Ceil(NDOF+1).W))
+    /** The result of computing in*NYH*NZL */
+    val nyhnzl = Output(UInt(log2Ceil(NDOF+1).W))
+    /** The result of computing in*NYL*NZH */
+    val nylnzh = Output(UInt(log2Ceil(NDOF+1).W))
+    /** The result of computing in*NYL*NZL */
+    val nylnzl = Output(UInt(log2Ceil(NDOF+1).W))
+  })
+
+  val lookup = Wire(Vec(entries, Vec(4, UInt(log2Ceil(NDOF+1).W))))
+  for(i <- 0 until entries) {
+    lookup(i)(0) := (i * NYH * NZH).U
+    lookup(i)(1) := (i * NYH * NZL).U
+    lookup(i)(2) := (i * NYL * NZH).U
+    lookup(i)(3) := (i * NYL * NZL).U
+  }
+
+  io.nyhnzh := lookup(io.in)(0)
+  io.nyhnzl := lookup(io.in)(1)
+  io.nylnzh := lookup(io.in)(2)
+  io.nylnzl := lookup(io.in)(3)
+}

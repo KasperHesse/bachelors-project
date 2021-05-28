@@ -12,9 +12,9 @@ class IJKgeneratorIO extends Bundle {
   val valid = Output(Bool())
   val ready = Input(Bool())
   /** Current iteration of the other IJK generator */
-  val iterationIn = UInt(4.W)
+  val iterationIn = Input(UInt(4.W))
   /** Current iteration of this IJK generator */
-  val iterationOut = UInt(4.W)
+  val iterationOut = Output(UInt(4.W))
 }
 
 /**
@@ -40,7 +40,7 @@ class IJKgenerator extends Module {
   /** Whether the output is valid or not. When asserted, all i,j,k-values have been iterated through */
   val invalidFlag = WireDefault(false.B)
   /** Sequence of starting values, used to initialize [[startVec]] */
-  val startValues = Seq(Seq(0,0,0), Seq(0,0,1), Seq(0,1,0), Seq(0,1,1), Seq(1,0,0), Seq(1,0,1), Seq(1,1,0), Seq(1,1,1))
+  val startValues = Seq(Seq(0,0,0), Seq(0,1,0), Seq(0,0,1), Seq(0,1,1), Seq(1,0,0), Seq(1,1,0), Seq(1,0,1), Seq(1,1,1))
   /** Vector of starting values, used to set starting offsets when starting a new iteration / colouring */
   val startVec = Wire(Vec(8, Vec(3, UInt(log2Ceil(GDIM).W))))
   for(i <- startVec.indices) {

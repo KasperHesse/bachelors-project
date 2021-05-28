@@ -12,6 +12,11 @@ import pipeline.StypeMod
 import utils.Config.{NUM_MEMORY_BANKS, NELX, NELY, NELZ}
 
 class IndexGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+  behavior of "Index generator"
+
+  val NELXH = (NELX+1)/2
+  val NELYH = (NELY+1)/2
+  val NELZH = (NELZ+1)/2
 
   def pokeIJK(dut: IndexGenerator, index: Int, i: Int, j: Int, k: Int): Unit = {
     dut.io.in.bits.ijk(index).poke((new IJKBundle).Lit(_.i -> i.U, _.j -> j.U, _.k -> k.U))
@@ -19,12 +24,13 @@ class IndexGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matche
   }
 
   def expectIJK(dut: IndexGenerator, index: Int, i: Int, j: Int, k: Int, valid: Boolean = true): Unit = {
-    val e = i * NELY * NELZ + k * NELY + j
+    //multiplying by NUM_MEMORY_BANKS instead of bitshifting by three
+    val e = (i/2*NELYH*NELZH + k/2*NELYH + j/2)*NUM_MEMORY_BANKS + iterationFromIJK(Array(i,j,k))
     dut.io.addrGen.bits.indices(index).expect(e.U)
     dut.io.addrGen.bits.validIndices(index).expect(valid.B)
   }
 
-  "Index generator" should "correctly generate indices" in {
+  it should "correctly generate indices" in {
     def testFun(dut: IndexGenerator): Unit = {
       dut.io.addrGen.ready.poke(true.B)
       dut.io.in.ready.expect(true.B)
@@ -47,7 +53,7 @@ class IndexGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matche
     }
   }
 
-  "Index  generator" should "use ready/valid signalling when pipelined" in {
+  it should "use ready/valid signalling when pipelined" in {
     test(new IndexGenerator(pipe=true)) { dut =>
       //Poke values, but make the consumer non-ready
       dut.io.in.valid.poke(true.B)
@@ -94,7 +100,7 @@ class IndexGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matche
     }
   }
 
-  "Index generator" should "override validIndices when outside the legal range" in {
+  it should "override validIndices when outside the legal range" in {
     test(new IndexGenerator(pipe=false)) {dut =>
       dut.io.addrGen.ready.poke(true.B)
       dut.io.in.valid.poke(true.B)
