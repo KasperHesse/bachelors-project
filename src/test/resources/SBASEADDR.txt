@@ -1,0 +1,14 @@
+0 KE
+1 X
+2 XPHYS
+3 XNEW
+4 DC
+5 DV
+6 F
+7 U
+8 R
+9 Z
+10 P
+11 Q
+12 INVD
+13 TMP
