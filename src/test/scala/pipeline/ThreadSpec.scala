@@ -142,7 +142,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       }
 
       //Assert 'fin' once end state has been reached
-      if(dut.io.stateOutUint.peek.litValue == sEnd.litValue && resCnt >= numRes) {
+      if(dut.io.stateOutUint.peek.litValue == sPend.litValue && resCnt >= numRes) {
         fin = true
       }
       dut.io.fin.poke(fin.B)

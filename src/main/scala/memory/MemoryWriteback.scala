@@ -33,7 +33,7 @@ class MemoryWriteback extends Module {
   /** Read data vector from memory */
   val rdData = io.mem.bits.rdData
   /** Iteration number from read queue */
-  val iteration = io.readQueue.bits.index
+  val iteration = io.readQueue.bits.iter
   /** Valid flag from memory */
   val valid = io.mem.valid
   /** S-type modifier from read queue */

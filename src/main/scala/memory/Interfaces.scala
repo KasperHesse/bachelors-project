@@ -74,8 +74,20 @@ class MemoryWritebackIO extends Bundle {
 class ReadQueueBundle extends Bundle {
   /** Destination register of the incoming read operation */
   val rd = new RegisterBundle
-  /** Global element index modulo 8. Used to access correct indices when executing ELEM, SEL, FCN and EDN1/2 operations */
-  val index = UInt(3.W)
+  /** IJK generator iteration value. Used to access correct indices when executing ELEM, SEL, FCN and EDN1/2 operations */
+  val iter = UInt(3.W)
   /** S-type modifier of the load operation being performed, for controlling the internal state machine */
   val mod = StypeMod()
+}
+
+/**
+ * A bundle holding an i,j,k-value pair
+ */
+class IJKBundle extends Bundle {
+  /** Element index in the x-direction */
+  val i = UInt(log2Ceil(GDIM+3).W)
+  /** Element index in the y-direction */
+  val j = UInt(log2Ceil(GDIM+3).W)
+  /** Element index in the z-direction */
+  val k = UInt(log2Ceil(GDIM+3).W)
 }

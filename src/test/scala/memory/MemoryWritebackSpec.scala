@@ -51,7 +51,7 @@ class MemoryWritebackSpec extends FlatSpec with ChiselScalatestTester with Match
    */
   def pokeReadQueue(dut: MemoryWriteback, iter: Int, mod: StypeMod.Type, rd: RegisterBundle): Unit = {
     dut.io.readQueue.bits.rd.poke(rd)
-    dut.io.readQueue.bits.index.poke(iter.U)
+    dut.io.readQueue.bits.iter.poke(iter.U)
     dut.io.readQueue.bits.mod.poke(mod)
   }
 

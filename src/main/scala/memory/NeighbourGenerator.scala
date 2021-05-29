@@ -33,7 +33,7 @@ class NeighbourGenerator extends Module {
   /** Current state of the neighbour generator */
   val state = RegInit(sIdleOutput)
   /** Pipeline register. Updated whenever producer has valid data and module is in idle state */
-  val in = RegEnable(io.in.bits, io.in.valid && state === sIdleOutput)
+  val in = RegEnable(io.in.bits, io.in.valid && state === sIdleOutput && io.indexGen.ready)
 
   // --- SIGNALS AND WIRES ---
   /** IJK values being output to index generator */
@@ -152,7 +152,7 @@ class NeighbourGenerator extends Module {
   }
 
   //Output logic
-  io.in.ready := state === sIdleOutput
+  io.in.ready := Mux(state === sIdleOutput, io.indexGen.ready, false.B)
 
   io.indexGen.valid := validOut
   io.indexGen.bits.ijk := ijk

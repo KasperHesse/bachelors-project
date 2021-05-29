@@ -63,8 +63,10 @@ class IdExIO extends Bundle {
 class IdMemIO extends Bundle {
   /** Values used when performing .vec operations that go directly to the address generator */
   val vec = Decoupled(new AddressGenProducerIO)
-  /** Values used when performing .dof, .elem, .fcn, .edn1, .edn2 and .sel operations that go to EDOF generator / neighbour generator */
-  val ijk = Decoupled(new IJKgeneratorConsumerIO)
+  /** Values used when performing .dof operations that go through the EDOF generator */
+  val edof = Decoupled(new IJKgeneratorConsumerIO)
+  /** Values used when performing .elem, .fcn, .edn1, .edn2 and .sel operations that go to neighbour generator */
+  val neighbour = Decoupled(new IJKgeneratorConsumerIO)
   /** Data to be written when performing store operations */
   val wrData = Decoupled(Vec(NUM_MEMORY_BANKS, SInt(FIXED_WIDTH.W)))
   /** Destination register and auxilliary information, to be used when storing data into register files */

@@ -198,6 +198,7 @@ package object memory {
    * @param start An Option holding the i,j,k coordinates to start at, at positions (0), (1) and (2) respectively. If (3) is set, this is used as the iteration number.
    *              If None is given, generates a random i,j,k-coordinate pair to start at
    * @param elems The number of coordinate pairs to generate. Defaults to XREG_DEPTH
+   * @return A sequence of arrays, each array holding the an i,j,k coordinate pair and their corresponding iteration value
    */
   def genIJKmultiple(start: Option[Array[Int]] = None, elems: Int = XREG_DEPTH): Seq[Array[Int]] = {
     val startVals = start match {

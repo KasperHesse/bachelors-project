@@ -38,7 +38,7 @@ class ThreadIO extends Bundle {
   /** Connections to the execute stage */
   val ex = new IdExIO
   /** Connections to memory stage */
-  val mem = Decoupled(new IdMemIO)
+  val mem = new IdMemIO
   /** Connections to the control module */
   val ctrl = new ThreadControlIO
   /** Connections to writeback stage */
@@ -52,11 +52,6 @@ class ThreadThreadIO extends Bundle {
   val stateIn = Input(ThreadState())
   /** Current state of the other thread */
   val stateOut = Output(ThreadState())
-
-//  val swapIn = Input(Bool())
-//  val swapOut = Output(Bool())
-//  val ijkOut = Output(new IJK)
-//  val ijkIn = Input(new IJK)
 }
 
 /**
@@ -262,6 +257,7 @@ class Thread(id: Int) extends Module {
       //Load data for this instruction, increment pointer as necessary
       when(Oinst.pe === OtypePE.EXEC && Oinst.se === OtypeSE.START) {
         finalCycle := false.B //This is funky, but required for correct functionality
+          //Above is necessary since we should keep the IP when waiting in sEstart
         state := sEstart
       }
     }
@@ -290,10 +286,10 @@ class Thread(id: Int) extends Module {
     is(sStore) {
       //Store data, increment IP as necessary
       when(Oinst.pe === OtypePE.PACKET && Oinst.se === OtypeSE.END) {
-        state := sEnd
+        state := sPend
       }
     }
-    is(sEnd) {
+    is(sPend) {
       when(!io.fin) {
         state := sLoad
         IP := 1.U

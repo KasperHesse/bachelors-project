@@ -33,19 +33,7 @@ class IndexGenerator(val pipe: Boolean = true) extends Module {
   /** Valid signal to consumer */
   val validInternal = if(pipe) RegInit(false.B) else WireDefault(false.B)
   val in = if(pipe) RegEnable(io.in.bits, io.in.valid && readyInternal) else io.in.bits
-  
-  
 
-
-  // --- SIGNALS AND WIRES ---
-//  /** Lookup tables for computing i*nely*nelz */
-//  val nelxnelyLookup = for(i <- 0 until NUM_INPUT_PORTS) yield {
-//    Wire(Vec(NELX, UInt((log2Ceil(NDOF)+1).W))) //Declared with one additional bit so we can perform arithmetic comparisons
-//  }
-//  /** Lookup tables for computing k*nely */
-//  val nelyLookup = for(i <- 0 until NUM_INPUT_PORTS) yield {
-//    Wire(Vec(NELY, UInt((log2Ceil(NDOF)+1).W)))
-//  }
 
   val NELXH = (NELX+1)/2
   val NELYH = (NELY+1)/2
@@ -67,15 +55,6 @@ class IndexGenerator(val pipe: Boolean = true) extends Module {
   val ny = in.ijk.map(ijk => (ijk.j >> 1).asUInt())
   val nz = in.ijk.map(ijk => (ijk.k >> 1).asUInt())
 
-//  //Fill lookup tables
-//  for(i <- nelxnelyLookup.indices) {
-//    for(j <- 0 until NELX) {
-//      nelxnelyLookup(i)(j) := (j * NELY * NELZ).U
-//    }
-//    for(j <- 0 until NELY) {
-//      nelyLookup(i)(j) := (j * NELY).U
-//    }
-//  }
   /** Vector holding calculated indices */
   val indices = VecInit(Seq.fill(NUM_MEMORY_BANKS)(0.U(log2Ceil(NDOF+1).W)))
   /** Vector holding valid flags for each calculated index */
@@ -84,9 +63,6 @@ class IndexGenerator(val pipe: Boolean = true) extends Module {
   // --- LOGIC ---
   //Calculate all indices and set valid flags
   for(x <- 0 until NUM_INPUT_PORTS) {
-    //i * nely * nelz + k * nely + j
-//    indices(i) := nelxnelyLookup(i)(in.ijk(i).i) + nelyLookup(i)(in.ijk(i).k) + in.ijk(i).j
-    //i/2 * NELYH*NELZH + k/2*NELYH + j/2
     val row = nxLookup(x)(nx(x)) + nzLookup(x)(nz(x)) + ny(x)
 
     val a = (in.ijk(x).i(0) << 2).asUInt()
