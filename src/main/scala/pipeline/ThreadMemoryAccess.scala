@@ -11,10 +11,10 @@ import pipeline.StypeMod._
 
 class ThreadMemoryAccessIO extends Bundle {
   /** Instruction bits from Thread module */
-  val instr = Input(UInt(32.W))
+  val instr = Input(new StypeInstruction)
   /** Current state of parent Thread module */
   val threadState = Input(ThreadState())
-
+  /** Maximum index at which the VEC index generator should output validIndex=1. Depends on instruction length in thread */
   val maxIndex = Input(UInt(log2Ceil(NDOFLENGTH + 1).W))
   /** Indices used when performing .vec operations that go straight to address generator */
   val vec = Decoupled(new AddressGenProducerIO)

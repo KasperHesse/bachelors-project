@@ -8,19 +8,13 @@ import utils.Fixed.FIXED_WIDTH
 import vector.KEWrapper
 import vector.Opcode._
 import chisel3.experimental.BundleLiterals._
-import memory.IJKBundle
+import memory.{IJKBundle, IJKgeneratorBundle}
 import pipeline.RegisterFileType._
 
 /**
  * I/O Ports for "Thread" modules inside of the decode stage
  */
 class ThreadIO extends Bundle {
-  /** `i` value in the current grid, used to index into memory elemeents */
-  val i = Input(UInt(log2Ceil(NELX+1).W))
-  /** `j` value in the current grid, used to index into memory elements */
-  val j = Input(UInt(log2Ceil(NELY+1).W))
-  /** `k` value in the current grid, used to index into memory elements */
-  val k = Input(UInt(log2Ceil(NELZ+1).W))
   /** How far into the current vector we have progressed. Used when loading/storing with .vec suffix */
   val progress = Input(UInt(log2Ceil(NDOF+1).W))
   /** The current instruction, fetched from instruction buffer in decode stage */
@@ -32,7 +26,9 @@ class ThreadIO extends Bundle {
   /** Instruction pointer of the current packet. Sent to IM in Decode stage */
   val ip = Output(UInt(4.W))
   /** Connections to other thread in Decode stage */
-  val thread = new ThreadThreadIO
+  val threadOut = Output(new ThreadThreadIO)
+  /** Input connections from other thread in Decode stage */
+  val threadIn = Flipped(new ThreadThreadIO)
   /** The literal value of the state. Only used for debugging purposes since we cannot peek enums yet */
   val stateOutUint = Output(UInt(8.W))
   /** Connections to the execute stage */
@@ -47,11 +43,14 @@ class ThreadIO extends Bundle {
   val sRegFile = Flipped(new ScalarRegFileIO)
 }
 
+/**
+ * I/O ports connecting two threads. Use as-is on the output port of a thread, Use Flipped() on the input port
+ */
 class ThreadThreadIO extends Bundle {
   /** Current state of this thread */
-  val stateIn = Input(ThreadState())
-  /** Current state of the other thread */
-  val stateOut = Output(ThreadState())
+  val state = Output(ThreadState())
+  /** Current i,j,k values in the thread */
+  val ijk = Output(new IJKgeneratorBundle)
 }
 
 /**
@@ -72,29 +71,31 @@ class Thread(id: Int) extends Module {
   val KE = Module(new KEWrapper(NUM_PROCELEM, sync=false, SIMULATION))
   /** Immediate generator */
   val immGen = Module(new ImmediateGenerator)
+  /** Module handling all memory access related stuff */
+  val memAccess = Module(new ThreadMemoryAccess())
 
   // --- REGISTERS ---
   /** Instruction pointer into the instruction buffer */
   val IP = RegInit(0.U(4.W))
   /** Current index into subvectors. Also gives the x-coordinate of the submatrix in the KE matrix */
-//  val X = RegInit(0.U(log2Ceil(VREG_DEPTH).W))
-  val X = RegInit(0.U)
+  val X = RegInit(0.U(log2Ceil(VREG_DEPTH).W))
+//  val X = RegInit(0.U)
   /** Current y-coordinate used to index into KE matrix */
-//  val Y = RegInit(0.U(log2Ceil(KE_SIZE/NUM_PROCELEM).W))
-  val Y = RegInit(0.U)
+  val Y = RegInit(0.U(log2Ceil(KE_SIZE/NUM_PROCELEM).W))
+//  val Y = RegInit(0.U)
   /** Current column of submatrix (x,y) in the KE matrix */
-//  val col = RegInit(0.U(log2Ceil(NUM_PROCELEM).W))
-  val col = RegInit(0.U)
+  val col = RegInit(0.U(log2Ceil(NUM_PROCELEM).W))
+//  val col = RegInit(0.U)
   /** Used to select which vector from a vector slot is output */
-//  val slotSelect = RegInit(0.U(log2Ceil(VREG_SLOT_WIDTH).W))
-  val slotSelect = RegInit(0.U)
+  val slotSelect = RegInit(0.U(log2Ceil(VREG_SLOT_WIDTH).W))
+//  val slotSelect = RegInit(0.U)
   /** State register */
   val state = RegInit(sIdle)
 
   // --- WIRES AND SIGNALS ---
   /** Handle to the current instruction */
   val currentInstr: UInt = io.instr
-  /** Length of the instruction being decoded */
+  /** Execution length of the instruction being decoded */
   val instrLen = RegInit(1.U(log2Ceil(NDOFLENGTH+1).W))
   /** LUT to decode vector lengths (for setting macLimit) */
   val lenDecode = VecInit(Array(
@@ -168,7 +169,7 @@ class Thread(id: Int) extends Module {
   }
 
   // --- OUTPUT & MODULE CONNECTIONS ---
-  //Register file and KE connections
+  //Register files and KE connections
   vRegFile.io.rs1 := v_rs1
   vRegFile.io.rs2 := v_rs2
   vRegFile.io.wrData := io.wb.wrData
@@ -183,13 +184,20 @@ class Thread(id: Int) extends Module {
 
   io.sRegFile.rs1 := Rinst.rs1
   io.sRegFile.rs2 := Rinst.rs2
+
   KE.io.keX := X
   KE.io.keY := Y
   KE.io.keCol := col
 
+  //Immediate generator
   immGen.io.instr := Rinst
   io.ex.imm := immGen.io.imm
   io.ex.useImm := Rinst.immflag
+
+  //Memory access module
+  memAccess.io.instr := Sinst
+  memAccess.io.threadState := state
+  memAccess.io.maxIndex := 512.U //TODO bad value, how to set this?
 
   //Dontcares
   vRegFile.io.wrMask := 0.U
@@ -206,16 +214,18 @@ class Thread(id: Int) extends Module {
   io.sRegFile.wrData := DontCare
 
   //Outputs
+  //Execute
   io.ex.a := a
   io.ex.b := b
   io.ex.dest:= dest
   io.ex.op := op
-
   io.ex.macLimit := macLimit
   io.ex.valid := valid
   io.ex.firstCycle := firstCycle
   io.ex.rs1 := rs1
   io.ex.rs2 := rs2
+
+  //Control
   io.ctrl.rtypemod := Rinst.mod
   io.ctrl.state := state
   io.ctrl.finalCycle := finalCycle
@@ -223,7 +233,19 @@ class Thread(id: Int) extends Module {
   io.ctrl.op := op
   io.ctrl.rs1 := rs1
   io.ctrl.rs2 := rs2
-  io.thread.stateOut := state
+
+  //Memory
+  io.mem.vec <> memAccess.io.vec
+  io.mem.edof <> memAccess.io.edof
+  io.mem.readQueue <> memAccess.io.readQueue
+  io.mem.neighbour <> memAccess.io.neighbour
+  io.mem.ls := Sinst.ls
+  io.threadOut.state := state
+  io.threadOut.ijk := memAccess.io.ijkOut
+  memAccess.io.ijkIn := io.threadIn.ijk
+
+  //Others
+  io.threadOut.state := state
   io.ip := IP
 
   /** Debug values */
@@ -232,7 +254,8 @@ class Thread(id: Int) extends Module {
   io.ctrl.stateUint := state.asUInt()
   io.ex.dest.rfUint := dest.rf.asUInt()
   io.ex.opUInt := op.asUInt()
-  io.mem := DontCare
+  io.mem.wrData.bits := DontCare
+  io.mem.wrData.valid := false.B
 
 
   // --- LOGIC ---
@@ -254,6 +277,7 @@ class Thread(id: Int) extends Module {
       }
     }
     is(sLoad) {
+      finalCycle := memAccess.io.finalCycle //Memory access module handles the rest
       //Load data for this instruction, increment pointer as necessary
       when(Oinst.pe === OtypePE.EXEC && Oinst.se === OtypeSE.START) {
         finalCycle := false.B //This is funky, but required for correct functionality
@@ -262,7 +286,7 @@ class Thread(id: Int) extends Module {
       }
     }
     is(sEstart) {
-      when(io.thread.stateIn === sEend || io.thread.stateIn === sWait1) {
+      when(io.threadIn.state === sEend || io.threadIn.state === sWait1) {
         finalCycle := true.B
         state := sExec
       }
@@ -278,7 +302,7 @@ class Thread(id: Int) extends Module {
       }
     }
     is(sEend) {
-      when(io.thread.stateIn === sEstart || io.thread.stateIn === sWait2) {
+      when(io.threadIn.state === sEstart || io.threadIn.state === sWait2) {
         finalCycle := true.B
         state := sStore
       }
@@ -294,7 +318,7 @@ class Thread(id: Int) extends Module {
         state := sLoad
         IP := 1.U
       } .otherwise {
-        when(io.thread.stateIn === sExec || io.thread.stateIn === sEend) {
+        when(io.threadIn.state === sExec || io.threadIn.state === sEend) {
           //Other thread is still executing, go to wait until it's finished
           state := sWait2
         } .otherwise {
@@ -304,7 +328,7 @@ class Thread(id: Int) extends Module {
       }
     }
     is(sWait1) {
-      when(io.thread.stateIn === sEstart) {
+      when(io.threadIn.state === sEstart) {
         when(io.fin) {
           state := sWait2
         } .otherwise {
@@ -313,7 +337,7 @@ class Thread(id: Int) extends Module {
       }
     }
     is(sWait2) {
-      when(io.thread.stateIn === sEend) {
+      when(io.threadIn.state === sEend) {
         state := sIdle
       }
     }

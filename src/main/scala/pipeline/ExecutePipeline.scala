@@ -38,4 +38,5 @@ class ExecutePipeline(memfile: String = "") extends Module {
   control.io.ex <> execute.io.ctrl
 
   decode.io.mem <> DontCare
+  decode.io.memWb <> DontCare
 }

@@ -403,7 +403,7 @@ package object pipeline {
    * Computes and prints the random seed to be used for this tester.
    * A specific seed may also be passed as a parameter in the option
    * @param name The name of the test
-   * @param seed a specific seed to be used instead of a randomly generated seed
+   * @param seed a specific seed to be used instead of a randomly generated seed. If
    */
   def seed(name: String, seed: Option[Long] = None): Unit = {
     val x = seed match {

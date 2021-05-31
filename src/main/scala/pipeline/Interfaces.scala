@@ -123,7 +123,7 @@ class WbFwdIO extends Bundle {
 }
 
 /** Interface between writeback stage and register files in instruction decode stage.
- * Instantiate as-is in the execute stage, use Flipped() in writeback stage
+ * Instantiate as-is in the writeback stage, use Flipped() in decode stage
  * */
 class WbIdIO extends Bundle {
   /** The data to be written into register file */

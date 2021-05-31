@@ -50,7 +50,7 @@ class ThreadMemoryAccessSpec extends FlatSpec with ChiselScalatestTester with Ma
   it should "not start transmitting DOF until ready goes high" in {
     test(new ThreadMemoryAccess(sim=true)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       val rd = 0
-      val instr = StypeInstruction(rsrd=rd, mod=DOF, baseAddr=Q, ls=LOAD).toUInt()
+      val instr = StypeInstruction(rsrd=rd, mod=DOF, baseAddr=Q, ls=LOAD)
 
       //Keep all ready signals low for now
       dut.io.vec.ready.poke(false.B)
@@ -78,7 +78,7 @@ class ThreadMemoryAccessSpec extends FlatSpec with ChiselScalatestTester with Ma
   it should "generate outputs for a DOF instruction" in {
     test(new ThreadMemoryAccess(sim=true)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       val rd = 2
-      val instr = StypeInstruction(rsrd=rd, mod=DOF, baseAddr=Q, ls=LOAD).toUInt()
+      val instr = StypeInstruction(rsrd=rd, mod=DOF, baseAddr=Q, ls=LOAD)
       val IJK = genIJKmultiple(start=Some(Array(0,0,0,0)))
 
       dut.io.vec.ready.poke(true.B)
@@ -98,7 +98,6 @@ class ThreadMemoryAccessSpec extends FlatSpec with ChiselScalatestTester with Ma
         expectReadQueue(dut, iter=0, reg=rd*VREG_SLOT_WIDTH + j, rf=VREG)
         dut.io.vec.valid.expect(false.B)
         dut.io.neighbour.valid.expect(false.B)
-
 
         val finalCycle = i == (IJK.length*SUBVECTORS_PER_VREG-1)
         dut.io.finalCycle.expect(finalCycle.B)
@@ -123,7 +122,7 @@ class ThreadMemoryAccessSpec extends FlatSpec with ChiselScalatestTester with Ma
   it should "generate outputs for a VEC instruction" in {
     test(new ThreadMemoryAccess(sim=true)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       val rd = 1
-      val instr = StypeInstruction(rsrd=rd, mod=VEC, baseAddr=R, ls=LOAD).toUInt()
+      val instr = StypeInstruction(rsrd=rd, mod=VEC, baseAddr=R, ls=LOAD)
       val baseIndices = Seq.range(0, ELEMS_PER_VSLOT, NUM_MEMORY_BANKS)
 
       dut.io.vec.ready.poke(true.B)
@@ -158,7 +157,7 @@ class ThreadMemoryAccessSpec extends FlatSpec with ChiselScalatestTester with Ma
 
   it should "generate outputs for an ELEM instruction" in {
     test(new ThreadMemoryAccess(sim=true)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      val instr = StypeInstruction(rsrd=3, mod=ELEM, baseAddr=XPHYS, ls=LOAD).toUInt()
+      val instr = StypeInstruction(rsrd=3, mod=ELEM, baseAddr=XPHYS, ls=LOAD)
       val IJK = genIJKmultiple(start=Some(Array(0,0,0,0)))
 
       dut.io.vec.ready.poke(true.B)
@@ -197,7 +196,7 @@ class ThreadMemoryAccessSpec extends FlatSpec with ChiselScalatestTester with Ma
     test(new ThreadMemoryAccess(sim=true)) { dut =>
       //Drive a ld.sel instruction. Observe outputs at ijk=0,0,0 and correct rd (and only one)
       //When finalCycle is asserted, move to sEstart, all valid signals should go low
-      val instr = StypeInstruction(rsrd = 2, mod=FCN, baseAddr=X, ls = LOAD).toUInt()
+      val instr = StypeInstruction(rsrd = 2, mod=FCN, baseAddr=X, ls = LOAD)
 
       dut.io.vec.ready.poke(true.B)
       dut.io.edof.ready.poke(true.B)
@@ -235,7 +234,7 @@ class ThreadMemoryAccessSpec extends FlatSpec with ChiselScalatestTester with Ma
     test(new ThreadMemoryAccess(sim=true)) { dut =>
       //Drive a ld.sel instruction. Observe outputs at ijk=0,0,0 and correct rd (and only one)
       //When finalCycle is asserted, move to sEstart, all valid signals should go low
-      val instr = StypeInstruction(rsrd = 2, mod=EDN1, baseAddr=X, ls = LOAD).toUInt()
+      val instr = StypeInstruction(rsrd = 2, mod=EDN1, baseAddr=X, ls = LOAD)
 
       dut.io.vec.ready.poke(true.B)
       dut.io.edof.ready.poke(true.B)
@@ -273,7 +272,7 @@ class ThreadMemoryAccessSpec extends FlatSpec with ChiselScalatestTester with Ma
     test(new ThreadMemoryAccess(sim=true)) { dut =>
       //Drive a ld.sel instruction. Observe outputs at ijk=0,0,0 and correct rd (and only one)
       //When finalCycle is asserted, move to sEstart, all valid signals should go low
-      val instr = StypeInstruction(rsrd = 2, mod=EDN2, baseAddr=X, ls = LOAD).toUInt()
+      val instr = StypeInstruction(rsrd = 2, mod=EDN2, baseAddr=X, ls = LOAD)
 
       dut.io.vec.ready.poke(true.B)
       dut.io.edof.ready.poke(true.B)
@@ -312,7 +311,7 @@ class ThreadMemoryAccessSpec extends FlatSpec with ChiselScalatestTester with Ma
     test(new ThreadMemoryAccess(sim=true)) { dut =>
       //Drive a ld.sel instruction. Observe outputs at ijk=0,0,0 and correct rd (and only one)
       //When finalCycle is asserted, move to sEstart, all valid signals should go low
-      val instr = StypeInstruction(rsrd = 2, mod=SEL, baseAddr=X, ls = LOAD).toUInt()
+      val instr = StypeInstruction(rsrd = 2, mod=SEL, baseAddr=X, ls = LOAD)
 
       dut.io.vec.ready.poke(true.B)
       dut.io.edof.ready.poke(true.B)

@@ -377,7 +377,6 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
 
   "Execute pipeline" should "use both threads" in {
     simulationConfig()
-//    SIMULATION = true
     seed("Execute pipeline both threads")
     val memfile = "src/test/resources/meminit/mem5.hex.txt"
     val program = "" +

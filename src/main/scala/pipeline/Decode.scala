@@ -16,7 +16,7 @@ class DecodeIO extends Bundle {
   /** Connections to execute stage */
   val ex = new IdExIO
   /** Output connections to memory stage */
-  val mem = Decoupled(new IdMemIO)
+  val mem = new IdMemIO
   /** Input connections from execute writeback stage */
   val wb = Flipped(new WbIdIO)
   /** Input connections from memory writeback stage */
@@ -52,12 +52,6 @@ class Decode extends Module {
   val IP = RegInit(0.U(4.W))
   /** Number of instructions in iBuffer */
   val iCount = RegInit(0.U(4.W))
-  /** i element used for indexing */
-  val i = RegInit(0.U(log2Ceil(NELX+1).W))
-  /** j element used for indexing */
-  val j = RegInit(0.U(log2Ceil(NELY+1).W))
-  /** k element used for indexing */
-  val k = RegInit(0.U(log2Ceil(NELZ+1).W))
   /** Progress when accessing vectors in linear fashion */
   val progress = RegInit(0.U(log2Ceil(NDOF+ELEMS_PER_VSLOT+1).W))
   /** Total number of operations to issue before instructions are finished */
@@ -80,7 +74,7 @@ class Decode extends Module {
   val incrDecode = VecInit(Array(VV.U, VV.U, 1.U))
   //When performing NDOF loads, we access VREG_DEPTH*VREG_SLOT_WIDTH elements per thread.
   //When performing i,j,k-based loads, we only load VREG_SLOT_WIDTH elements per thread.
-  /** Current state of our threads */
+  /** Current states of our threads */
   val threadStates = Wire(Vec(2, ThreadState()))
   /** Asserted to threads when the current instruction packet is finished */
   val fin = WireDefault(false.B)
@@ -92,15 +86,12 @@ class Decode extends Module {
   val branch = WireDefault(false.B)
 
   for(i <- 0 until 2) {
-    threadStates(i) := threads(i).io.thread.stateOut
+    threadStates(i) := threads(i).io.threadOut.state
   }
 
   // --- OUTPUTS AND CONNECTIONS --- //
   //Common thread connections
   for(thread <- threads) {
-    thread.io.i := i
-    thread.io.j := j
-    thread.io.k := k
     thread.io.progress := progress
     thread.io.fin := fin
     thread.io.start := start
@@ -109,8 +100,8 @@ class Decode extends Module {
     thread.io.instr := iBuffer(thread.io.ip)
   }
   //Specific thread connections
-  threads(0).io.thread.stateIn := threads(1).io.thread.stateOut
-  threads(1).io.thread.stateIn := threads(0).io.thread.stateOut
+  threads(0).io.threadIn := threads(1).io.threadOut
+  threads(1).io.threadIn := threads(0).io.threadOut
   io.ctrl.threadCtrl(0) <> threads(0).io.ctrl
   io.ctrl.threadCtrl(1) <> threads(1).io.ctrl
 
@@ -131,7 +122,7 @@ class Decode extends Module {
 
   //Debug connections. TODO: Remove these
   io.ctrl.stateUint := state.asUInt()
-  io.mem <> threads(0).io.mem
+//  io.mem <> threads(0).io.mem
 
   //Assign shared resources to threads
   when(execThread === 0.U) {
@@ -140,6 +131,11 @@ class Decode extends Module {
     threads(0).io.wb <> io.wb
     sRegFile.io.rs1 := threads(0).io.sRegFile.rs1
     sRegFile.io.rs2 := threads(0).io.sRegFile.rs2
+    threads(0).io.mem.wrData.ready := false.B
+    threads(0).io.mem.edof.ready := false.B
+    threads(0).io.mem.neighbour.ready := false.B
+    threads(0).io.mem.vec.ready := false.B
+    threads(0).io.mem.readQueue.ready := false.B
 
     //Thread 1 accesses mem stage
     threads(1).io.mem <> io.mem
@@ -158,6 +154,11 @@ class Decode extends Module {
     threads(1).io.wb <> io.wb
     sRegFile.io.rs1 := threads(1).io.sRegFile.rs1
     sRegFile.io.rs2 := threads(1).io.sRegFile.rs2
+    threads(1).io.mem.wrData.ready := false.B
+    threads(1).io.mem.edof.ready := false.B
+    threads(1).io.mem.neighbour.ready := false.B
+    threads(1).io.mem.vec.ready := false.B
+    threads(1).io.mem.readQueue.ready := false.B
   }
 
   // --- LOGIC ---

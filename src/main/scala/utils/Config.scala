@@ -118,8 +118,8 @@ object Config {
     KE_SIZE = 24
     NUM_PROCELEM = 6
     SUBVECTORS_PER_VREG  = VREG_DEPTH/NUM_PROCELEM
-    FIXED_WIDTH = if(largeNumbers) 32 else 24
-    INT_WIDTH = if(largeNumbers) 16 else 8
+    FIXED_WIDTH = if(largeNumbers) 32 else 26
+    INT_WIDTH = if(largeNumbers) 16 else 10
     FRAC_WIDTH = 15
     Config.checkRequirements()
   }

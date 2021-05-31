@@ -37,6 +37,7 @@ class DecodeExecute extends Module {
 
   /** DONTCARES */
   decode.io.mem := DontCare
+  decode.io.memWb := DontCare
   decode.io.wb := DontCare
 
   execute.io.fwd := DontCare

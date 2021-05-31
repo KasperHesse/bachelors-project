@@ -33,7 +33,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
     if(op.litValue == MAC.litValue) {
       //Example: Each register is 16(VECTOR_REGISTER_DEPTH) elements deep, and 4(NUM_PROCELEM) elements are processed on each clock cycle.
-      //Hence, it takes 4 cycles to clear each register * 4(VREG_SLOT_WIDTH) registers per slot = 16 cycles for each vreg slot = 64(VECTOR_REGISTER_DEPTH*VREG_SLOT*WIDTH) values processed
+      //Hence, it takes 4 cycles to clear each register * 4(VREG_SLOT_WIDTH) registers per slot = 16 cycles for each vreg slot = 64(ELEMS_PER_VSLOT) values processed
       //After 16 cycles, we swap to the other thread, repeating our calculations
       //If eg. NDOF=128, we require one full pass through each thread before 128 values have been processed
       //The result is 4(NUM_PROCELEM) sub-sums, which totalled would give us the final sum.
@@ -214,7 +214,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     var resCnt = 0
     var resMax = KE_SIZE //KE_SIZE/NUM_PROCELEM (eg 24/8=3) outputs per. matrix-vector product
     //Multiplied by VREG_SLOT_WIDTH outputs per slot. Since VREG_SLOT_WIDTH==NUM_PROCELEM, we get KE_SIZE total results
-    while (i < 400 && resCnt < resMax) { //If eg KE_SIZE=24 and
+    while (i < 600 && resCnt < resMax) {
       if (dut.io.out.valid.peek.litToBoolean) {
         //Slices of KE-matrix that goes into this result
         val slices = KE.slice((resCnt % smpr) * KE_SIZE, ((resCnt % smpr) + 1) * KE_SIZE)
@@ -304,10 +304,10 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
     var progress = 0 //How many elements have been processed
     var i = 0
-    while(progress < maxProgress && i < 200) {
+    while(progress < maxProgress && i < 300) {
       var resCnt = 0 //How many instructions of the current packet have been processed
       print(s"resCnt(${instrs.length}): ")
-      while(resCnt < instrs.length && i < 200) {
+      while(resCnt < instrs.length && i < 300) {
         if(dut.io.out.valid.peek.litToBoolean) {
           //MAC.VV instructions only output on the final cycle of that packet. Skip them while working towards the final outputs
           if(instrs(resCnt).op.litValue == MAC.litValue && instrs(resCnt).mod.litValue == RtypeMod.VV.litValue && progress != (maxProgress-progressIncr)) {
@@ -400,8 +400,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("Decode/execute postpone MAC results")
-      scala.util.Random.setSeed(2)
-      val instrs = Array(genRtype(MAC, RtypeMod.VV), genRtype(DIV, RtypeMod.VV))
+      val instrs = Array(genRtype(MAC, RtypeMod.VV), genRtype(ADD, RtypeMod.VV))
       val ops = wrapInstructions(instrs, OtypeLen.NELEM)
       MAClength = NELEMLENGTH
       loadInstructions(ops, dut)
@@ -409,7 +408,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  "DecodeExecute" should "decode and execute a dot product (MAC.VV)" in {
+  it should "decode and execute a dot product (MAC.VV)" in {
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("Decode/execute dot product")
@@ -417,7 +416,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       val ops = wrapInstructions(instrs, OtypeLen.NELEM)
       MAClength = NELEMLENGTH
       loadInstructions(ops, dut)
-      test(dut, instrs) //Testing with length SINGLE since we only expect one output. It will stall swap threads
+      test(dut, instrs) //Testing with length SINGLE since we only expect one output. It will still swap threads
     }
   }
 
@@ -482,11 +481,10 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  "Decode/Execute stage" should "decode and execute VV instructions" in {
+  it should "decode and execute VV instructions" in {
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("VV decode execute")
-      scala.util.Random.setSeed(5347764876420400419L)
       val instrs = genAndPoke(dut, RtypeMod.VV)
       test(dut, instrs)
     }
@@ -540,9 +538,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   it should "decode and execute a random instruction mix" in {
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      //1254595567306819563
       seed("Decode/execute random mix")
-      scala.util.Random.setSeed(1254595567306819563L)
       val instrs = genAndPoke(dut)
       test(dut, instrs)
     }

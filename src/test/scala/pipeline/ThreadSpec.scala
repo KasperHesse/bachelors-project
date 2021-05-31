@@ -6,15 +6,20 @@ import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
 import vector.Opcode
 import chisel3.experimental.BundleLiterals._
+import chisel3.util.DecoupledIO
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 import utils.Config
 import utils.Config._
 import vector.Opcode._
 import pipeline.ThreadState._
+import pipeline.StypeMod._
+import pipeline.StypeBaseAddress._
+import pipeline.StypeLoadStore._
+import memory.{IJKBundle, IJKgeneratorConsumerIO, ReadQueueBundle, genIJKmultiple}
+import pipeline.RegisterFileType._
 
 class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
-  behavior of "Decoder thread"
 
   def expectVVvalues(dut: Thread, inst: RtypeInstruction): Unit = {
     val vReg = dut.vRegFile.arr
@@ -116,12 +121,9 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val instrs = genInstructions(dut, mod)
 
     //Poke default values
-    dut.io.i.poke(0.U)
-    dut.io.j.poke(0.U)
-    dut.io.k.poke(0.U)
     dut.io.fin.poke(false.B)
     dut.io.progress.poke(0.U)
-    dut.io.thread.stateIn.poke(sEstart)
+    dut.io.threadIn.state.poke(sEstart)
     dut.io.instr.poke(0.U)
     dut.io.start.poke(true.B)
 
@@ -129,16 +131,16 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     var i: Int = 0
     var resCnt: Int = 0
 
-    while(!fin && i < 200) {
+    while(!fin && i < 300) {
       val ip = dut.io.ip.peek.litValue.toInt
       dut.io.instr.poke(instrs(ip).toUInt())
 
       //Assign stateIn to speed through load and store stages
       if(dut.io.stateOutUint.peek.litValue == sLoad.litValue) {
-        dut.io.thread.stateIn.poke(sEend)
+        dut.io.threadIn.state.poke(sEend)
         dut.io.start.poke(false.B)
       } else if (dut.io.stateOutUint.peek.litValue == sExec.litValue) {
-        dut.io.thread.stateIn.poke(sEstart)
+        dut.io.threadIn.state.poke(sEstart)
       }
 
       //Assert 'fin' once end state has been reached
@@ -163,24 +165,14 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     assert(resCnt == numRes)
   }
 
-  /**
-   * Computes and prints the random seed to be used for this tester. Returns the ID of the thread object instantiated
-   * @param name The name of the test
-   * @return ID to be used for Thread object
-   */
-  def seed(name: String): Int = {
-    val seed = scala.util.Random.nextLong()
-    scala.util.Random.setSeed(seed)
-    val id = scala.util.Random.nextInt(2) //1 or 2
-    print(s"$name. Using seed $seed. Thread id $id\n")
-    id
-  }
+  behavior of "Thread without memory access"
 
   it should "test VV instruction load and decode" in {
     SIMULATION = true
     Config.checkRequirements()
-    val id = seed("VV thread decode")
-    test(new Thread(id)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    seed("VV thread decode")
+    val id = scala.util.Random.nextInt(2)
+    test(new Thread(id)) {dut =>
       testThread(dut, RtypeMod.VV)
     }
   }
@@ -188,8 +180,9 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   it should "test XV instruction load and decode" in {
     SIMULATION = true
     Config.checkRequirements()
-    val id = seed("XV thread decode")
-    test(new Thread(id)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    seed("XV thread decode")
+    val id = scala.util.Random.nextInt(2)
+    test(new Thread(id)) {dut =>
       testThread(dut, RtypeMod.XV)
     }
   }
@@ -197,26 +190,17 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   it should "test XX instruction load and decode" in {
     SIMULATION = true
     Config.checkRequirements()
-    val id = seed("XX thread decode")
+    seed("XX thread decode")
+    val id = scala.util.Random.nextInt(2)
     test(new Thread(id)) {dut =>
       testThread(dut, RtypeMod.XX)
-    }
-  }
-
-  //This test uses the same instruction mix as previously, but keeps 'fin' low until multiple iterations have been performed.
-  it should "perform multiple runs if length is NDOF or NELEM" in {
-    SIMULATION = true
-    Config.checkRequirements()
-    val id = seed("VV length NDOF/NELEM")
-    test(new Thread(id)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      testThread(dut, RtypeMod.VV, 16)
     }
   }
 
   it should "go back to idle when id=1 and fin=true" in {
     SIMULATION = true
     Config.checkRequirements()
-    test(new Thread(1)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    test(new Thread(1)) {dut =>
       val istart = OtypeInstruction(se = OtypeSE.START, pe = OtypePE.PACKET)
 
       dut.io.start.poke(true.B)
@@ -225,16 +209,141 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.clock.step()
 
       assert(dut.io.stateOutUint.peek.litValue == sWait1.litValue)
-      dut.io.thread.stateIn.poke(sEstart)
+      dut.io.threadIn.state.poke(sEstart)
       dut.clock.step()
 
       assert(dut.io.stateOutUint.peek().litValue() == sWait2.litValue)
       dut.clock.step(5)
       assert(dut.io.stateOutUint.peek().litValue() == sWait2.litValue)
-      dut.io.thread.stateIn.poke(sEend)
+      dut.io.threadIn.state.poke(sEend)
       dut.clock.step()
 
       assert(dut.io.stateOutUint.peek.litValue() == sIdle.litValue())
+    }
+  }
+
+  behavior of "Thread with memory access"
+
+  def wrapLoadInstructions(instrs: Array[StypeInstruction]): Array[UInt] = {
+    val pstart = Array(OtypeInstruction(se=OtypeSE.START, pe = OtypePE.PACKET)).asInstanceOf[Array[Bundle with Instruction]]
+    val estart = OtypeInstruction(se=OtypeSE.START, pe=OtypePE.EXEC)
+    val eend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.EXEC)
+    val pend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.PACKET)
+
+    val a = Array.concat(pstart, instrs.asInstanceOf[Array[Bundle with Instruction]], Array(estart, eend, pend).asInstanceOf[Array[Bundle with Instruction]])
+    a.map(_.toUInt())
+  }
+
+  def expectIJK(neighbour: DecoupledIO[IJKgeneratorConsumerIO], baseAddr: StypeBaseAddress.Type, ijk: Array[Int], mod: StypeMod.Type, pad: Boolean, valid: Boolean = true): Unit = {
+    neighbour.valid.expect(valid.B)
+    neighbour.bits.baseAddr.expect(baseAddr)
+    neighbour.bits.ijk.expect((new IJKBundle).Lit(_.i -> ijk(0).U, _.j -> ijk(1).U, _.k -> ijk(2).U))
+    neighbour.bits.mod.expect(mod)
+    neighbour.bits.pad.expect(pad.B)
+  }
+
+  def expectReadQueue(rq: DecoupledIO[ReadQueueBundle], iter: Int, reg: Int, rf: RegisterFileType.Type): Unit = {
+    rq.valid.expect(true.B)
+    rq.bits.iter.expect(iter.U)
+    rq.bits.rd.reg.expect(reg.U)
+    rq.bits.rd.rf.expect(rf)
+  }
+
+  it should "generate outputs for an ELEM instruction" in {
+    val elem = StypeInstruction(rsrd=0, mod=ELEM, baseAddr = XPHYS, ls=LOAD)
+    val IJK = genIJKmultiple(start=Some(Array(0,0,0,0)))
+    val instrs = wrapLoadInstructions(Array(elem))
+
+    test(new Thread(0)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      var fin: Boolean = false
+      var i: Int = 0
+      dut.io.mem.vec.ready.poke(true.B)
+      dut.io.mem.edof.ready.poke(true.B)
+      dut.io.mem.neighbour.ready.poke(true.B)
+      dut.io.mem.readQueue.ready.poke(true.B)
+      dut.io.fin.poke(false.B)
+      dut.io.threadIn.state.poke(sEstart)
+      dut.io.start.poke(true.B)
+
+      while(!fin & i < 50) {
+        fork {
+          //Poke the wanted instruction
+          val ip = dut.io.ip.peek.litValue.toInt
+          val instr = instrs(ip)
+          dut.io.instr.poke(instr)
+
+          //Observe outputs
+          if(dut.io.mem.neighbour.valid.peek.litToBoolean) {
+            for(i <- IJK.indices) {
+              val ijk = IJK(i)
+              expectIJK(dut.io.mem.neighbour, elem.baseAddr, ijk, elem.mod, pad=false)
+              expectReadQueue(dut.io.mem.readQueue, ijk(3), reg=0, rf=XREG)
+              dut.clock.step()
+            }
+          } else {
+            dut.clock.step()
+          }
+        } .fork { //Watch end of instruction
+          if(dut.io.ctrl.stateUint.peek().litValue === ThreadState.sEstart.litValue.toInt) {
+            fin = true
+          }
+          dut.clock.step()
+          i += 1
+        }.join
+      }
+      assert(fin)
+    }
+  }
+
+  it should "generate outputs for a DOF instruction" in {
+    val rd = 2
+    val dof = StypeInstruction(rsrd=2, mod=DOF, baseAddr=P, ls=LOAD)
+    val IJK = genIJKmultiple(start=Some(Array(0,0,0,0)))
+    val instrs = wrapLoadInstructions(Array(dof))
+
+    test(new Thread(0)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+      var fin: Boolean = false
+      var i: Int = 0
+      dut.io.mem.vec.ready.poke(true.B)
+      dut.io.mem.edof.ready.poke(true.B)
+      dut.io.mem.neighbour.ready.poke(true.B)
+      dut.io.mem.readQueue.ready.poke(true.B)
+      dut.io.fin.poke(false.B)
+      dut.io.threadIn.state.poke(sEstart)
+      dut.io.start.poke(true.B)
+      while(!fin & i < 50) {
+        fork {
+          //Poke the wanted instruction
+          val ip = dut.io.ip.peek.litValue.toInt
+          val instr = instrs(ip)
+          dut.io.instr.poke(instr)
+
+          //Observe outputs
+          if(dut.io.mem.edof.valid.peek.litToBoolean) {
+            for(i <- 0 until IJK.length*SUBVECTORS_PER_VREG) {
+              val j = i/SUBVECTORS_PER_VREG
+              val ijk = IJK(j)
+              if(i % SUBVECTORS_PER_VREG==0) expectIJK(dut.io.mem.edof, dof.baseAddr, ijk, dof.mod, pad=false)
+              expectReadQueue(dut.io.mem.readQueue, iter=0, reg=rd*VREG_SLOT_WIDTH + j, rf=VREG)
+              dut.clock.step()
+              if(i % SUBVECTORS_PER_VREG == 0) {
+                dut.io.mem.edof.ready.poke(false.B)
+              } else if (i % SUBVECTORS_PER_VREG == SUBVECTORS_PER_VREG-1) {
+                dut.io.mem.edof.ready.poke(true.B)
+              }
+            }
+          } else {
+            dut.clock.step()
+          }
+        } .fork { //Watch end of instruction
+          if(dut.io.ctrl.stateUint.peek().litValue === ThreadState.sEstart.litValue.toInt) {
+            fin = true
+          }
+          dut.clock.step()
+          i += 1
+        }.join
+      }
+      assert(fin)
     }
   }
 }
