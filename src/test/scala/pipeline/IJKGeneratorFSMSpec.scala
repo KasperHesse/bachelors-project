@@ -55,8 +55,8 @@ class IJKGeneratorFSMSpec extends FlatSpec with ChiselScalatestTester with Match
 
   it should "output multiple values when mod is DOF or ELEM" in {
     test(new IJKGeneratorFSM).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-      val dof = StypeInstruction(rsrd = 0, mod=DOF, offset = StypeBaseAddress.X, LOAD).toUInt()
-      val elem = StypeInstruction(rsrd=0, mod=ELEM, offset = StypeBaseAddress.X, LOAD).toUInt()
+      val dof = StypeInstruction(rsrd = 0, mod=DOF, baseAddr = StypeBaseAddress.X, LOAD)
+      val elem = StypeInstruction(rsrd=0, mod=ELEM, baseAddr = StypeBaseAddress.X, LOAD)
       val ijk = genIJKmultiple(start = Some(Array(0,0,0,0)))
       dut.io.instr.poke(dof)
       dut.io.edof.ready.poke(true.B)
@@ -74,12 +74,13 @@ class IJKGeneratorFSMSpec extends FlatSpec with ChiselScalatestTester with Match
       }
     }
   }
+
   it should "keep the output constant when mod is SEL, FCN, EDN1 or EDN2" in {
     test(new IJKGeneratorFSM) { dut =>
-      val sel = StypeInstruction(0, SEL, StypeBaseAddress.X, LOAD).toUInt()
-      val fcn = StypeInstruction(0, FCN, StypeBaseAddress.X, LOAD).toUInt()
-      val edn1 = StypeInstruction(0, EDN1, StypeBaseAddress.X, LOAD).toUInt()
-      val edn2 = StypeInstruction(0, EDN2, StypeBaseAddress.X, LOAD).toUInt()
+      val sel = StypeInstruction(0, SEL, StypeBaseAddress.X, LOAD)
+      val fcn = StypeInstruction(0, FCN, StypeBaseAddress.X, LOAD)
+      val edn1 = StypeInstruction(0, EDN1, StypeBaseAddress.X, LOAD)
+      val edn2 = StypeInstruction(0, EDN2, StypeBaseAddress.X, LOAD)
 
       val instrs = Seq(sel, fcn, edn1, edn2)
 
@@ -95,10 +96,11 @@ class IJKGeneratorFSMSpec extends FlatSpec with ChiselScalatestTester with Match
       }
     }
   }
+
   it should "increment and keep its value when moving to Estart" in {
     test(new IJKGeneratorFSM) { dut =>
-      val dof = StypeInstruction(rsrd = 0, mod=DOF, offset = StypeBaseAddress.X, LOAD).toUInt()
-      val elem = StypeInstruction(rsrd=0, mod=ELEM, offset = StypeBaseAddress.X, LOAD).toUInt()
+      val dof = StypeInstruction(rsrd = 0, mod=DOF, baseAddr = StypeBaseAddress.X, LOAD)
+      val elem = StypeInstruction(rsrd=0, mod=ELEM, baseAddr = StypeBaseAddress.X, LOAD)
       val ijk = genIJKmultiple(start = Some(Array(0,0,0,0))).last
       val instrs = Seq(dof, elem)
 
@@ -131,10 +133,10 @@ class IJKGeneratorFSMSpec extends FlatSpec with ChiselScalatestTester with Match
 
   it should "not increment until leaving sOutput when using neighbour gen" in {
     test(new IJKGeneratorFSM).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-      val sel = StypeInstruction(0, SEL, StypeBaseAddress.X, LOAD).toUInt()
-      val fcn = StypeInstruction(0, FCN, StypeBaseAddress.X, LOAD).toUInt()
-      val edn1 = StypeInstruction(0, EDN1, StypeBaseAddress.X, LOAD).toUInt()
-      val edn2 = StypeInstruction(0, EDN2, StypeBaseAddress.X, LOAD).toUInt()
+      val sel = StypeInstruction(0, SEL, StypeBaseAddress.X, LOAD)
+      val fcn = StypeInstruction(0, FCN, StypeBaseAddress.X, LOAD)
+      val edn1 = StypeInstruction(0, EDN1, StypeBaseAddress.X, LOAD)
+      val edn2 = StypeInstruction(0, EDN2, StypeBaseAddress.X, LOAD)
       val ijk = genIJKmultiple(start = Some(Array(0,0,0,0)), elems=2).last
       val instrs = Seq(sel, fcn, edn1, edn2)
 
@@ -164,8 +166,8 @@ class IJKGeneratorFSMSpec extends FlatSpec with ChiselScalatestTester with Match
   }
 
   it should "load new values when processing DOF or ELEM" in {
-    val dof = StypeInstruction(rsrd = 0, mod=DOF, offset = StypeBaseAddress.X, LOAD).toUInt()
-    val elem = StypeInstruction(rsrd=0, mod=ELEM, offset = StypeBaseAddress.X, LOAD).toUInt()
+    val dof = StypeInstruction(rsrd = 0, mod=DOF, baseAddr = StypeBaseAddress.X, LOAD)
+    val elem = StypeInstruction(rsrd=0, mod=ELEM, baseAddr = StypeBaseAddress.X, LOAD)
     val ijk = genIJKmultiple(start = Some(Array(0,0,0,0))).last
     val instrs = Seq(dof, elem)
 
@@ -217,10 +219,10 @@ class IJKGeneratorFSMSpec extends FlatSpec with ChiselScalatestTester with Match
   }
 
   it should "load new values when processing SEL, FCN, EDN1 and EDN2" in {
-    val sel = StypeInstruction(0, SEL, StypeBaseAddress.X, LOAD).toUInt()
-    val fcn = StypeInstruction(0, FCN, StypeBaseAddress.X, LOAD).toUInt()
-    val edn1 = StypeInstruction(0, EDN1, StypeBaseAddress.X, LOAD).toUInt()
-    val edn2 = StypeInstruction(0, EDN2, StypeBaseAddress.X, LOAD).toUInt()
+    val sel = StypeInstruction(0, SEL, StypeBaseAddress.X, LOAD)
+    val fcn = StypeInstruction(0, FCN, StypeBaseAddress.X, LOAD)
+    val edn1 = StypeInstruction(0, EDN1, StypeBaseAddress.X, LOAD)
+    val edn2 = StypeInstruction(0, EDN2, StypeBaseAddress.X, LOAD)
     val ijk = genIJKmultiple(start = Some(Array(0,0,0,0)), elems=2).last
 
     val instrs = Seq(sel, fcn, edn1, edn2)
@@ -273,6 +275,7 @@ class IJKGeneratorFSMSpec extends FlatSpec with ChiselScalatestTester with Match
       dut.io.threadState.poke(sWait1)
       dut.clock.step()
       pokeIJK(dut, 0, 4, 0, 0)
+      dut.io.threadState.poke(sLoad)
       dut.io.threadState.poke(sLoad)
       dut.clock.step()
       expectIJK(dut, 0, 4, 0)

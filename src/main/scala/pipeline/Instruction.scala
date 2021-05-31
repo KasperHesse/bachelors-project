@@ -186,8 +186,8 @@ object StypeInstruction {
   }
 
   /** Constructs an S-type instruction from the given parameters */
-  def apply(rsrd: Int, mod: StypeMod.Type, offset: StypeBaseAddress.Type, ls: StypeLoadStore.Type): StypeInstruction = {
-    (new StypeInstruction).Lit(_.rsrd -> rsrd.U, _.mod -> mod, _.baseAddr -> offset, _.fmt -> InstructionFMT.STYPE, _.ls -> ls)
+  def apply(rsrd: Int, mod: StypeMod.Type, baseAddr: StypeBaseAddress.Type, ls: StypeLoadStore.Type): StypeInstruction = {
+    (new StypeInstruction).Lit(_.rsrd -> rsrd.U, _.mod -> mod, _.baseAddr -> baseAddr, _.fmt -> InstructionFMT.STYPE, _.ls -> ls, _.nu1 -> 0.U)
   }
 
   /** Converts a UInt to the corresponding Stype instruction */

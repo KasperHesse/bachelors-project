@@ -10,11 +10,9 @@ import pipeline.ThreadState._
 
 class MemoryAccessFSMIO extends Bundle {
   /** Instruction bits from Thread module */
-  val instr = Input(UInt(32.W))
+  val instr = Input(new StypeInstruction)
   /** Current state of parent Thread module */
   val threadState = Input(ThreadState())
-  /** Explicit reset signal that resets the IJK generator and control FSM. Not the same as the Chisel-inferred reset signal... */
-  val reset = Input(Bool())
   /** Values used when performing .dof operations that go through the EDOF generator */
   val edof = Decoupled(new IJKgeneratorConsumerIO)
   /** Values used when performing .elem, .fcn, .edn1, .edn2 and .sel operations that go to neighbour generator */
@@ -23,6 +21,8 @@ class MemoryAccessFSMIO extends Bundle {
   val ijkOut = Output(new IJKgeneratorBundle)
   /** I,J,K values input from other thread */
   val ijkIn = Flipped(new IJKgeneratorBundle)
+  /** Signal indicating that the final load of the current instruction has been performed, and the next instruction should be loaded */
+  val finalCycle = Output(Bool())
 }
 
 /**
@@ -41,9 +41,9 @@ class IJKGeneratorFSM extends Module {
   /** Number of values that have been output on this instruction */
   val cnt = RegInit(0.U(4.W))
   /** Registered version of current instruction. Only updated when current threadState is sLoad */
-  val regSinstr = RegEnable(io.instr.asTypeOf(new StypeInstruction), io.threadState === sLoad || io.threadState === sStore)
+  val regSinstr = RegEnable(io.instr, io.threadState === sLoad || io.threadState === sStore)
   /** Handle to most recent valid Stype instruction. If thread state is not sStore or sLoad, keeps the previous instruction saved */
-  val Sinstr = Mux(io.threadState === sLoad || io.threadState === sStore, io.instr.asTypeOf(new StypeInstruction), regSinstr)
+  val Sinstr = Mux(io.threadState === sLoad || io.threadState === sStore, io.instr, regSinstr)
   /** Number of values total to output on this instruction */
   val cntMax = WireDefault(0.U(4.W))
   /** Ready signal received from the connected consumer module */
@@ -68,7 +68,7 @@ class IJKGeneratorFSM extends Module {
   }
 
   //Set cntMax based on instruction type
-  when(Sinstr.mod === VEC || Sinstr.mod === DOF || Sinstr.mod === ELEM) {
+  when(Sinstr.mod === DOF || Sinstr.mod === ELEM) {
     cntMax := (VREG_SLOT_WIDTH-1).U
   } .otherwise { //SEL, FCN, EDN1, EDN2.
     cntMax := 0.U
@@ -85,8 +85,7 @@ class IJKGeneratorFSM extends Module {
       when(io.threadState === ThreadState.sEstart) { //end of load operation
         state := sCalcNext
         cnt := 0.U
-      }
-      when(io.threadState === ThreadState.sPend || io.threadState === sWait1) { //End of store / start of load
+      } .elsewhen(io.threadState === ThreadState.sPend || io.threadState === sWait1) { //End of store / start of load
         state := sWait
         cnt := 0.U
       }
@@ -138,21 +137,26 @@ class IJKGeneratorFSM extends Module {
   ijkGenerator.io.ctrl.next := next
 
   io.ijkOut := ijkGenerator.io.out
-  io.neighbour.bits.ijk := ijkGenerator.io.out.ijk
-  io.edof.bits.ijk := ijkGenerator.io.out.ijk
 
+  io.edof.bits.pad := ijkGenerator.io.ctrl.pad
+  io.edof.bits.ijk := ijkGenerator.io.out.ijk
   io.edof.bits.baseAddr := Sinstr.baseAddr
-  io.neighbour.bits.baseAddr := Sinstr.baseAddr
-  io.neighbour.bits.mod := Sinstr.mod
   io.edof.bits.mod := Sinstr.mod
   io.neighbour.bits.pad := ijkGenerator.io.ctrl.pad
-  io.edof.bits.pad := ijkGenerator.io.ctrl.pad
+  io.neighbour.bits.baseAddr := Sinstr.baseAddr
+  io.neighbour.bits.mod := Sinstr.mod
+  io.neighbour.bits.ijk := ijkGenerator.io.out.ijk
+
+  io.finalCycle := ready & cnt === cntMax
+
 
   //All output valid signals default to false. Overridden by when statement below
   io.edof.valid := false.B
   io.neighbour.valid := false.B
   when(Sinstr.mod === DOF) {
     io.edof.valid := valid
+  } .elsewhen(Sinstr.mod === VEC) {
+    //No assignments, letting defaults take place
   } .otherwise {
     io.neighbour.valid := valid
   }
