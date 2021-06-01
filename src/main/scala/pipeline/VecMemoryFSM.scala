@@ -25,7 +25,7 @@ class VecMemoryFSM extends Module {
   val state = RegInit(MemoryAccessFSMState.sOutput)
 
   /** Number of times the index has been incremented this time around */
-  val cnt = RegInit(0.U(log2Ceil(VREG_SLOT_WIDTH * SUBVECTORS_PER_VREG + 1).W))
+  val cnt = RegInit(0.U(log2Ceil(VREG_SLOT_WIDTH * (VREG_DEPTH/NUM_MEMORY_BANKS) + 1).W))
   /** The base index from which the output indices will be constructed */
   val index = RegInit(0.U(log2Ceil(NDOFLENGTH + 1).W))
   /** The index at which to start the next iteration */
@@ -37,7 +37,7 @@ class VecMemoryFSM extends Module {
   val ready = io.vec.ready
 
   /** Total number of times the index should be incremented on one instruction */
-  val cntMax = (VREG_SLOT_WIDTH * SUBVECTORS_PER_VREG - 1).U
+  val cntMax = (VREG_SLOT_WIDTH * (VREG_DEPTH/NUM_MEMORY_BANKS) - 1).U
   /** High signal when outputs should be driven */
   val outputState = (io.threadState === sLoad || io.threadState === sStore) && state === sOutput
 

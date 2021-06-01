@@ -6,6 +6,7 @@ class ControlIO extends Bundle {
   val id = Flipped(new IdControlIO)
   val ex = Flipped(new ExControlIO)
   val fe = Flipped(new IfControlIO)
+  val mem = Flipped(new MemControlIO)
 }
 
 class Control extends Module {
@@ -68,6 +69,11 @@ class Control extends Module {
   //When branch instructions are encountered, toggle iload in fetch stage but don't keep high
   when(io.id.state === DecodeState.sIdle && isBtype) {
     io.fe.iload := true.B
+  }
+
+  // --- THREAD CONTROL SIGNALS ---
+  when(memThread.state === ThreadState.sLoad && io.mem.rqCount =/= 0.U && memThread.fmt =/= InstructionFMT.STYPE) {
+    memThread.stall := true.B
   }
 
 

@@ -155,6 +155,11 @@ class MemoryWriteback extends Module {
     is(SEL) {
       when(valid) {
         writeBuffer(0)(cnt) := rdData(iteration)
+        for(i <- 1 until XREG_DEPTH) {
+          val wb = i/NUM_MEMORY_BANKS
+          val j = i % NUM_MEMORY_BANKS
+          writeBuffer(wb)(j) := 0.S
+        }
       }
     }
     is(FCN) {

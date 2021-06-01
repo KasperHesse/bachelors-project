@@ -1,6 +1,10 @@
 import utils.Config._
+import pipeline.StypeBaseAddress._
+import pipeline.StypeBaseAddress
 
 package object memory {
+
+  val baseAddresses: Array[StypeBaseAddress.Type] = Array(KE, X, XPHYS, XNEW, DC, DV, F, U, R, Z, P, Q, INVD, TMP)
 
   /**
    * Compute the indices of the of the 24 degrees of freedom associated with the 8 corners of the element at (i,j,k) in the grid.

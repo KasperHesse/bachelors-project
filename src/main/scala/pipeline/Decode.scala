@@ -139,15 +139,17 @@ class Decode extends Module {
 
     //Thread 1 accesses mem stage
     threads(1).io.mem <> io.mem
-    threads(1).io.wb.rd := (new RegisterBundle).Lit(_.reg -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U, _.subvec -> 0.U)
-    threads(1).io.wb.we := false.B
-    threads(1).io.wb.wrData := DontCare
+    threads(1).io.wb <> io.memWb
+//    threads(1).io.wb.rd := (new RegisterBundle).Lit(_.reg -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U, _.subvec -> 0.U)
+//    threads(1).io.wb.we := false.B
+//    threads(1).io.wb.wrData := DontCare
   } .otherwise {
     //Thread 0 accesses mem stage
     threads(0).io.mem <> io.mem
-    threads(0).io.wb.we := false.B
-    threads(0).io.wb.rd := (new RegisterBundle).Lit(_.reg -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U, _.subvec -> 0.U)
-    threads(0).io.wb.wrData := DontCare
+    threads(0).io.wb <> io.memWb
+//    threads(0).io.wb.we := false.B
+//    threads(0).io.wb.rd := (new RegisterBundle).Lit(_.reg -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U, _.subvec -> 0.U)
+//    threads(0).io.wb.wrData := DontCare
 
     //Thread 1 accesses execute and wb stage
     threads(1).io.ex <> io.ex
@@ -226,11 +228,7 @@ class Decode extends Module {
   when(io.ctrl.stall) {
     state := state
     IP := IP
-    i := i
-    j := j
-    k := k
     progress := progress
     maxProgress := maxProgress
   }
-
 }

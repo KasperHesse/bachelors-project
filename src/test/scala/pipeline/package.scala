@@ -413,4 +413,19 @@ package object pipeline {
     scala.util.Random.setSeed(x)
     print(s"$name. Using seed $x\n")
   }
+
+  /**
+   * Wraps a load instruction with pstart, estart, eend and pend instructions to make a valid instruction packet
+   * @param instrs The load instruction to wrap
+   * @return An array of UInts representing the instructions in the packet
+   */
+  def wrapLoadInstructions(instrs: Array[StypeInstruction]): Array[Bundle with Instruction] = {
+    val pstart = Array(OtypeInstruction(se=OtypeSE.START, pe = OtypePE.PACKET)).asInstanceOf[Array[Bundle with Instruction]]
+    val estart = OtypeInstruction(se=OtypeSE.START, pe=OtypePE.EXEC)
+    val eend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.EXEC)
+    val pend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.PACKET)
+
+    val a = Array.concat(pstart, instrs.asInstanceOf[Array[Bundle with Instruction]], Array(estart, eend, pend).asInstanceOf[Array[Bundle with Instruction]])
+    a
+  }
 }

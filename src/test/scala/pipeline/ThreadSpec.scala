@@ -152,7 +152,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       //Expect output values. Start doing this on the first clock cycle of each instruction
       //Currently pretty ugly, but that's what we have to work with, I guess
       //We need the final check since IP is kept constant for one cycle before moving to sLoad, and we should not expect in that cycle
-      if(dut.io.stateOutUint.peek.litValue == sExec.litValue && dut.io.ctrl.firstCycle.peek.litToBoolean && dut.io.ex.valid.peek.litToBoolean /*&& resCnt < numRes */) {
+      if(dut.io.stateOutUint.peek.litValue == sExec.litValue && dut.io.ctrl.firstCycle.peek.litToBoolean && dut.io.ex.valid.peek.litToBoolean) {
         expectValues(dut, instrs(ip).toUInt())
         resCnt += 1
       } else {
@@ -224,24 +224,32 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
   behavior of "Thread with memory access"
 
-  def wrapLoadInstructions(instrs: Array[StypeInstruction]): Array[UInt] = {
-    val pstart = Array(OtypeInstruction(se=OtypeSE.START, pe = OtypePE.PACKET)).asInstanceOf[Array[Bundle with Instruction]]
-    val estart = OtypeInstruction(se=OtypeSE.START, pe=OtypePE.EXEC)
-    val eend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.EXEC)
-    val pend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.PACKET)
 
-    val a = Array.concat(pstart, instrs.asInstanceOf[Array[Bundle with Instruction]], Array(estart, eend, pend).asInstanceOf[Array[Bundle with Instruction]])
-    a.map(_.toUInt())
+
+  /**
+   * Performs an expect on an output port implementing [[IJKgeneratorConsumerIO]] with the [[DecoupledIO]] interface.
+   * @param port The output port to expect data on. Must
+   * @param baseAddr The base addresss of the instruction
+   * @param ijk The ijk-values of the instruction
+   * @param mod The S-type modifier of the instruction
+   * @param pad Padding flag for the instruction
+   * @param valid Valid output bit. Defaults to true
+   */
+  def expectIJK(port: DecoupledIO[IJKgeneratorConsumerIO], baseAddr: StypeBaseAddress.Type, ijk: Array[Int], mod: StypeMod.Type, pad: Boolean, valid: Boolean = true): Unit = {
+    port.valid.expect(valid.B)
+    port.bits.baseAddr.expect(baseAddr)
+    port.bits.ijk.expect((new IJKBundle).Lit(_.i -> ijk(0).U, _.j -> ijk(1).U, _.k -> ijk(2).U))
+    port.bits.mod.expect(mod)
+    port.bits.pad.expect(pad.B)
   }
 
-  def expectIJK(neighbour: DecoupledIO[IJKgeneratorConsumerIO], baseAddr: StypeBaseAddress.Type, ijk: Array[Int], mod: StypeMod.Type, pad: Boolean, valid: Boolean = true): Unit = {
-    neighbour.valid.expect(valid.B)
-    neighbour.bits.baseAddr.expect(baseAddr)
-    neighbour.bits.ijk.expect((new IJKBundle).Lit(_.i -> ijk(0).U, _.j -> ijk(1).U, _.k -> ijk(2).U))
-    neighbour.bits.mod.expect(mod)
-    neighbour.bits.pad.expect(pad.B)
-  }
-
+  /**
+   * Performs an expect on a read queue output implementing [[ReadQueueBundle]] with the [[DecoupledIO]] interface.
+   * @param rq The read queue port to expect data on
+   * @param iter The iteration number expected in the outupt
+   * @param reg The destination register number
+   * @param rf The destination register file type
+   */
   def expectReadQueue(rq: DecoupledIO[ReadQueueBundle], iter: Int, reg: Int, rf: RegisterFileType.Type): Unit = {
     rq.valid.expect(true.B)
     rq.bits.iter.expect(iter.U)
@@ -270,7 +278,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
           //Poke the wanted instruction
           val ip = dut.io.ip.peek.litValue.toInt
           val instr = instrs(ip)
-          dut.io.instr.poke(instr)
+          dut.io.instr.poke(instr.toUInt())
 
           //Observe outputs
           if(dut.io.mem.neighbour.valid.peek.litToBoolean) {
@@ -316,7 +324,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
           //Poke the wanted instruction
           val ip = dut.io.ip.peek.litValue.toInt
           val instr = instrs(ip)
-          dut.io.instr.poke(instr)
+          dut.io.instr.poke(instr.toUInt())
 
           //Observe outputs
           if(dut.io.mem.edof.valid.peek.litToBoolean) {

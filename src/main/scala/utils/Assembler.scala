@@ -288,7 +288,7 @@ object Assembler {
   }
 
   /**
-   * Parses an Btype-instruction, returning an integer containing the bit pattern representing that instruction
+   * Parses an Stype-instruction, returning an integer containing the bit pattern representing that instruction
    * @param tokens The tokens representing the currently parsed line
    * @return An integer representing that instruction
    */
@@ -441,8 +441,8 @@ object Assembler {
             case "eend" => parseOtype(tokens)
             case "pend" => parseOtype(tokens)
 
-            case x if x.startsWith("st") => parseStype(tokens)
-            case x if x.startsWith("ld") => parseStype(tokens)
+            case x if x.startsWith("st.") => parseStype(tokens)
+            case x if x.startsWith("ld.") => parseStype(tokens)
 
             case x if x.startsWith("mvp") => parsePseudoInstruction(tokens)
             case x if x.startsWith("sqrt") => parsePseudoInstruction(tokens)

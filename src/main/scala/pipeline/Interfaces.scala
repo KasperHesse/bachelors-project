@@ -48,8 +48,6 @@ class IdExIO extends Bundle {
   /** Signals to the execution unit that the incoming operation should be added to the destination queue.
    * Mostly useful for MAC operations, where multiple operations are performed for each destination input. */
   val valid = Output(Bool())
-  /** Asserted on the first cycle of an executing instruction */
-  val firstCycle = Output(Bool())
   /** Immediate value */
   val imm = Output(SInt(FIXED_WIDTH.W))
   /** Asserted when the immediate should be used instead of b-values */
@@ -185,6 +183,17 @@ class IfControlIO extends Bundle {
 }
 
 /**
+ * Interface between memory module and control module.
+ * Use as-is in memory module, use Flipped() in control module
+ */
+class MemControlIO extends Bundle {
+  /** Number of elements currently in the read queue */
+  val rqCount = Output(UInt(4.W))
+  /** Number of elements currently in the write queue */
+  val wqCount = Output(UInt(4.W))
+}
+
+/**
  * Interface between threads and the control module.
  * Use as-is in the decode stage, use Flipped() in control module
  */
@@ -193,14 +202,12 @@ class ThreadControlIO extends Bundle {
   val state = Output(ThreadState())
   /** Current state as UInt, decoded for debug purposes */
   val stateUint = Output(UInt(8.W))
-  /** Asserted during the final clock cycle of the current instruction */
-  val finalCycle = Output(Bool())
-  /** Asserted during the first clock cycle of the current instruction */
-  val firstCycle = Output(Bool())
   /** Opcode of the currently executing Rtype instruction */
   val op = Output(Opcode())
   /** R-type mod field of the currently executing instruction */
   val rtypemod = Output(RtypeMod())
+  /** Instruction format of the current instruction */
+  val fmt = Output(InstructionFMT())
   /** Asserted when the thread should stall.*/
   val stall = Input(Bool())
   /** Register bundle for source 1 of the incoming instruction */
@@ -211,6 +218,9 @@ class ThreadControlIO extends Bundle {
   val empty = Input(Bool())
   /** Asserted when the MAC destination queue is empty */
   val macEmpty = Input(Bool())
+
+  val finalCycle = Output(Bool()) //TODO remove this
+  val firstCycle = Output(Bool()) //TODO remove this
 }
 
 /**
@@ -239,19 +249,6 @@ class ValidRegisterBundle extends Bundle {
   val valid = Bool()
 }
 
-/**
- * A bundle containing information to be used when processing memory load/store operations
- */
-class MemoryBundle extends Bundle {
-  /** The destination register for this memory operation */
-  val rd = new RegisterBundle
-  /** Whether this instruction is actually valid, or padding zero's should be returned */
-  val pad = Bool()
-  /** The encoded base address for this load/store operation */
-  val baseAddr = StypeBaseAddress()
-  /** Indices in a vector to use when performing direct load/store operations */
-  val indices = Vec(8, UInt(log2Ceil(NDOF+1).W))
-}
 
 object RegisterFileType extends ChiselEnum {
   val SREG, VREG, XREG, KREG = Value

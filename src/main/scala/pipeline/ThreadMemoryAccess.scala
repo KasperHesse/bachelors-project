@@ -28,7 +28,7 @@ class ThreadMemoryAccessIO extends Bundle {
   val ijkOut = Output(new IJKgeneratorBundle)
   /** I,J,K values input from other thread */
   val ijkIn = Flipped(new IJKgeneratorBundle)
-
+  /** Signal output on the final cycle of a load instruction, indicating that the Thread's IP can update */
   val finalCycle = Output(Bool())
 }
 
@@ -53,7 +53,7 @@ class ThreadMemoryAccess(sim: Boolean = false) extends Module {
   // --- REGISTERS ---
 
   // --- SIGNALS ---
-  val Sinstr = io.instr.asTypeOf(new StypeInstruction)
+  val Sinstr = io.instr
   val readQueue = Wire(new ReadQueueBundle)
   val readQueueValid = WireDefault(false.B)
   /** Destination register for VEC and DOF instructions */
@@ -67,7 +67,7 @@ class ThreadMemoryAccess(sim: Boolean = false) extends Module {
 
   val threadState = if(sim) RegNext(io.threadState) else io.threadState
 
-  val outputState = threadState === sLoad || threadState === sStore
+  val outputState = (threadState === sLoad || threadState === sStore) && io.instr.fmt === InstructionFMT.STYPE
 
   // --- LOGIC ---
   //Generate logic to create correct read queue bundles
@@ -92,7 +92,7 @@ class ThreadMemoryAccess(sim: Boolean = false) extends Module {
   //Logic to drive read queue bundles and increment slotSelect on instructions that require multiple bundles
   when(Sinstr.mod === VEC && outputState) {
     //Increment outputcnt every time a vec output is made.
-    val ocTick = outputCnt === (SUBVECTORS_PER_VREG-1).U
+    val ocTick = outputCnt === ((VREG_DEPTH/NUM_MEMORY_BANKS)-1).U
     val SStick = slotSelect === (VREG_SLOT_WIDTH-1).U
     outputCnt := Mux(vec.io.vec.valid, Mux(ocTick, 0.U, outputCnt + 1.U), outputCnt)
     slotSelect := Mux(ocTick, Mux(SStick, 0.U, slotSelect + 1.U), slotSelect)
@@ -101,7 +101,7 @@ class ThreadMemoryAccess(sim: Boolean = false) extends Module {
 
   } .elsewhen(Sinstr.mod === DOF && outputState) {
     //Increment outputCnt when first output is made + 2 times afterwards for 3 total bundles per. vreg
-    val ocTick = outputCnt === (SUBVECTORS_PER_VREG-1).U
+    val ocTick = outputCnt === ((VREG_DEPTH/NUM_MEMORY_BANKS)-1).U
     val SStick = slotSelect === (VREG_SLOT_WIDTH-1).U
     //Outputcnt should start incrementing when valid & ready
     outputCnt := Mux((ijk.io.edof.valid && io.edof.ready) || outputCnt > 0.U, Mux(ocTick, 0.U, outputCnt + 1.U), outputCnt)
@@ -141,20 +141,21 @@ class ThreadMemoryAccess(sim: Boolean = false) extends Module {
   vec.io.instr := Sinstr
   vec.io.maxIndex := io.maxIndex
 
+  io.finalCycle := finalCycle
+  io.readQueue.bits := readQueue
+  io.readQueue.valid := readQueueValid
+
   //Override ready/valid handshakes to only be valid when an S-type instruction is processing
   when(Sinstr.fmt =/= InstructionFMT.STYPE) {
     io.edof.valid := false.B
     io.neighbour.valid := false.B
     io.vec.valid := false.B
+    io.readQueue.valid := false.B
 
     ijk.io.edof.ready := false.B
     ijk.io.neighbour.ready := false.B
     vec.io.vec.ready := false.B
   }
-
-  io.finalCycle := finalCycle
-  io.readQueue.bits := readQueue
-  io.readQueue.valid := readQueueValid
 }
 
 

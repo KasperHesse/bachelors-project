@@ -22,8 +22,6 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   val memInitFileLocation = "src/test/scala/memory/membankinit"
   val mem: Array[Array[Long]] = Array.ofDim[Long](NUM_MEMORY_BANKS, wordsPerBank)
 
-  val baseAddresses: Array[StypeBaseAddress.Type] = Array(KE, X, XPHYS, XNEW, DC, DV, F, U, R, Z, P, Q, INVD, TMP)
-
   /**
    * (Re)initializes the variable [[mem]] to a clean version that matches the memory contents at startup
    * when simulating.
@@ -80,7 +78,6 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
 
   /**
    * Calculates the expected data for a given memory load operation
-   * @param mod The s-type modifier of the memory load operation
    * @param indices The memory indices that the load operation accessed / The IJK-values used for the load operation
    * @param baseAddr The S-type base address of the load operation
    * @return
@@ -609,6 +606,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       (expDof, takeNth(rdDof, 3)).zipped.foreach((e, r) => waitAndExpect(dut, e, r.rd))
     }
   }
+  //Tests removed since this never should be the case, that we perform ld.vec and ld.dof in the same instruction
 //
 //  it should "perform ld.dof followed by ld.vec" in {
 //    simulationConfig(true)

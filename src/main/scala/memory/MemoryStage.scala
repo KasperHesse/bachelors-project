@@ -3,7 +3,7 @@ package memory
 import chisel3._
 import chisel3.util.{Decoupled, Queue, RegEnable, Valid}
 import pipeline.StypeMod._
-import pipeline.{IdMemIO, StypeLoadStore, StypeMod, WbIdIO}
+import pipeline.{IdMemIO, MemControlIO, StypeLoadStore, StypeMod, WbIdIO}
 import utils.Config._
 import utils.Fixed.FIXED_WIDTH
 
@@ -15,6 +15,8 @@ class MemoryStageIO extends Bundle {
   val id = Flipped(new IdMemIO)
   /** Output connections to decode stage */
   val wb = new WbIdIO
+  /** Connections to control module */
+  val ctrl = new MemControlIO
 }
 
 /**
@@ -80,4 +82,6 @@ class MemoryStage(wordsPerBank: Int, memInitFileLocation: String) extends Module
   writeQueue.io.enq <> io.id.wrData
 
   mem.io.we := io.id.ls === StypeLoadStore.STORE
+  io.ctrl.rqCount := readQueue.io.count
+  io.ctrl.wqCount := writeQueue.io.count
 }

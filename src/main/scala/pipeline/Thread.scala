@@ -221,18 +221,18 @@ class Thread(id: Int) extends Module {
   io.ex.op := op
   io.ex.macLimit := macLimit
   io.ex.valid := valid
-  io.ex.firstCycle := firstCycle
   io.ex.rs1 := rs1
   io.ex.rs2 := rs2
 
   //Control
   io.ctrl.rtypemod := Rinst.mod
   io.ctrl.state := state
-  io.ctrl.finalCycle := finalCycle
-  io.ctrl.firstCycle := firstCycle
   io.ctrl.op := op
   io.ctrl.rs1 := rs1
   io.ctrl.rs2 := rs2
+  io.ctrl.fmt := Rinst.fmt
+  io.ctrl.finalCycle := finalCycle
+  io.ctrl.firstCycle := firstCycle
 
   //Memory
   io.mem.vec <> memAccess.io.vec

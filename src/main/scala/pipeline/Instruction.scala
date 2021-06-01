@@ -185,8 +185,15 @@ object StypeInstruction {
     s.U(32.W)
   }
 
-  /** Constructs an S-type instruction from the given parameters */
-  def apply(rsrd: Int, mod: StypeMod.Type, baseAddr: StypeBaseAddress.Type, ls: StypeLoadStore.Type): StypeInstruction = {
+  /**
+   * Constructs an S-type instruction from the given parameters
+   * @param rsrd The destination/source register of the load/store operation
+   * @param mod The s-type modifier for the operation
+   * @param baseAddr The base address for the load/store
+   * @param ls Whether the operation is load or store. Defaults to LOAD
+   * @return An Stype instruction bundle with all fields set
+   */
+  def apply(rsrd: Int, mod: StypeMod.Type, baseAddr: StypeBaseAddress.Type, ls: StypeLoadStore.Type = LOAD): StypeInstruction = {
     (new StypeInstruction).Lit(_.rsrd -> rsrd.U, _.mod -> mod, _.baseAddr -> baseAddr, _.fmt -> InstructionFMT.STYPE, _.ls -> ls, _.nu1 -> 0.U)
   }
 
