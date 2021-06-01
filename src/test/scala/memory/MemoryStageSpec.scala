@@ -156,6 +156,10 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     assert(readCnt == readMax)
   }
 
+  def performStVec(dut: MemoryStage): Unit = {
+
+  }
+
   /**
    * Performs the logic necessary for a ld.dof operation
    * @param dut The DUT
@@ -232,13 +236,13 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     (new IJKgeneratorConsumerIO).Lit(_.baseAddr -> baseAddr, _.ijk -> ijkBundle, _.pad -> pad.B, _.mod -> mod)
   }
 
-  /**
-   * Generates a number of VEC input bundles for poking onto the DUT. Given 24 indices into a vector, this method
-   * returns a sequence of 3 bundles that can be used to execute that load operation.
-   * @param indices The 24 indices to load data from
-   * @param baseAddress The encoded base address from which data should be loaded
-   * @return A Seq containing 3 bundles that represent the desired loads
-   */
+//  /**
+//   * Generates a number of VEC input bundles for poking onto the DUT. Given 24 indices into a vector, this method
+//   * returns a sequence of 3 bundles that can be used to execute that load operation.
+//   * @param indices The 24 indices to load data from
+//   * @param baseAddress The encoded base address from which data should be loaded
+//   * @return A Seq containing 3 bundles that represent the desired loads
+//   */
   //This won't work until Chisel 3.5 when vec literals are introduced
 //  def genVecInput(indices: Seq[Int], baseAddress: Option[StypeBaseAddress.Type]): Seq[AddressGenProducerIO] = {
 //    val baseAddr = baseAddress match {
@@ -293,6 +297,10 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
 //      val baseAddress = randomElement(baseAddresses)
 //      val vec = indices.map(a => genVecInput)
     }
+  }
+
+  it should "perform at st.vec" in {
+
   }
 
 
@@ -606,6 +614,8 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       (expDof, takeNth(rdDof, 3)).zipped.foreach((e, r) => waitAndExpect(dut, e, r.rd))
     }
   }
+
+
   //Tests removed since this never should be the case, that we perform ld.vec and ld.dof in the same instruction
 //
 //  it should "perform ld.dof followed by ld.vec" in {
