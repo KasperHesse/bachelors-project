@@ -11,5 +11,4 @@ test_run_dir
 target
 quartus
 project/target
-src/test/scala/test
-src/test/scala/memory/membankinit
+src/resources/meminit

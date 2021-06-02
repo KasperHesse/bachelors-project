@@ -19,7 +19,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   behavior of "Memory stage"
 
   val wordsPerBank = 1300
-  val memInitFileLocation = "src/test/scala/memory/membankinit"
+  val memInitFileLocation = "src/resources/meminit/"
   val mem: Array[Array[Long]] = Array.ofDim[Long](NUM_MEMORY_BANKS, wordsPerBank)
 
   /**

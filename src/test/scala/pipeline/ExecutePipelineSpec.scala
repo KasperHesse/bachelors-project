@@ -356,7 +356,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   it should "execute simple instructions and branch" in {
     simulationConfig()
     seed("Execute pipeline payload")
-    val memfile = "src/test/resources/meminit/mem4.hex.txt"
+    val memfile = "src/resources/meminit/mem4.hex.txt"
 
     /* Instructions
     beq s0, s1, L1 //+4 (not taken)
@@ -397,7 +397,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   it should "use both threads" in {
     simulationConfig()
     seed("Execute pipeline both threads")
-    val memfile = "src/test/resources/meminit/mem5.hex.txt"
+    val memfile = "src/resources/meminit/mem5.hex.txt"
     val program = "" +
       "pstart ndof\n" +
       "estart\n" +
@@ -414,7 +414,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   it should "count to 5" in {
     simulationConfig()
     seed("Execute pipeline count to 5")
-    val memfile = "src/test/resources/meminit/mem5.hex.txt"
+    val memfile = "src/resources/meminit/mem5.hex.txt"
     val program = "" +
     "pstart single\n" + //0
       "estart\n" + //4
@@ -439,7 +439,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   it should "perform MAC instructions V3" in {
     simulationConfig()
     seed("Execute pipeline mac instructions")
-    val memfile = "src/test/resources/meminit/mem5.hex.txt"
+    val memfile = "src/resources/meminit/mem5.hex.txt"
     /* Instructions
     pstart ndof
     estart
@@ -466,7 +466,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   it should "perform a mac.kv instruction" in {
     simulationConfig()
     seed("Execute pipeline mac.kv instructions")
-    val memfile = "src/test/resources/meminit/mem7.hex.txt"
+    val memfile = "src/resources/meminit/mem7.hex.txt"
     /*
     pstart single
     estart
