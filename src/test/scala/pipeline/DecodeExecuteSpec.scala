@@ -13,7 +13,7 @@ import Opcode._
 import utils.Config
 
 class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers {
-  behavior of "decode and execute stages"
+  behavior of "Decode execute stages"
 
   var MAClength: Int = _
 
@@ -43,8 +43,8 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       for (s <- 0 until VREG_SLOT_WIDTH) {
         for (u <- 0 until subvectorsPerRegister) {
           for (k <- 0 until NUM_PROCELEM) {
-            val sv1 = vReg(rs1 * VREG_SLOT_WIDTH + s)(0)(u * NUM_PROCELEM + k)
-            val sv2 = vReg(rs2 * VREG_SLOT_WIDTH + s)(0)(u * NUM_PROCELEM + k)
+            val sv1 = vReg(rs1 * VREG_SLOT_WIDTH + s)(u * NUM_PROCELEM + k)
+            val sv2 = vReg(rs2 * VREG_SLOT_WIDTH + s)(u * NUM_PROCELEM + k)
             tempResults(k) = fixedAdd(tempResults(k), fixedMul(sv1, sv2))
           }
         }
@@ -63,8 +63,8 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       for (s <- 0 until VREG_SLOT_WIDTH) {
         for (i <- 0 until VREG_DEPTH by NUM_PROCELEM) {
           //Extract operands used (a[0] and b[0] in each iteration
-          val op1 = vReg(s + rs1 * VREG_SLOT_WIDTH)(0)(i)
-          val op2 = vReg(s + rs2 * VREG_SLOT_WIDTH)(0)(i)
+          val op1 = vReg(s + rs1 * VREG_SLOT_WIDTH)(i)
+          val op2 = vReg(s + rs2 * VREG_SLOT_WIDTH)(i)
           val res = calculateRes(instr, op1, op2)
           assert(math.abs(fixed2double((dut.io.out.res(0).peek.litValue - res.litValue).toLong)) < 1e-2)
           dut.io.out.dest.reg.expect((rd*VREG_SLOT_WIDTH+s).U)
@@ -79,17 +79,16 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
     val rd = instr.rd.litValue().toInt
-    val op = instr.op
     val subvecsPerVreg = VREG_DEPTH/NUM_PROCELEM
     val vReg = dut.decode.threads(0).vRegFile.arr
     val xReg = dut.decode.threads(0).xRegFile.arr
 
     for(s <- 0 until VREG_SLOT_WIDTH) {
-      val op1 = xReg(rs1)(0)(s)
+      val op1 = xReg(rs1)(s)
       for(i <- 0 until subvecsPerVreg) {
         for (j <- 0 until NUM_PROCELEM) {
 
-          val op2 = vReg(s+rs2*VREG_SLOT_WIDTH)(0)(i*NUM_PROCELEM+j)
+          val op2 = vReg(s+rs2*VREG_SLOT_WIDTH)(i*NUM_PROCELEM+j)
           val res = calculateRes(instr, op1, op2)
           assert(math.abs(fixed2double(dut.io.out.res(j).peek) - fixed2double(res)) < 1e-2)
           dut.io.out.dest.reg.expect((rd*VREG_SLOT_WIDTH + s).U)
@@ -108,8 +107,8 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val xReg = dut.decode.threads(0).xRegFile.arr
 
     for(i <- 0 until NUM_PROCELEM) {
-      val op1 = xReg(rs1)(0)(i)
-      val op2 = xReg(rs2)(0)(i)
+      val op1 = xReg(rs1)(i)
+      val op2 = xReg(rs2)(i)
       val res = calculateRes(instr, op1, op2)
       assert(math.abs(fixed2double((dut.io.out.res(i).peek.litValue - res.litValue).toLong)) < 1e-2)
       dut.io.out.dest.reg.expect(rd)
@@ -134,7 +133,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
         for (u <- 0 until SUBVECTORS_PER_VREG) {
           for(k <- 0 until NUM_PROCELEM) {
             val a = sReg(rs1)
-            val b = vReg(s + rs2 * VREG_SLOT_WIDTH)(0)(u * NUM_PROCELEM + k)
+            val b = vReg(s + rs2 * VREG_SLOT_WIDTH)(u * NUM_PROCELEM + k)
             tempResults(k) = fixedAdd(tempResults(k), fixedMul(a,b))
           }
         }
@@ -152,7 +151,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       for (s <- 0 until VREG_SLOT_WIDTH) {
         for (i <- 0 until SUBVECTORS_PER_VREG) {
           for (j <- 0 until NUM_PROCELEM) {
-            val b = vReg(s + rs2 * VREG_SLOT_WIDTH)(0)(i * NUM_PROCELEM + j)
+            val b = vReg(s + rs2 * VREG_SLOT_WIDTH)(i * NUM_PROCELEM + j)
             val res = calculateRes(instr, a, b)
             assert(math.abs(fixed2double((dut.io.out.res(j).peek.litValue - res.litValue).toLong)) < 1e-2)
             dut.io.out.dest.rf.expect(RegisterFileType.VREG)
@@ -174,7 +173,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val sReg = dut.decode.sRegFile.arr
     for(i <- 0 until NUM_PROCELEM) {
       val op1 = sReg(rs1)
-      val op2 = xReg(rs2)(0)(i)
+      val op2 = xReg(rs2)(i)
       val res = calculateRes(instr, op1, op2)
       assert(math.abs(fixed2double((dut.io.out.res(i).peek.litValue - res.litValue).toLong)) < 1e-2)
       dut.io.out.dest.reg.expect(rd)
@@ -219,7 +218,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
         //Slices of KE-matrix that goes into this result
         val slices = KE.slice((resCnt % smpr) * KE_SIZE, ((resCnt % smpr) + 1) * KE_SIZE)
         //B-values used for this result
-        val b = arr(rs1 * VREG_SLOT_WIDTH + resCnt / smpr)(0)
+        val b = arr(rs1 * VREG_SLOT_WIDTH + resCnt / smpr)
 
         val outVals = Array.fill(NUM_PROCELEM)(0.S(FIXED_WIDTH.W))
         //For each slice, add the product of all slice values and the corresponding b-value
@@ -481,7 +480,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  it should "decode and execute VV instructions" in {
+  it should "execute VV V3" in {
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("VV decode execute")
@@ -490,10 +489,19 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  it should "decode and execute XV instructions" in {
+  it should "decode execute XV instructions V3" in {
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("XV decode/execute")
+      val instrs = genAndPoke(dut, RtypeMod.XV)
+      test(dut, instrs)
+    }
+  }
+
+  it should "decode execute XV instructions" in {
+    simulationConfig()
+    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+      seed("XV decode/execute", Some(5847713380284279438L))
       val instrs = genAndPoke(dut, RtypeMod.XV)
       test(dut, instrs)
     }
@@ -535,10 +543,19 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  it should "decode and execute a random instruction mix" in {
+  it should "decode and execute a random instruction mix V3" in {
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("Decode/execute random mix")
+      val instrs = genAndPoke(dut)
+      test(dut, instrs)
+    }
+  }
+
+  it should "decode and execute a random instruction mix" in {
+    simulationConfig()
+    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      seed("Decode/execute random mix", seed=Some(2L))
       val instrs = genAndPoke(dut)
       test(dut, instrs)
     }
@@ -548,14 +565,16 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   it should "decode and execute specific VV instructions" in {
     //These seeds have previously made the test fail. Used for regression testing
     simulationConfig()
-    val seeds = Array(6838063735844486541L, -3695747970121693403L)
-    for(seed  <- seeds) {
+//    val seeds = Array(6838063735844486541L, -3695747970121693403L)
+//    val seeds = Array(6838063735844486541L)
+    val seed = 6838063735844486541L
+//    for(seed  <- seeds) {
       test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
         print(s"VV, specific seed. Using seed ${seed}\n")
         scala.util.Random.setSeed(seed)
         val instrs = genAndPoke(dut, RtypeMod.VV)
         test(dut, instrs)
-      }
+//      }
     }
   }
 

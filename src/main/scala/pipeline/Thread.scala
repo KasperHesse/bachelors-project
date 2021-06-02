@@ -56,19 +56,21 @@ class ThreadThreadIO extends Bundle {
 /**
  * A module representing a thread in the decode stage. Each decode stage contains two threads. Implements [[ThreadIO]]
  * @param id The ID of the thread. If id=0, this thread will be the first to fetch data from memory.
- *           If ID=1, this thread will wait until thread 0 has started executing, at which point this one will start loading
+ *           If ID=1, this thread will wait until thread 0 has started executing, at which point this one will start loading from memory
  */
 class Thread(id: Int) extends Module {
   require(id == 0 || id == 1, "Thread ID must be 0 or 1")
   val io = IO(new ThreadIO)
 
   // --- MODULES ---
-  /** Vector register file. Has [[utils.Config.NUM_VREG]] entries, each of which holds [[utils.Config.VREG_DEPTH]] elements */
-  val vRegFile = Module(new VectorRegisterFile(NUM_VREG, VREG_DEPTH, VREG_DEPTH))
-  /** X-value vector register file. Has [[utils.Config.NUM_XREG]] entries, each of which holds [[utils.Config.VREG_SLOT_WIDTH]] values */
-  val xRegFile = Module(new VectorRegisterFile(NUM_XREG, VREG_SLOT_WIDTH, VREG_SLOT_WIDTH))
+  val vRegFile = new InlineVectorRegisterFile(width=NUM_VREG, depth=VREG_DEPTH, memInitFileLocation = s"src/resources/meminit/vreg$id.txt")
+  val xRegFile = new InlineVectorRegisterFile(width=NUM_XREG, depth=XREG_DEPTH, memInitFileLocation = s"src/resources/meminit/xreg$id.txt")
+  if(SIMULATION) {
+    vRegFile.initMemory()
+    xRegFile.initMemory()
+  }
   /** Wrapper for KE-matrix, holding all KE-values */
-  val KE = Module(new KEWrapper(NUM_PROCELEM, sync=false, SIMULATION))
+  val KE = Module(new KEWrapper(NUM_PROCELEM, sync=true, SIMULATION))
   /** Immediate generator */
   val immGen = Module(new ImmediateGenerator)
   /** Module handling all memory access related stuff */
@@ -78,17 +80,17 @@ class Thread(id: Int) extends Module {
   /** Instruction pointer into the instruction buffer */
   val IP = RegInit(0.U(4.W))
   /** Current index into subvectors. Also gives the x-coordinate of the submatrix in the KE matrix */
-  val X = RegInit(0.U(log2Ceil(VREG_DEPTH).W))
-//  val X = RegInit(0.U)
+  val X = RegInit(0.U(log2Ceil(VREG_DEPTH+1).W))
+//    val X = RegInit(0.U)
   /** Current y-coordinate used to index into KE matrix */
-  val Y = RegInit(0.U(log2Ceil(KE_SIZE/NUM_PROCELEM).W))
-//  val Y = RegInit(0.U)
+  val Y = RegInit(0.U(log2Ceil(KE_SIZE/NUM_PROCELEM+1).W))
+//    val Y = RegInit(0.U)
   /** Current column of submatrix (x,y) in the KE matrix */
-  val col = RegInit(0.U(log2Ceil(NUM_PROCELEM).W))
-//  val col = RegInit(0.U)
+  val col = RegInit(0.U(log2Ceil(NUM_PROCELEM+1).W))
+//    val col = RegInit(0.U)
   /** Used to select which vector from a vector slot is output */
-  val slotSelect = RegInit(0.U(log2Ceil(VREG_SLOT_WIDTH).W))
-//  val slotSelect = RegInit(0.U)
+  val slotSelect = RegInit(0.U(log2Ceil(VREG_SLOT_WIDTH+1).W))
+//    val slotSelect = RegInit(0.U)
   /** State register */
   val state = RegInit(sIdle)
 
@@ -116,15 +118,6 @@ class Thread(id: Int) extends Module {
   val firstCycle = IP =/= RegNext(IP)
   /** Used to indicate whenever an instruction is finished and the IP should update */
   val finalCycle = WireDefault(false.B)
-
-  //This makes it easier to address subvectors of the output vectors a, b from register file
-  val a_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
-  val b_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
-  for(i <- 0 until SUBVECTORS_PER_VREG) {
-    a_subvec(i) := vRegFile.io.rdData1.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
-    b_subvec(i) := vRegFile.io.rdData2.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
-  }
-
   /** 'a' data subvector going into execute stage */
   val a = WireDefault(VecInit(Seq.fill(NUM_PROCELEM)(0.S(FIXED_WIDTH.W)))) //TODO Change default assignment to a_subvec(0)
   /** 'b' data subvector going to execute stage */
@@ -134,14 +127,13 @@ class Thread(id: Int) extends Module {
   /** Bundle holding the values necessary to identify register source 2 */
   val rs2 = WireDefault((new RegisterBundle).Lit(_.reg -> 0.U, _.rf -> VREG, _.subvec -> 0.U, _.rfUint -> 0.U))
   /** Opcode going into execution stage */
-  val op = WireDefault(NOP)
+  val op = Mux(Rinst.fmt === InstructionFMT.RTYPE, Rinst.op, NOP)
   /** Destination register for current operation */
   val dest = WireDefault((new RegisterBundle).Lit(_.reg -> 0.U, _.subvec -> 0.U, _.rf -> VREG))
   /** Limit for MAC operations, if such a one is being processed */
   val macLimit = WireDefault(0.U(32.W))
   /** Signals that the outgoing operation should be added to the destination queue */
   val valid = WireDefault(false.B)
-
 
   //Declare variables here to allow assignment in if-statement
   /** Index into vector register file */
@@ -168,19 +160,22 @@ class Thread(id: Int) extends Module {
     v_rd := (Rinst.rd << log2Ceil(VREG_SLOT_WIDTH)).asUInt + slotSelect
   }
 
-  // --- OUTPUT & MODULE CONNECTIONS ---
-  //Register files and KE connections
-  vRegFile.io.rs1 := v_rs1
-  vRegFile.io.rs2 := v_rs2
-  vRegFile.io.wrData := io.wb.wrData
-  vRegFile.io.we := io.wb.we && (io.wb.rd.rf === RegisterFileType.VREG)
-  vRegFile.io.rd := io.wb.rd.reg
 
-  xRegFile.io.rs1 := Rinst.rs1
-  xRegFile.io.rs2 := Rinst.rs2
-  xRegFile.io.wrData := io.wb.wrData.slice(0, XREG_DEPTH)
-  xRegFile.io.we := io.wb.we && (io.wb.rd.rf === RegisterFileType.XREG)
-  xRegFile.io.rd := io.wb.rd.reg
+  // --- OUTPUT & MODULE CONNECTIONS ---
+  val vRegRdData1 = vRegFile.setReadPort(v_rs1)
+  val vRegRdData2 = vRegFile.setReadPort(v_rs2)
+  vRegFile.setWritePort(io.wb.rd.reg, io.wb.wrData, io.wb.we && io.wb.rd.rf === RegisterFileType.VREG)
+  //This makes it easier to address subvectors of the output vectors a, b from register file
+  val a_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
+  val b_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
+  for(i <- 0 until SUBVECTORS_PER_VREG) {
+    a_subvec(i) := vRegRdData1.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
+    b_subvec(i) := vRegRdData2.slice(i*NUM_PROCELEM, (i+1)*NUM_PROCELEM)
+  }
+
+  val xRegRdData1 = xRegFile.setReadPort(Rinst.rs1)
+  val xRegRdData2 = xRegFile.setReadPort(Rinst.rs2)
+  xRegFile.setWritePort(io.wb.rd.reg, VecInit(io.wb.wrData.slice(0, XREG_DEPTH)), io.wb.we && io.wb.rd.rf === RegisterFileType.XREG)
 
   io.sRegFile.rs1 := Rinst.rs1
   io.sRegFile.rs2 := Rinst.rs2
@@ -191,22 +186,12 @@ class Thread(id: Int) extends Module {
 
   //Immediate generator
   immGen.io.instr := Rinst
-  io.ex.imm := immGen.io.imm
-  io.ex.useImm := Rinst.immflag
+
 
   //Memory access module
   memAccess.io.instr := Sinst
   memAccess.io.threadState := state
   memAccess.io.maxIndex := 512.U //TODO bad value, how to set this?
-
-  //Dontcares
-  vRegFile.io.wrMask := 0.U
-  vRegFile.io.rdMask2 := X
-  vRegFile.io.rdMask1 := X
-
-  xRegFile.io.wrMask := 0.U
-  xRegFile.io.rdMask1 := X
-  xRegFile.io.rdMask2 := X
 
   //All inputs to scalar reg file are supplied via writeback stage, hence these are dontcares
   io.sRegFile.we := DontCare
@@ -217,12 +202,14 @@ class Thread(id: Int) extends Module {
   //Execute
   io.ex.a := a
   io.ex.b := b
-  io.ex.dest:= dest
+  io.ex.dest := dest
   io.ex.op := op
   io.ex.macLimit := macLimit
   io.ex.valid := valid
   io.ex.rs1 := rs1
   io.ex.rs2 := rs2
+  io.ex.imm := immGen.io.imm
+  io.ex.useImm := Rinst.immflag
 
   //Control
   io.ctrl.rtypemod := Rinst.mod
@@ -281,7 +268,7 @@ class Thread(id: Int) extends Module {
       //Load data for this instruction, increment pointer as necessary
       when(Oinst.pe === OtypePE.EXEC && Oinst.se === OtypeSE.START) {
         finalCycle := false.B //This is funky, but required for correct functionality
-          //Above is necessary since we should keep the IP when waiting in sEstart
+        //Above is necessary since we should keep the IP when waiting in sEstart
         state := sEstart
       }
     }
@@ -351,22 +338,10 @@ class Thread(id: Int) extends Module {
     rs2.subvec := sv
     rs2.rf := rf2
   }
-  //Output selection logic
+
   when(state === sExec && Rinst.fmt === InstructionFMT.RTYPE) {
-  //It might be worthwhile factoring the output selection logic and the X,Y,Col update logic into separate blocks
-  //Output logic can be run all the time without being gated behind the when-statement
     switch(Rinst.mod) {
-      is(RtypeMod.VV) { //This won't work when processing SUM instructions. They are special cases
-        //Output connections
-
-        a := a_subvec(X)
-        b := b_subvec(X)
-//        for(i <- 0 until NUM_PROCELEM) {
-//          a(i) := vRegFile.io.rdData1(i.U+X*NUM_PROCELEM.U)
-//          b(i) := vRegFile.io.rdData2(i.U+X*NUM_PROCELEM.U)
-//        }
-        op := Rinst.op
-
+      is(RtypeMod.VV) {
         dest.reg := Mux(Rinst.op === MAC, Rinst.rd, v_rd) //MAC.VV instructions always end in s-registers
         dest.subvec := Mux(Rinst.op === MAC, 0.U, X)
         dest.rf := Mux(Rinst.op === MAC, SREG, VREG)
@@ -384,14 +359,6 @@ class Thread(id: Int) extends Module {
       }
 
       is(RtypeMod.XV) {
-        //XV instructions take the first element in 'x' and operate with all elements in the first vector of 'v'
-        //SlotSelect is used to index into xReg, X is used to index into vReg
-        for (i <- 0 until NUM_PROCELEM) {
-          a(i) := xRegFile.io.rdData1(slotSelect)
-//          b(i) := vRegFile.io.rdData2(i.U+X*NUM_PROCELEM.U)
-        }
-        b := b_subvec(X)
-        op := Rinst.op
         dest.reg := v_rd
         dest.subvec := X
         dest.rf := VREG
@@ -409,10 +376,6 @@ class Thread(id: Int) extends Module {
       }
 
       is(RtypeMod.XX) {
-        //Operates in the same way as VV decode, except it only takes one clock cycle
-        a := xRegFile.io.rdData1
-        b := xRegFile.io.rdData2
-        op := Rinst.op
         dest.reg := Rinst.rd
         dest.subvec := 0.U
         dest.rf := XREG
@@ -423,12 +386,6 @@ class Thread(id: Int) extends Module {
       }
 
       is(RtypeMod.SV) {
-        for (i <- 0 until NUM_PROCELEM) {
-          a(i) := io.sRegFile.rdData1
-//          b(i) := vRegFile.io.rdData2(i.U + X*NUM_PROCELEM.U)
-        }
-        b := b_subvec(X)
-        op := Rinst.op
         dest.reg := Mux(Rinst.op === MAC, Rinst.rd, v_rd)
         dest.subvec := Mux(Rinst.op === MAC, 0.U, X)
         dest.rf := Mux(Rinst.op === MAC, SREG, VREG)
@@ -444,13 +401,11 @@ class Thread(id: Int) extends Module {
 
         assignRsRfValues(Rinst.rs1, v_rs2, X, SREG, VREG)
       }
+      //Consider factoring the update logic into a separate switch statement from the output logic.
+      //Update logic takes current values of X,Y into accoutn
+      //Output logic takes previous values + previous value of Rinst into account
 
       is(RtypeMod.SX) {
-        for(i <- 0 until NUM_PROCELEM) {
-          a(i) := io.sRegFile.rdData1
-        }
-        b := xRegFile.io.rdData2
-        op := Rinst.op
         dest.reg := Rinst.rd
         dest.subvec := 0.U
         dest.rf := XREG
@@ -460,12 +415,6 @@ class Thread(id: Int) extends Module {
       }
 
       is(RtypeMod.SS) {
-        //Operates just like XX decode, except the same value is used on all ports
-        for (i <- 0 until NUM_PROCELEM) {
-          a(i) := io.sRegFile.rdData1
-          b(i) := io.sRegFile.rdData2
-        }
-        op := Rinst.op
         dest.reg := Rinst.rd
         dest.subvec := 0.U
         dest.rf := SREG
@@ -475,13 +424,6 @@ class Thread(id: Int) extends Module {
       }
 
       is(RtypeMod.KV) {
-        for (i <- 0 until NUM_PROCELEM) {
-          a(i) := a_subvec(X)(col)
-//          a(i) := vRegFile.io.rdData1(col + X*NUM_PROCELEM.U)
-        }
-        b := KE.io.keVals
-
-        op := Rinst.op
         macLimit := KE_SIZE.U
         dest.reg := v_rd
         dest.subvec := Y
@@ -501,6 +443,49 @@ class Thread(id: Int) extends Module {
         finalCycle := Xtick && Ytick && colTick && SStick
         //Rs/rf-values have no relevance here. Setting both source to XREG removes any chance of
         assignRsRfValues(v_rs1, X, Y, VREG, KREG)
+      }
+    }
+  }
+
+  when(state === sExec && RegNext(Rinst.fmt) === InstructionFMT.RTYPE) {
+    switch(RegNext(Rinst.mod)) {
+      is(RtypeMod.VV) {
+        a := a_subvec(RegNext(X))
+        b := b_subvec(RegNext(X))
+      }
+      is(RtypeMod.XV) {
+        for (i <- 0 until NUM_PROCELEM) {
+          a(i) := xRegRdData1(RegNext(slotSelect))
+        }
+        b := b_subvec(RegNext(X))
+      }
+      is(RtypeMod.SV) {
+        for (i <- 0 until NUM_PROCELEM) {
+          a(i) := RegNext(io.sRegFile.rdData1) //TODO should probably just use memory for the sreg file as well. Right now, it is delayed by one cycle to match vector reg file
+        }
+        b := b_subvec(RegNext(X))
+      }
+      is(RtypeMod.XX) {
+        a := xRegRdData1
+        b := xRegRdData2
+      }
+      is(RtypeMod.SX) {
+        for(i <- 0 until NUM_PROCELEM) {
+          a(i) := RegNext(io.sRegFile.rdData1) //TODO use memory for sreg and remove this register
+        }
+        b := xRegRdData2
+      }
+      is(RtypeMod.SS) {
+        for (i <- 0 until NUM_PROCELEM) {
+          a(i) := RegNext(io.sRegFile.rdData1) //TODO remove registers
+          b(i) := RegNext(io.sRegFile.rdData2)
+        }
+      }
+      is(RtypeMod.KV) {
+        for (i <- 0 until NUM_PROCELEM) {
+          a(i) := a_subvec(RegNext(X))(RegNext(col))
+        }
+        b := KE.io.keVals
       }
     }
   }

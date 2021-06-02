@@ -41,7 +41,7 @@ class Control extends Module {
   io.id.iload := false.B
 
   execThread.stall := execStall
-  io.ex.stall := execStall
+  io.ex.stall := execStall //normal verison
   memThread.stall := memStall
 
   // --- LOGIC ---
@@ -103,12 +103,23 @@ class Control extends Module {
   val isSingleCycleOp: Bool = (execThread.rtypemod === RtypeMod.XX) || (execThread.rtypemod === RtypeMod.SX) || (execThread.rtypemod === RtypeMod.SS)
   val newOp: Bool = execThread.op =/= RegNext(execThread.op) && execThread.rtypemod =/= RegNext(execThread.rtypemod)
   val singleCycleAwaitStall = WireDefault(false.B)
-  when(isSingleCycleOp && newOp && execThread.state === ThreadState.sExec) {
+  when((isSingleCycleOp && newOp && execThread.state === ThreadState.sExec)) {
     singleCycleAwaitStall := true.B
+//    estall := true.B
+//  } .elsewhen (estall) {
+//    estall := false.B
   }
 
   //When exec thread has entered Eend state but data is still in either destination queue, stall until empty
+  execStall := dataHazardStall | destQueueStall | singleCycleAwaitStall | estall
 
-  execStall := dataHazardStall | destQueueStall | singleCycleAwaitStall
+  //TODO figure out why the f decode/execute isn't working.
+  /*
+  Observations: In the correct version, there is 1 clock cycle delay between singleCycleAwaitStall and destQueueStall going high
+  since destQueueStall is delayed by one clock cycle, the DATA coming in on the next instruction is able to override the correct data
+  Namely, the values (6,18) are held for 2 cycles in the correct version, and only for 1 cycle in the wrong version, before being replaced with (1,432).
+  To solve the problem, we must hold the data for one addtional clock cycle.
+  Solution: Change the input register from a RegNext to a RegEnable?
+   */
 }
 

@@ -15,8 +15,8 @@ import utils.Config
 class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
   var sReg: Array[SInt] = _
-  var xReg: Array[Array[Array[SInt]]] = _
-  var vReg: Array[Array[Array[SInt]]] = _
+  var xReg: Array[Array[SInt]] = _
+  var vReg: Array[Array[SInt]] = _
   var MAClength: Int = _
 
 
@@ -70,8 +70,8 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     for (s <- 0 until VREG_SLOT_WIDTH) {
       for (u <- 0 until SUBVECTORS_PER_VREG) {
         for (k <- 0 until NUM_PROCELEM) {
-          val a = vReg(rs1 * VREG_SLOT_WIDTH + s)(0)(u * NUM_PROCELEM + k)
-          val b = vReg(rs2 * VREG_SLOT_WIDTH + s)(0)(u * NUM_PROCELEM + k)
+          val a = vReg(rs1 * VREG_SLOT_WIDTH + s)(u * NUM_PROCELEM + k)
+          val b = vReg(rs2 * VREG_SLOT_WIDTH + s)(u * NUM_PROCELEM + k)
           tempResults(k) = fixedAdd(tempResults(k), fixedMul(a, b))
         }
       }
@@ -107,7 +107,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       for (u <- 0 until SUBVECTORS_PER_VREG) {
         for(k <- 0 until NUM_PROCELEM) {
           val a = sReg(rs1)
-          val b = vReg(s + rs2 * VREG_SLOT_WIDTH)(0)(u * NUM_PROCELEM + k)
+          val b = vReg(s + rs2 * VREG_SLOT_WIDTH)(u * NUM_PROCELEM + k)
           tempResults(k) = fixedAdd(tempResults(k), fixedMul(a,b))
         }
       }

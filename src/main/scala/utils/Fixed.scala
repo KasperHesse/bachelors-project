@@ -102,7 +102,7 @@ object Fixed {
   }
 
   def fixedAdd(x: SInt, y: SInt): SInt = {
-    fixedAdd(x.litValue().toLong, y.litValue.toLong).S
+    fixedAdd(x.litValue().toLong, y.litValue.toLong).S(FIXED_WIDTH.W)
   }
 
   /**
@@ -186,7 +186,7 @@ object Fixed {
    * @return a*b, within in the limits of the hardware
    */
   def fixedMul(x: SInt, y: SInt): SInt = {
-    fixedMul(x.litValue().toLong, y.litValue.toLong).S
+    fixedMul(x.litValue().toLong, y.litValue.toLong).S(FIXED_WIDTH.W)
   }
 
   /**
@@ -196,7 +196,7 @@ object Fixed {
    * @return the fixed-point number representing n/d. If d==0, returns 0 instead (as the hardware does)
    */
   def fixedDiv(n: SInt, d: SInt): SInt = {
-    if(d.litValue == 0) return 0.S
+    if(d.litValue == 0) return 0.S(FIXED_WIDTH.W)
     double2fixed(fixed2double(n) / fixed2double(d)).S(FIXED_WIDTH.W)
   }
 
@@ -206,7 +206,7 @@ object Fixed {
    * @return The square root of v
    */
   def fixedSqrt(v: Double): Double = {
-    fixed2double(fixedSqrt(double2fixed(v).S))
+    fixed2double(fixedSqrt(double2fixed(v).S(FIXED_WIDTH.W)))
   }
   /**
    * Calculates a square root in the same manner that the hardware would using the Babylonian method
@@ -214,9 +214,9 @@ object Fixed {
    * @return The square root of v
    */
   def fixedSqrt(S: SInt): SInt = {
-    var x0 = fixedDiv(S, double2fixed(2).S) //Initial estimate, S/2
-    val onehalf = double2fixed(0.5).S //Constant: 1/2
-    var xnew = 0.S //New value
+    var x0 = fixedDiv(S, double2fixed(2).S(FIXED_WIDTH.W)) //Initial estimate, S/2
+    val onehalf = double2fixed(0.5).S(FIXED_WIDTH.W) //Constant: 1/2
+    var xnew = 0.S(FIXED_WIDTH.W) //New value
     for(i <- 0 until 6) {
       xnew = fixedMul(onehalf, fixedAdd(x0, fixedDiv(S, x0)))
       x0 = xnew
@@ -230,7 +230,7 @@ object Fixed {
    * @return The square root of v
    */
   def fixedSqrt(S: Long): Long = {
-    fixedSqrt(S.S).litValue.toLong
+    fixedSqrt(S.S(FIXED_WIDTH.W)).litValue.toLong
   }
 
   /**
@@ -250,7 +250,7 @@ object Fixed {
    * @return The largest of the two inputs
    */
   def fixedMax(a: SInt, b: SInt): SInt = {
-    fixedMax(a.litValue.toLong, b.litValue.toLong).S
+    fixedMax(a.litValue.toLong, b.litValue.toLong).S(FIXED_WIDTH.W)
   }
 
   /**
@@ -274,7 +274,7 @@ object Fixed {
   }
 
   def fixedMin(a: SInt, b: SInt): SInt = {
-    fixedMin(a.litValue().toLong, b.litValue().toLong).S
+    fixedMin(a.litValue().toLong, b.litValue().toLong).S(FIXED_WIDTH.W)
   }
 
   /**
@@ -311,7 +311,7 @@ object Fixed {
    * @return The absolute value of that value
    */
   def fixedAbs(a: SInt): SInt = {
-    fixedAbs(a.litValue.toLong).S
+    fixedAbs(a.litValue.toLong).S(FIXED_WIDTH.W)
   }
 
   /**
@@ -351,7 +351,7 @@ object Fixed {
     val high = if(neg) -1*(16-immh) else immh
     val imm: Double = high + immfrac*math.pow(2,-7)
 
-    return double2fixed(imm).S
+    return double2fixed(imm).S(FIXED_WIDTH.W)
   }
 
   /**

@@ -41,7 +41,6 @@ class Decode extends Module {
 
   // --- REGISTERS ---
   /** Pipeline stage register */
-//  val in = RegNext(io.fe)
   val fe_instr = RegNext(io.fe.instr)
   val fe_pc = RegNext(io.fe.pc)
   /** State register */

@@ -39,4 +39,6 @@ class ExecutePipeline(memfile: String = "") extends Module {
 
   decode.io.mem <> DontCare
   decode.io.memWb <> DontCare
+  control.io.mem.wqCount := 0.U
+  control.io.mem.rqCount := 0.U
 }

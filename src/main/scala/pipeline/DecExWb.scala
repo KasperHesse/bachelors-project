@@ -38,4 +38,9 @@ class DecExWb extends Module {
 
   /** Dontcares */
   decode.io.mem := DontCare
+  decode.io.memWb.we := false.B
+  decode.io.memWb.wrData := DontCare
+  decode.io.memWb.rd := DontCare
+  control.io.mem.wqCount := 0.U
+  control.io.mem.rqCount := 0.U
 }

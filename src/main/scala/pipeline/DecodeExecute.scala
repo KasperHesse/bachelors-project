@@ -5,7 +5,7 @@ import chisel3._
 /**
  * A module encompassing the decode and execute stages. Mainly used for testing the two stages together.
  */
-class DecodeExecute extends Module {
+class DecodeExecute(v3: Boolean = false) extends Module {
   val io = IO(new Bundle{
     val in = Flipped(new IfIdIO)
     val idctrl = new IdControlIO
@@ -41,4 +41,6 @@ class DecodeExecute extends Module {
   decode.io.wb := DontCare
 
   execute.io.fwd := DontCare
+  control.io.mem.wqCount := 0.U
+  control.io.mem.rqCount := 0.U
 }

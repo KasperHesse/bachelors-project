@@ -37,9 +37,11 @@ class Execute extends Module {
   val op = RegInit(Opcode.NOP)
   val valid = RegInit(false.B)
 
+
   // --- LOGIC ---
-  //Valid signal going into the MPU and destination queues
-  val validSignal = !io.ctrl.stall && io.id.op =/= Opcode.NOP && io.id.valid
+  //Must delay stall signal by one cc, since valid + op from decode stage are also delayed by 1 due to
+  //the SyncReadMem implementation of the register file
+  val validSignal =  !io.ctrl.stall && io.id.op =/= Opcode.NOP && io.id.valid //normal version
   valid := validSignal
 
   //Stall / NOP overrides to ensure we don't process anything
@@ -47,8 +49,8 @@ class Execute extends Module {
   op := opSignal
 
   //Select between forwarding values or original values
-  val a = Mux(io.fwd.rs1swap, io.fwd.rs1newData, in.a)
-  val b = Mux(io.fwd.rs2swap, io.fwd.rs2newData, in.b)
+  val a = Mux(io.fwd.rs1swap, io.fwd.rs1newData, io.id.a)
+  val b = Mux(io.fwd.rs2swap, io.fwd.rs2newData, io.id.b)
   val immVec = Wire(Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W)))
   for(i <- 0 until NUM_PROCELEM) {
     immVec(i) := in.imm

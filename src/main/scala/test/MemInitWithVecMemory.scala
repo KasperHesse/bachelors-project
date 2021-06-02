@@ -19,8 +19,6 @@ class MemInitWithVecMemory(width: Int, depth: Int, bits: Int) extends Module {
     val we = Input(Bool())
   })
 
-
-
   val mem = SyncReadMem(width, SInt((depth*bits).W))
   val rdData = mem.read(io.rdAddr)
   val wrData = io.wrData.asUInt().asSInt() //asUInt to cast down from vec, then asSInt to cast to correct data type
@@ -47,5 +45,5 @@ class MemInitWithVecMemory(width: Int, depth: Int, bits: Int) extends Module {
     writer.write("\n")
   }
   writer.close()
-  loadMemoryFromFileInline(mem, "meminit.txt")
+  loadMemoryFromFile(mem, "meminit.txt")
 }

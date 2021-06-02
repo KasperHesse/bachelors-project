@@ -24,27 +24,27 @@ class VectorRegisterFile(val width: Int, val depth: Int, val portsize: Int) exte
   val io = IO(new VectorRegFileIO(width, depth, portsize))
 
   //This field is only used for simulation purposes
-  var arr: Array[Array[Array[SInt]]] = Array.ofDim[SInt](0,0,0)
+  var arr: Array[Array[SInt]] = Array.ofDim[SInt](0,0)
   if(utils.Config.SIMULATION) {
     arr = ArrayInitaliser(width, depth, portsize)
     //This is some really ugly code, but it works.
     //It builds up the register file using VecInit on the subvectors,
     // stores them in array, creates nested Vecs, and finally initialises the register file
-    val b = Array.ofDim[Vec[Vec[SInt]]](width)
-    for(j<- 0 until width) {
-      val a = Array.ofDim[Vec[SInt]](depth/portsize)
-      for(k <- 0 until depth/portsize) {
-        a(k) = VecInit(arr(j)(k)) //a(k): Vec[SInt].
+    val b = Array.ofDim[Vec[SInt]](width)
+    for(j <- 0 until width) {
+      val a = Array.ofDim[SInt](depth)
+      for(k <- 0 until depth) {
+        a(k) = arr(j)(k) //a(k): SInt.
       }
-      b(j) = VecInit(a) //b(j): Vec[Vec[SInt]]
+      b(j) = VecInit(a) //b(j): Vec[SInt]
     }
     val regFile = RegInit(VecInit(b))
 
-    io.rdData1 := regFile(io.rs1)(io.rdMask1)
-    io.rdData2 := regFile(io.rs2)(io.rdMask2)
+    io.rdData1 := regFile(io.rs1)
+    io.rdData2 := regFile(io.rs2)
 
     when(io.we) {
-      regFile(io.rd)(io.wrMask) := io.wrData
+      regFile(io.rd) := io.wrData
     }
   } else {
     val regFile = SyncReadMem(width, Vec(depth, SInt(FIXED_WIDTH.W)))
@@ -84,20 +84,16 @@ object ArrayInitaliser {
    * Generates an array used to initalize the register file.
    * @param width The number of entries in the register file
    * @param depth The number of values per entry
-   * @param portsize The number of values that may be read on each clock cycle
    * @return A 3D-array containing the register file initialization.
-   *         The first dimension is `width` deep
-   *         The second dimension is `depth/portsize`. If eg depth=32 and portsize=8, this dimension will be 4 wide (4 subvectors per vector register)
-   *         The third dimension is `portsize`. As above, if portsize=8, 8 values are stored in this dimension.
+   *         The first dimension is `width`
+   *         The second dimension is `depth`
    */
-  def apply(width: Int, depth: Int, portsize: Int): Array[Array[Array[SInt]]] = {
-    val arr = Array.ofDim[SInt](width, depth/portsize, portsize)
+  def apply(width: Int, depth: Int, portsize: Int): Array[Array[SInt]] = {
+    val arr = Array.ofDim[SInt](width, depth)
 
     for(w <- 0 until width) {
-      for(d <- 0 until depth/portsize) {
-        for(p <- 0 until portsize) {
-          arr(w)(d)(p) = long2fixed(w*depth+d*portsize+p)
-        }
+      for(d <- 0 until depth) {
+          arr(w)(d) = double2fixed(w*depth+d).S(FIXED_WIDTH.W)
       }
     }
     arr

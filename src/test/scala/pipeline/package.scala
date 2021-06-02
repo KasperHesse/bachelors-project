@@ -21,9 +21,9 @@ package object pipeline {
     val rs1 = rand.nextInt(NUM_VREG_SLOTS)
     val rs2 = rand.nextInt(NUM_VREG_SLOTS)
 
-    if(rand.nextInt(5) == 4) { //Generate MVP instruction and exit 20% of the time
-      return RtypeInstruction(rd, rs1, rs2, MAC, KV)
-    }
+//    if(rand.nextInt(10) == 9) { //Generate MVP instruction and exit 10% of the time
+//      return RtypeInstruction(rd, rs1, rs2, MAC, KV)
+//    }
 
     val mods = Array(VV, XV, SV, XX, SX, SS)
     val opcodes = Array(ADD, SUB, MUL, DIV, MAX, MIN)
@@ -215,7 +215,7 @@ package object pipeline {
    * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
    */
   def calculateKVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
-                        vReg: Array[Array[Array[SInt]]]): Unit = {
+                        vReg: Array[Array[SInt]]): Unit = {
     val KE = KEWrapper.getKEMatrix()
     val rs1 = instr.rs1.litValue.toInt
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
@@ -226,7 +226,7 @@ package object pipeline {
     for(i <- 0 until KE_SIZE) {
       for(j <- 0 until KE_SIZE) {
         val a = double2fixed(KE(i)(j)).S
-        val b = vReg(rs1*VREG_SLOT_WIDTH + rdOffset)(0)(j)
+        val b = vReg(rs1*VREG_SLOT_WIDTH + rdOffset)(j)
         results(i) = fixedAdd(results(i), fixedMul(a, b))
       }
     }
@@ -255,13 +255,13 @@ package object pipeline {
    * @param results Result buffer
    */
   def calculateSXresult(instr: RtypeInstruction, results: Array[SInt],
-                        sReg: Array[SInt], xReg: Array[Array[Array[SInt]]]): Unit = {
+                        sReg: Array[SInt], xReg: Array[Array[SInt]]): Unit = {
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
     val imm = getImmediate(instr)
     for (i <- 0 until NUM_PROCELEM) {
       val a = sReg(rs1)
-      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(0)(i)
+      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -272,13 +272,13 @@ package object pipeline {
    * @param results Result buffer
    */
   def calculateXXresult(instr: RtypeInstruction, results: Array[SInt],
-                        xReg: Array[Array[Array[SInt]]]): Unit = {
+                        xReg: Array[Array[SInt]]): Unit = {
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
     val imm = getImmediate(instr)
     for (i <- 0 until NUM_PROCELEM) {
-      val a = xReg(rs1)(0)(i)
-      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(0)(i)
+      val a = xReg(rs1)(i)
+      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -290,14 +290,14 @@ package object pipeline {
    * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
    */
   def calculateSVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
-                        sReg: Array[SInt], vReg: Array[Array[Array[SInt]]]): Unit = {
+                        sReg: Array[SInt], vReg: Array[Array[SInt]]): Unit = {
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
     val imm = getImmediate(instr)
     for(i <- 0 until VREG_DEPTH) {
       val a = sReg(rs1)
-      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
+      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -308,14 +308,14 @@ package object pipeline {
    * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
    */
   def calculateVVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
-                        vReg: Array[Array[Array[SInt]]]): Unit = {
+                        vReg: Array[Array[SInt]]): Unit = {
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
     val imm = getImmediate(instr)
     for(i <- 0 until VREG_DEPTH) {
-      val a = vReg(rs1*VREG_SLOT_WIDTH+rdOffset)(0)(i)
-      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
+      val a = vReg(rs1*VREG_SLOT_WIDTH+rdOffset)(i)
+      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -327,14 +327,14 @@ package object pipeline {
    * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
    */
   def calculateXVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
-                        xReg: Array[Array[Array[SInt]]], vReg: Array[Array[Array[SInt]]]): Unit = {
+                        xReg: Array[Array[SInt]], vReg: Array[Array[SInt]]): Unit = {
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
-    val a = xReg(rs1)(0)(rdOffset)
+    val a = xReg(rs1)(rdOffset)
     val imm = getImmediate(instr)
     for(i <- 0 until VREG_DEPTH) {
-      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(0)(i)
+      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -346,12 +346,12 @@ package object pipeline {
    * @param results The results buffer, holding the output of the instruction
    * @param rdDUT Destination register, as peeked from the DUT
    */
-  def updateVREG(instr: RtypeInstruction, results: Array[SInt], rdDUT: UInt, vReg: Array[Array[Array[SInt]]]): Unit = {
+  def updateVREG(instr: RtypeInstruction, results: Array[SInt], rdDUT: UInt, vReg: Array[Array[SInt]]): Unit = {
     val rd = instr.rd.litValue.toInt
     //    val rdOffset = dut.io.wb.rd.reg.peek.litValue.toInt % VREG_SLOT_WIDTH
     val rdOffset = rdDUT.litValue.toInt % VREG_SLOT_WIDTH
     for (j <- 0 until VREG_DEPTH) {
-      vReg(rd * VREG_SLOT_WIDTH + rdOffset)(0)(j) = results(j)
+      vReg(rd * VREG_SLOT_WIDTH + rdOffset)(j) = results(j)
     }
   }
 
@@ -360,10 +360,10 @@ package object pipeline {
    * @param instr The instruction that spawned these values
    * @param results The results buffer, holding the output of the instruction
    */
-  def updateXREG(instr: RtypeInstruction, results: Array[SInt], xReg: Array[Array[Array[SInt]]]): Unit = {
+  def updateXREG(instr: RtypeInstruction, results: Array[SInt], xReg: Array[Array[SInt]]): Unit = {
     val rd = instr.rd.litValue.toInt
     for(i <- 0 until NUM_PROCELEM) {
-      xReg(rd)(0)(i) = results(i)
+      xReg(rd)(i) = results(i)
     }
   }
 

@@ -18,19 +18,24 @@ import scala.collection.mutable.ListBuffer
 
 class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
+  behavior of "Execute pipeline"
+
   /** S-register file in decode stage */
   var sReg: Array[SInt] = _
   /** 2D-array holding both x-reg files from both threads */
-  var xReg: Array[Array[Array[Array[SInt]]]]= _
+  var xReg: Array[Array[Array[SInt]]]= _
   /** 2D-array holding both v-reg files from both threads */
-  var vReg: Array[Array[Array[Array[SInt]]]] = _
+  var vReg: Array[Array[Array[SInt]]] = _
   /** ID of executing thread */
   var execThread: Int = _
   /** ID of memory access thread */
   var memThread: Int = _
   /** Length an instruction operating through NDOF/NELEM elements */
   var MAClength: Int = _
-  /** Global buffer for MAC operation results */
+  /** Flag indicating if a MAC instruction is the first MAC instruction seen in that iteration */
+  var firstMAC: Boolean = true
+  /** The number of MAC instructions that have been processed in the current iteration */
+  var macCnt: Int = 0
 
 
   /**
@@ -182,7 +187,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
         if (i < VREG_SLOT_WIDTH-1) {
           dut.clock.step()
           handleMACSVandMACVV(dut, MACresults)
-        } //Don't step after final result, this happens in test()
+        } //Don't step after final result, this happens in testFun()
       }
     } else if (rf == XREG.litValue) {
       expectXREG(dut, instr, results)
@@ -202,15 +207,29 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
    * @param MACresults The buffer storing MAC calculations until the result is presented
    */
   def handleMACSVandMACVV(dut: ExecutePipeline, MACresults: Array[SInt]): Unit = {
-    if(dut.io.idout.valid.peek().litToBoolean
-      && dut.io.idout.opUInt.peek.litValue == Opcode.MAC.litValue()
-      && dut.io.idout.dest.rfUint.peek.litValue == RegisterFileType.SREG.litValue) {
+    val isMACinstruction = dut.io.idout.valid.peek().litToBoolean &&
+      dut.io.idout.opUInt.peek.litValue == Opcode.MAC.litValue() &&
+      dut.io.idout.dest.rfUint.peek.litValue == RegisterFileType.SREG.litValue
+    val macLimit = ELEMS_PER_VSLOT / NUM_PROCELEM //Number of elements added to each result register on each MAC iteration
+    /*
+      When a mac is noticed on the output, the actual values arrive one clock cycle later since the reg file is a syncreadmem
+      To support mac instructions, we first notice the mac instruction and set firstMac false
+      On subsequent iterations, the first statement (isMacInstruction && !firstMac) will cause the update logic to be executed
+      On the final iteration, isMacInstruction will be low (since control signals are ahead by one clock cycle).
+      To solve this, we count up, to ensure that the correct number of values have been added together. Once macCnt == macLimit, we reset the mac update logic
+     */
+    if((isMACinstruction && !firstMAC) || (0 < macCnt && macCnt < macLimit)) {
       for(i <- 0 until NUM_PROCELEM) {
         val a = dut.io.idout.a(i).peek
         val b = if(dut.io.idout.useImm.peek.litToBoolean) dut.io.idout.imm.peek else dut.io.idout.b(i).peek
         MACresults(i) = fixedAdd(MACresults(i), fixedMul(a,b))
       }
-
+      macCnt += 1
+    } else if (isMACinstruction && firstMAC) {
+      firstMAC = false
+    } else if (!isMACinstruction && macCnt >= macLimit) {
+      firstMAC = true
+      macCnt = 0
     }
   }
 
@@ -225,14 +244,14 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     var maxProgress = 0   //How many elements total should be processed
     var progressIncr = 0  //Elements processed per thread
     var progress = 0      //Elements processed so far
-    if(iBuffer.istart.len.litValue == SINGLE.litValue) {
+    if(iBuffer.pstart.len.litValue == SINGLE.litValue) {
       maxProgress = 1
       progressIncr = 1
-    } else if (iBuffer.istart.len.litValue == NDOF.litValue){
+    } else if (iBuffer.pstart.len.litValue == NDOF.litValue){
       maxProgress = NDOFLENGTH
       progressIncr = ELEMS_PER_VSLOT
       MAClength = NDOFLENGTH
-    } else if (iBuffer.istart.len.litValue == NELEM.litValue) {
+    } else if (iBuffer.pstart.len.litValue == NELEM.litValue) {
       maxProgress = NELEMLENGTH
       progressIncr = ELEMS_PER_VSLOT
       MAClength = NELEMLENGTH
@@ -320,7 +339,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
         verifyBranchOutcome(dut, BtypeInstruction(instr))
       } else if (fmt.litValue == InstructionFMT.OTYPE.litValue) { //Executable packet
         val iBuffer = new InstructionBuffer
-        iBuffer.istart = OtypeInstruction(instr)
+        iBuffer.pstart = OtypeInstruction(instr)
         fillInstructionBuffer(dut, iBuffer)
         performExecution(dut, iBuffer)
         //Wait until all threads are idle
@@ -334,30 +353,30 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
 
 
 
-  "Execute pipeline" should "execute simple instructions and branch" in {
+  it should "execute simple instructions and branch" in {
     simulationConfig()
     seed("Execute pipeline payload")
     val memfile = "src/test/resources/meminit/mem4.hex.txt"
 
     /* Instructions
-    beq s0, s1, L1 //+4 (not taken)s
-    L1: istart single
+    beq s0, s1, L1 //+4 (not taken)
+    L1: pstart single
     estart
     add.vv vs2, vs1, vs0
     eend
-    iend
+    pend
     beq s0, s1, L1 //-20 (not taken)
     bne s0, s1, L2 //+24 (taken)
-    istart single
+    pstart single
     estart
     sub.xx x3, x2, x0
     eend
-    iend
+    pend
     L2: istart single
     estart
     mul.ss s1, s2, s3
     eend
-    iend
+    pend
   */
     //Write to memory file
     val b0 = Array(BtypeInstruction(EQUAL, 0, 1, 4)).asInstanceOf[Array[Bundle with Instruction]]
@@ -375,7 +394,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     }
   }
 
-  "Execute pipeline" should "use both threads" in {
+  it should "use both threads" in {
     simulationConfig()
     seed("Execute pipeline both threads")
     val memfile = "src/test/resources/meminit/mem5.hex.txt"
@@ -392,7 +411,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     }
   }
 
-  "Execute pipeline" should "count to 5" in {
+  it should "count to 5" in {
     simulationConfig()
     seed("Execute pipeline count to 5")
     val memfile = "src/test/resources/meminit/mem5.hex.txt"
@@ -417,19 +436,19 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     }
   }
 
-  "Execute pipeline" should "perform MAC instructions" in {
+  it should "perform MAC instructions V3" in {
     simulationConfig()
     seed("Execute pipeline mac instructions")
     val memfile = "src/test/resources/meminit/mem5.hex.txt"
     /* Instructions
-    istart ndof
+    pstart ndof
     estart
     sub.xv vs1, x0, vs3
     mac.sv s2, s1, vs2
     add.vv vs1, vs1, vs2
     eend
     iend
-    istart nelem
+    pstart nelem
     estart
     mac.vv s0, vs1, vs2
     eend
@@ -439,14 +458,32 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     val p2 = wrapInstructions(Array(RtypeInstruction(0, 1, 2, MAC, RtypeMod.VV)), OtypeLen.NELEM)
     val instrs = Array.concat(p1,p2)
     writeMemInitFile(memfile, instrs)
-    test(new ExecutePipeline(memfile=memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    test(new ExecutePipeline(memfile=memfile)) {dut =>
+      testFun(dut)
+    }
+  }
+
+  it should "perform a mac.kv instruction" in {
+    simulationConfig()
+    seed("Execute pipeline mac.kv instructions")
+    val memfile = "src/test/resources/meminit/mem7.hex.txt"
+    /*
+    pstart single
+    estart
+    mac.kv v0, v1
+    eend
+    pend
+     */
+    val p1 = wrapInstructions(Array(RtypeInstruction(0, 1, 1, MAC, RtypeMod.KV)))
+    writeMemInitFile(memfile, p1)
+    test(new ExecutePipeline(memfile)) {dut =>
       testFun(dut)
     }
   }
 }
 
 class InstructionBuffer {
-  var istart: OtypeInstruction = new OtypeInstruction
+  var pstart: OtypeInstruction = new OtypeInstruction
   val load = ListBuffer.empty[StypeInstruction]
   val exec = ListBuffer.empty[RtypeInstruction]
   val store = ListBuffer.empty[StypeInstruction]
