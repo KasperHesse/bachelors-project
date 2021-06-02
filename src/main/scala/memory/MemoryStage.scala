@@ -41,11 +41,12 @@ class MemoryStage(wordsPerBank: Int, memInitFileLocation: String) extends Module
   val indexGen = Module(new IndexGenerator(pipe=true))
   val neighbour = Module(new NeighbourGenerator)
   val readQueue = Module(new Queue(new ReadQueueBundle, 8))
-  val writeQueue = Module(new Queue(Vec(NUM_MEMORY_BANKS, SInt(FIXED_WIDTH.W)), 16))
+  val writeQueue = Module(new Queue(new WriteQueueBundle, 8))
+  val writeQueueWrapper = Module(new WriteQueueWrapper)
 
   // --- SIGNALS AND WIRES ---
   /** S-type modifier currently processing */
-  val mod = readQueue.io.deq.bits.mod
+  val mod = Mux(io.id.ls === StypeLoadStore.LOAD, readQueue.io.deq.bits.mod, writeQueue.io.deq.bits.mod)
   /** Number of entries in the read queue */
   val count = readQueue.io.count
 
@@ -79,7 +80,8 @@ class MemoryStage(wordsPerBank: Int, memInitFileLocation: String) extends Module
   io.wb <> wb.io.id
 
   readQueue.io.enq <> io.id.readQueue
-  writeQueue.io.enq <> io.id.wrData
+  writeQueueWrapper.io.in <> io.id.writeQueue
+  writeQueue.io.enq <> writeQueueWrapper.io.out
 
   mem.io.we := io.id.ls === StypeLoadStore.STORE
   io.ctrl.rqCount := readQueue.io.count

@@ -241,8 +241,8 @@ class Thread(id: Int) extends Module {
   io.ctrl.stateUint := state.asUInt()
   io.ex.dest.rfUint := dest.rf.asUInt()
   io.ex.opUInt := op.asUInt()
-  io.mem.wrData.bits := DontCare
-  io.mem.wrData.valid := false.B
+  io.mem.writeQueue.bits := DontCare
+  io.mem.writeQueue.valid := false.B
 
 
   // --- LOGIC ---

@@ -130,7 +130,7 @@ class Decode extends Module {
     threads(0).io.wb <> io.wb
     sRegFile.io.rs1 := threads(0).io.sRegFile.rs1
     sRegFile.io.rs2 := threads(0).io.sRegFile.rs2
-    threads(0).io.mem.wrData.ready := false.B
+    threads(0).io.mem.writeQueue.ready := false.B
     threads(0).io.mem.edof.ready := false.B
     threads(0).io.mem.neighbour.ready := false.B
     threads(0).io.mem.vec.ready := false.B
@@ -155,7 +155,7 @@ class Decode extends Module {
     threads(1).io.wb <> io.wb
     sRegFile.io.rs1 := threads(1).io.sRegFile.rs1
     sRegFile.io.rs2 := threads(1).io.sRegFile.rs2
-    threads(1).io.mem.wrData.ready := false.B
+    threads(1).io.mem.writeQueue.ready := false.B
     threads(1).io.mem.edof.ready := false.B
     threads(1).io.mem.neighbour.ready := false.B
     threads(1).io.mem.vec.ready := false.B

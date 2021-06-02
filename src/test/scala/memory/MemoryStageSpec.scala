@@ -10,7 +10,7 @@ import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 import pipeline.RegisterFileType.SREG
-import pipeline.{RegisterBundle, RegisterFileType, StypeBaseAddress, StypeMod, WbIdIO, seed}
+import pipeline.{RegisterBundle, RegisterFileType, StypeBaseAddress, StypeLoadStore, StypeMod, WbIdIO, seed}
 import pipeline.StypeMod._
 import pipeline.StypeBaseAddress._
 import pipeline.RegisterFileType._
@@ -39,6 +39,54 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     dut.io.id.readQueue.bits.iter.poke(iter.U)
     dut.io.id.readQueue.bits.mod.poke(mod)
     dut.io.id.readQueue.valid.poke(true.B)
+  }
+
+  /**
+   * Pokes data onto the write queue. Waits until the write queue 'ready' signal is high, and then pokes the given data
+   * onto the queue, asserting valid for 1 clock cycle.
+   * @param wq The write queue to poke data onto
+   * @param wrData The data to be written
+   * @param clock The clock of the DUT
+   * @param mod The S-type modifier of the instruction being processed
+   */
+  def pokeWriteQueue(wq: DecoupledIO[WriteQueueBundle], clock: Clock, wrData: Seq[Long], mod: StypeMod.Type, iter: Int): Unit = {
+    require(wrData.length <= 8, "Cannot poke than more 8 pieces of data onto the write queue at the same time")
+    while(!wq.ready.peek.litToBoolean) {
+      clock.step()
+    }
+    for(i <- wrData.indices) {
+      wq.bits.wrData(i).poke(wrData(i).S)
+    }
+    wq.bits.mod.poke(mod)
+    wq.bits.iter.poke(iter.U)
+    timescope {
+      wq.valid.poke(true.B)
+      clock.step()
+    }
+  }
+
+  /**
+   * Enqueues an instruction onto the vector port of the memory stage. Waits until the 'ready' signal is high, then pokes the given data
+   * onto the port, asserting valid for 1 clock cycle
+   * @param vec The vec input port of the memory stage
+   * @param clock The clock of the DUT
+   * @param indices The indices to read/write from
+   * @param baseAddr The base address of the read/write operation
+   */
+  def enqueueVec(vec: DecoupledIO[AddressGenProducerIO], clock: Clock, indices: Seq[Long], baseAddr: StypeBaseAddress.Type): Unit = {
+    require(indices.length == 8, "Must poke 8 indices onto vector port")
+    while(!vec.ready.peek.litToBoolean) {
+      clock.step()
+    }
+    for(i <- indices.indices) {
+      vec.bits.indices(i).poke(indices(i).U)
+      vec.bits.validIndices(i).poke(true.B)
+    }
+    vec.bits.baseAddr.poke(baseAddr)
+    timescope {
+      vec.valid.poke(true.B)
+      clock.step()
+    }
   }
 
   /**
@@ -156,10 +204,6 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     assert(readCnt == readMax)
   }
 
-  def performStVec(dut: MemoryStage): Unit = {
-
-  }
-
   /**
    * Performs the logic necessary for a ld.dof operation
    * @param dut The DUT
@@ -200,6 +244,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     dut.io.id.readQueue.initSource().setSourceClock(dut.clock)
     dut.io.id.neighbour.initSource().setSourceClock(dut.clock)
     dut.io.id.edof.initSource().setSourceClock(dut.clock)
+    dut.io.id.writeQueue.initSource().setSourceClock(dut.clock)
   }
 
   /**
@@ -299,10 +344,46 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     }
   }
 
-  it should "perform at st.vec" in {
+  it should "perform a st.vec" in {
+    simulationConfig(true)
+    initMemory()
+    seed("Memory stage st.dof")
+    test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
+      setupClock(dut)
+      dut.clock.setTimeout(30)
+      val baseAddress = randomElement(baseAddresses)
+      val indices = Seq.tabulate(ELEMS_PER_VSLOT/NUM_MEMORY_BANKS)(n => Seq.range[Long](n*NUM_MEMORY_BANKS, (n+1)*NUM_MEMORY_BANKS))
+      val wrData = indices
+      val expData = Seq.tabulate(VREG_SLOT_WIDTH)(n => Seq.range[Long](n*VREG_DEPTH, (n+1)*VREG_DEPTH))
+      val rdq = Seq.tabulate(VREG_SLOT_WIDTH)(n => Seq.fill(3)(genReadQueueBundle(reg=n, rf=VREG, iter=0, mod=VEC))).flatten //iteration value is don'tcare in this scenario
 
+      //Poke data
+      dut.io.id.ls.poke(StypeLoadStore.STORE)
+      fork {
+        for(i <- indices.indices) {
+          enqueueVec(dut.io.id.vec, dut.clock, indices(i), baseAddress)
+        }
+      } .fork {
+        for(wd <- wrData) {
+          pokeWriteQueue(dut.io.id.writeQueue, dut.clock, wd, VEC, iter=0)
+        }
+      }.join
+      while(dut.io.ctrl.wqCount.peek().litValue() > 0) {
+        dut.clock.step()
+      }
+
+      //Read dagta
+      dut.io.id.ls.poke(StypeLoadStore.LOAD)
+      fork {
+        for(i <- indices.indices) {
+          enqueueVec(dut.io.id.vec, dut.clock, indices(i), baseAddress)
+        }
+      } .fork {
+        dut.io.id.readQueue.enqueueSeq(rdq)
+      }
+      (expData, takeNth(rdq, 3)).zipped.foreach((e,r) => waitAndExpect(dut, e, r.rd))
+    }
   }
-
 
   it should "zero out remaining bits in ld.vec" in {
     simulationConfig(true)
@@ -364,6 +445,45 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     }
   }
 
+  it should "perform a st.dof" in {
+    simulationConfig(true)
+    initMemory()
+    seed("Memory stage st.dof")
+    test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
+      setupClock(dut)
+      dut.clock.setTimeout(10)
+      val baseAddress = randomElement(baseAddresses)
+
+      val ijk = genIJKmultiple()
+      val instrs = ijk.map(e => genIJKinput(IJK=Some(e), pad=false, mod=DOF, baseAddress = Some(baseAddress)))
+      val rdq = Seq.tabulate(XREG_DEPTH)(n => Seq.fill(3)(genReadQueueBundle(reg=n, rf=VREG, iter=ijk(n)(3), mod=DOF))).flatten
+      val wrData = Seq.tabulate(ELEMS_PER_VSLOT/NUM_MEMORY_BANKS)(n => Seq.range[Long](n*NUM_MEMORY_BANKS, (n+1)*NUM_MEMORY_BANKS))
+      val expData = Seq.tabulate(XREG_DEPTH)(n => Seq.range[Long](n*VREG_DEPTH, (n+1)*VREG_DEPTH))
+
+      //Poke data onto mdodule
+      dut.io.id.ls.poke(StypeLoadStore.STORE)
+      fork {
+        dut.io.id.edof.enqueueSeq(instrs)
+      } .fork {
+        for(wd <- wrData) {
+          pokeWriteQueue(dut.io.id.writeQueue, dut.clock, wd, mod=DOF, iter=0)
+        }
+      }.join
+      while(dut.io.ctrl.wqCount.peek.litValue() > 0) {
+        dut.clock.step()
+      }
+
+      //Read back values
+      dut.io.id.ls.poke(StypeLoadStore.LOAD)
+      fork {
+        dut.io.id.edof.enqueueSeq(instrs)
+      } .fork {
+        dut.io.id.readQueue.enqueueSeq(rdq)
+      }
+      (expData, takeNth(rdq, 3)).zipped.foreach((e, r) => waitAndExpect(dut, e, r.rd))
+    }
+  }
+
   it should "perform a ld.elem" in {
     simulationConfig(true)
     initMemory()
@@ -390,6 +510,42 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     }
   }
 
+  it should "perform a st.elem" in {
+    simulationConfig(true)
+    initMemory()
+    seed("Memory stage st.elem")
+    test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) { dut =>
+      setupClock(dut)
+      dut.clock.setTimeout(30)
+      val ijk = genIJKmultiple()
+      val instrs = ijk.map(e => genIJKinput(IJK = Some(e), pad=false, mod=ELEM))
+      val rdq = ijk.map(e => genReadQueueBundle(reg=0, rf=XREG, iter=e(3), mod=ELEM))
+      val wrData = Seq.range[Long](0, XREG_DEPTH)
+      val expData = wrData
+
+      //Poke data onto queue
+      dut.io.id.ls.poke(StypeLoadStore.STORE)
+      fork {
+        dut.io.id.neighbour.enqueueSeq(instrs)
+      } .fork {
+        for(i <- wrData.indices) { //Same data being poked every time, iteration value may change
+          pokeWriteQueue(wq=dut.io.id.writeQueue, clock=dut.clock, wrData, mod=ELEM, iter=ijk(i)(3))
+        }
+      }.join
+      while(dut.io.ctrl.wqCount.peek.litValue() > 0) {
+        dut.clock.step()
+      }
+      //Read data from memory
+      dut.io.id.ls.poke(StypeLoadStore.LOAD)
+      fork {
+        dut.io.id.neighbour.enqueueSeq(instrs)
+      } .fork {
+        dut.io.id.readQueue.enqueueSeq(rdq)
+      }
+      waitAndExpect(dut, expData, rdq(0).rd)
+    }
+  }
+
   it should "perform a ld.sel" in {
     simulationConfig(true)
     initMemory()
@@ -410,6 +566,39 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         dut.io.id.neighbour.enqueue(ijk)
       }
       fork {
+        dut.io.id.readQueue.enqueue(rdq)
+      }
+      waitAndExpect(dut, expData, rdq.rd)
+    }
+  }
+
+  it should "perform a st.sel" in {
+    //This test should first write a value to a location in memory, and then try to retrieve that same value
+    simulationConfig(true)
+    initMemory()
+    seed("Memory stage st.sel")
+    test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
+      setupClock(dut)
+      dut.clock.setTimeout(10)
+
+      val ijk = genIJK()
+      val instr = genIJKinput(IJK=Some(ijk), pad=false, mod=SEL)
+      val rdq = genReadQueueBundle(reg=1, rf=XREG, iter=ijk(3), mod=SEL)
+      val expData = Seq(1L)
+      //Poking data onto write queue requires manual work, since vec literals don't work yet :(
+      dut.io.id.ls.poke(StypeLoadStore.STORE)
+      fork {
+        dut.io.id.neighbour.enqueue(instr)
+      } .fork {
+        pokeWriteQueue(wq=dut.io.id.writeQueue, clock=dut.clock, wrData=Seq(1), mod=SEL, iter=ijk(3))
+      }.join
+      while(dut.io.ctrl.wqCount.peek.litValue > 0) {
+        dut.clock.step()
+      }
+      dut.io.id.ls.poke(StypeLoadStore.LOAD)
+      fork {
+        dut.io.id.neighbour.enqueue(instr)
+      } .fork {
         dut.io.id.readQueue.enqueue(rdq)
       }
       waitAndExpect(dut, expData, rdq.rd)

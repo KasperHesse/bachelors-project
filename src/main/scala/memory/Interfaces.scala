@@ -81,6 +81,19 @@ class ReadQueueBundle extends Bundle {
 }
 
 /**
+ * A bundle for gruping the values in the read queue inside of [[MemoryStage]].
+ * Accessed by [[OnChipMemory]] when writing values into the register file
+ */
+class WriteQueueBundle extends Bundle {
+  /** The data to be written into the write queue */
+  val wrData = Vec(NUM_MEMORY_BANKS, SInt(FIXED_WIDTH.W))
+  /** IJK generator iteration value. Used to access correct indices when performing st.sel and st.elem */
+  val iter = UInt(3.W)
+  /** S-type modifier of the store operation being performed */
+  val mod = StypeMod()
+}
+
+/**
  * A bundle holding an i,j,k-value pair
  */
 class IJKBundle extends Bundle {

@@ -3,7 +3,7 @@ package pipeline
 import chisel3._
 import chisel3.experimental.ChiselEnum
 import chisel3.util.{Decoupled, log2Ceil}
-import memory.{AddressGenProducerIO, IJKgeneratorConsumerIO, ReadQueueBundle}
+import memory.{AddressGenProducerIO, IJKgeneratorConsumerIO, ReadQueueBundle, WriteQueueBundle}
 import utils.Config._
 import utils.Fixed._
 import vector.Opcode
@@ -66,7 +66,7 @@ class IdMemIO extends Bundle {
   /** Values used when performing .elem, .fcn, .edn1, .edn2 and .sel operations that go to neighbour generator */
   val neighbour = Decoupled(new IJKgeneratorConsumerIO)
   /** Data to be written when performing store operations */
-  val wrData = Decoupled(Vec(NUM_MEMORY_BANKS, SInt(FIXED_WIDTH.W)))
+  val writeQueue = Decoupled(new WriteQueueBundle)
   /** Destination register and auxilliary information, to be used when storing data into register files */
   val readQueue = Decoupled(new ReadQueueBundle)
   /** Load/store flag used to toggle we on memory */

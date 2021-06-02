@@ -81,7 +81,7 @@ class OnChipMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       for(i <- 0 until NUM_MEMORY_BANKS) {
         dut.io.addrGen.bits.addr(i).poke(i.U)
         dut.io.addrGen.bits.validAddress(i).poke(true.B)
-        dut.io.writeQueue.bits(i).poke(double2fixed(i+8).S)
+        dut.io.writeQueue.bits.wrData(i).poke(double2fixed(i+8).S)
       }
 
       //First, read values to verify their existence
@@ -116,7 +116,7 @@ class OnChipMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       for(i <- 0 until NUM_MEMORY_BANKS) {
         dut.io.addrGen.bits.addr(i).poke(i.U)
         dut.io.addrGen.bits.validAddress(i).poke((i < 4).B)
-        dut.io.writeQueue.bits(i).poke(double2fixed(i+8).S)
+        dut.io.writeQueue.bits.wrData(i).poke(double2fixed(i+8).S)
       }
       //Step in values
       dut.clock.step()
