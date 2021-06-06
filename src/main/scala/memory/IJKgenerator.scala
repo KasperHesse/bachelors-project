@@ -25,6 +25,8 @@ class IJKgeneratorBundle extends Bundle {
   val ijk = Output(new IJKBundle)
   /** Current iteration number. If >=8, the output is invalid */
   val iteration = Output(UInt(4.W))
+  /** Asserted when the ijk and iteration values may be sampled by the other thread */
+  val valid = Output(Bool())
 }
 
 /**
@@ -123,4 +125,6 @@ class IJKgenerator extends Module {
   io.out.ijk.k := k
   io.out.iteration := iteration
   io.ctrl.pad := invalidFlag
+
+  io.out.valid := DontCare //Not set in this module
 }

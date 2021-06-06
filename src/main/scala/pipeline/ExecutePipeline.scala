@@ -4,7 +4,7 @@ import chisel3._
 
 /**
  * A module encompassing all modules present in the execution logic.
- * @param memfile Path to a memory file used when simulating
+ * @param memfile Path to a memory file for the instruction memory, used when simulating
  */
 class ExecutePipeline(memfile: String = "") extends Module {
   val io = IO(new Bundle {

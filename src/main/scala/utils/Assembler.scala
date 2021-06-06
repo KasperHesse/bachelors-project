@@ -2,16 +2,14 @@ package utils
 
 import java.io.{BufferedWriter, FileWriter}
 import java.util.NoSuchElementException
-
 import chisel3._
 import pipeline.InstructionFMT._
-import pipeline.OtypeInstruction
-import pipeline._
+import pipeline.{Opcode, OtypeInstruction, _}
 import utils.Config._
 import utils.Fixed._
 
+import scala.io.Source
 import scala.language.implicitConversions
-import vector.Opcode
 
 //import scala.collection.mutable.ListBuffer
 import scala.collection.mutable._
@@ -46,7 +44,7 @@ object Assembler {
    * Initializes a memory file
    * @param memfile Relative path to the memory file to initialize. Existing contents are overwritten, a new file is created if none exists
    * @param instrs Encoded instruction to write into that file
-   * @param len The number of decimals to print out for each line (if eg value=8 and figs=4, it will print 0004)
+   * @param len The number of figures to print out for each line (if eg value=8 and len=4, it will print 0004)
    */
   def writeMemInitFile(memfile: String, instrs: Array[Long], len: Int = 8): Unit = {
     val writer = new BufferedWriter(new FileWriter(memfile))
@@ -54,6 +52,7 @@ object Assembler {
       writer.write(("0000000000000000" + instr.toHexString).takeRight(len) + "\n")
     }
     writer.close()
+    println(s"\tWrote ${instrs.length} instructions to $memfile")
   }
 
   /**
@@ -105,6 +104,7 @@ object Assembler {
       case "max" => MAX
       case "min" => MIN
       case "abs" => ABS
+      case "red" => RED
       case _ => throw new IllegalArgumentException(s"Opcode '$op' not recognized")
     }
   }
@@ -235,7 +235,7 @@ object Assembler {
    * @param tokens The tokens representing the currently parsed line
    * @return An integer representing that instruction
    */
-  def parseOtype(tokens: Array[String]): Int = {
+  def parseOtype(tokens: Array[String], incrementType: Array[Int] = Array(0)): Int = {
     import OtypeInstruction._
 
     def startEndFlag(str: String): Int = {
@@ -259,32 +259,68 @@ object Assembler {
     }
 
     def length(str: String): Int = {
-      if(str.equals("single")) {
-        SINGLE
-      } else if (str.equals("ndof")) {
-        NDOF
-      } else if (str.equals("nelem")) {
-        NELEM
-      } else {
-        throw new IllegalArgumentException(s"Unable to parse instruction length '$str'. Did not equal 'single', 'nelem' or 'ndof'")
-      }
+      val map = Map("single" -> SINGLE,
+      "ndof" -> NDOF,
+      "nelemvec" -> NELEMVEC,
+      "nelemdof" -> NELEMDOF,
+      "nelemstep" -> NELEMSTEP)
+      if(map.contains(str)) map(str) else throw new IllegalArgumentException(s"Unable to parse instruction length $str")
     }
     //Parse i/e and start/end values
     val se = startEndFlag(tokens(0))
     val pe = packetExecFlag(tokens(0))
 
-    val len = if (se == START && pe == PACKET) length(tokens(1)) else SINGLE
+    val len = if (se == START && pe == PACKET) length(tokens(1)) else SINGLE //SINGLE is used as a placeholder value in estart, eend and pend instructions
+    incrementType(0) = len
     val fmt = OTYPE
-    val it = LINEAR
 
     var instr: Int = 0
     instr |= se << SE_OFFSET
     instr |= pe << PE_OFFSET
     instr |= len << LEN_OFFSET
-    instr |= it << IT_OFFSET
     instr |= fmt << FMT_OFFSET
 
     instr
+  }
+
+  /**
+   * Extracts the S-type modifier from an instruction, or throws an error if no valid modifier is present
+   * @param token The first token parsed, of the type [loadstore].[mod]
+   * @return An integer represnting that modifier
+   */
+  def sMod(mod: String): Int = {
+    val map = Map("vec" -> VEC,
+      "dof" -> DOF,
+      "fdof" -> FDOF,
+      "fcn" -> FCN,
+      "edn1" -> EDN1,
+      "edn2" -> EDN2,
+      "sel" -> SEL,
+      "elem" -> ELEM)
+    if (map.contains(mod)) map(mod) else throw new IllegalArgumentException(s"Unable to recognize Stype-modifier $mod")
+  }
+
+  def sLoadStore(ls: String): Int = {
+    val map = Map("ld" -> LOAD,
+    "st" -> STORE)
+    if(map.contains(ls)) map(ls) else throw new IllegalArgumentException(s"Unable to recognize Stype load/store $ls")
+  }
+
+  def sBaseAddr(baseAddr: String): Int = {
+    val map = Map("x" -> X,
+    "xphys" -> XPHYS,
+    "xnew" -> XNEW,
+    "dc" -> DC,
+    "dv" -> DV,
+    "f" -> F,
+    "u" -> U,
+    "r" -> R,
+    "z" -> Z,
+    "p" -> P,
+    "q" -> Q,
+    "invd" -> INVD,
+    "tmp" -> TMP)
+    if(map.contains(baseAddr)) map(baseAddr) else throw new IllegalArgumentException(s"Unable to recognize Stype base address $baseAddr")
   }
 
   /**
@@ -292,12 +328,53 @@ object Assembler {
    * @param tokens The tokens representing the currently parsed line
    * @return An integer representing that instruction
    */
-  def parseStype(tokens: Array[String]): Int = {
-    ???
+  def parseStype(tokens: Array[String], incrementType: Array[Int]): Int = {
+    import StypeInstruction._
+    require(tokens.length == 3, "S-type instructions must have exactly 3 tokens")
+
+    val lsString = tokens(0).split("\\.")(0)
+    val modString = tokens(0).split("\\.")(1)
+    val rsrdString = tokens(1)
+    val baseAddrString = tokens(2)
+
+    val ls = sLoadStore(lsString)
+    val mod = sMod(modString)
+    val rsrd = if(Seq(DOF,FDOF,VEC).contains(mod)) vReg(rsrdString) else xReg(rsrdString)
+    val baseAddr = sBaseAddr(baseAddrString)
+    val it = incrementType(0)
+
+    //Perform compatibility checks
+    if(ls == STORE && Seq(FCN,EDN1,EDN2).contains(mod)) {
+      throw new IllegalArgumentException(s"Cannot perform store operations with Stype modifier $modString")
+    } else if (ls == LOAD && mod == FDOF) {
+      throw new IllegalArgumentException(s"Cannot perform load operations with Stype modifier $modString")
+    } else if (Seq(DOF, FDOF).contains(mod) && Seq(X, XPHYS, XNEW, DC, DV).contains(baseAddr)) {
+      throw new IllegalArgumentException(s"Cannot perform dof/fdof operations to base address $baseAddrString")
+    } else if (Seq(ELEM, SEL, FCN, EDN1, EDN2).contains(mod) && !Seq(X, XPHYS, XNEW, DC, DV).contains(baseAddr)) {
+      throw new IllegalArgumentException(s"Cannot perform $modString operations to base address $baseAddrString")
+    } else if (it == NELEMSTEP && !Seq(SEL, FCN, EDN1, EDN2).contains(mod)) {
+      throw new IllegalArgumentException(s"Cannot perform $modString operations when increment type is 'nelemstep'")
+    } else if (it == NELEMDOF && !Seq(DOF, ELEM, FDOF).contains(mod)) {
+      throw new IllegalArgumentException(s"Cannot perform $modString operations when increment type is 'nelemdof'")
+    } else if (Seq(NELEMVEC, NDOF).contains(it) && mod != VEC) {
+      throw new IllegalArgumentException(s"Can only perform ld.vec and st.vec operations when increment type is 'nelemvec' or 'ndof'")
+    }
+
+    //TODO add error checking for dof/fdof loads on non-ndof long vectors and elem loads on ndof-long vectors
+
+    val fmt = STYPE
+    //Generate instruction
+    var instr: Int = 0
+    instr |= ls << LS_OFFSET
+    instr |= mod << MOD_OFFSET
+    instr |= fmt << FMT_OFFSET
+    instr |= rsrd << RSRD_OFFSET
+    instr |= baseAddr << BASEADDR_OFFSET
+    instr
   }
 
   def parsePseudoInstruction(tokens: Array[String]): Int = {
-    ???
+    throw new IllegalArgumentException("Pseudo-instruction decode is not support yet.")
   }
 
   /**
@@ -354,7 +431,7 @@ object Assembler {
     val comp = comparison(tokens(0))
     val rs1 = sReg(tokens(1))
     val rs2 = sReg(tokens(2))
-    val target = if(symbols.contains(tokens(3))) namedBranch() else offset2targets(tokens(3))
+    val target = if(symbols.contains(tokens(3))) namedBranch() else throw new IllegalArgumentException(s"Unrecognized label '${tokens(3)}'")
     val fmt = BTYPE
 
     var instr = 0
@@ -395,6 +472,11 @@ object Assembler {
     }
   }
 
+  def assemble(source: Source): Array[Int] = {
+    val lines = source.mkString
+    assemble(lines)
+  }
+
   /**
    * Assembles a program for the topological optimizer. Currently has limited error checking
    *
@@ -403,7 +485,7 @@ object Assembler {
    */
   def assemble(program: String): Array[Int] = {
     val prog = program.toLowerCase
-    val lines: Array[String] = prog.trim.split("\n") //Split at newlines
+    val lines: Array[String] = prog.trim.split("[\r\n]+") //Split at newlines
 
     var pc: Int = 0
     val symbols: scala.collection.mutable.Map[String, Int] = Map[String, Int]()
@@ -416,6 +498,7 @@ object Assembler {
     var pend = false
     var packetSize = 0
     var mac = false
+    val incrementType: Array[Int] = Array(0) //Using an array to allow modification and pass by reference
 
     val code = ListBuffer.empty[Int]
     assemblerPass(false)
@@ -436,13 +519,13 @@ object Assembler {
             case x if x.startsWith("//") => "" //Comment
             case x if x.trim().equals("") => "" //Blank line
             case symbolPattern(x) => if(!pass2) parseSymbol(symbols, pc, tokens)
-            case "pstart" => parseOtype(tokens)
-            case "estart" => parseOtype(tokens)
-            case "eend" => parseOtype(tokens)
-            case "pend" => parseOtype(tokens)
+            case "pstart" => parseOtype(tokens, incrementType)
+            case "estart" => parseOtype(tokens, incrementType)
+            case "eend" => parseOtype(tokens, incrementType)
+            case "pend" => parseOtype(tokens, incrementType)
 
-            case x if x.startsWith("st.") => parseStype(tokens)
-            case x if x.startsWith("ld.") => parseStype(tokens)
+            case x if x.startsWith("st.") => parseStype(tokens, incrementType)
+            case x if x.startsWith("ld.") => parseStype(tokens, incrementType)
 
             case x if x.startsWith("mvp") => parsePseudoInstruction(tokens)
             case x if x.startsWith("sqrt") => parsePseudoInstruction(tokens)
@@ -455,6 +538,7 @@ object Assembler {
             case x if x.startsWith("max.") => parseRtype(tokens)
             case x if x.startsWith("min.") => parseRtype(tokens)
             case x if x.startsWith("abs.") => parseRtype(tokens)
+            case x if x.startsWith("red.") => parseRtype(tokens)
 
             case x if x.startsWith("beq") => if(pass2) parseBtype(tokens, symbols, pc) else 0
             case x if x.startsWith("bne") => if(pass2) parseBtype(tokens, symbols, pc) else 0
@@ -512,6 +596,9 @@ object Assembler {
           estart = false
           eend = false
           mac = false
+          if(packetSize > INSTRUCTION_BUFFER_SIZE) {
+            throw new IllegalArgumentException(s"Instruction packet too large. Maximum size is $INSTRUCTION_BUFFER_SIZE, this packet is $packetSize instructions long")
+          }
           packetSize = 0
         }
         case "//" => return
@@ -530,7 +617,8 @@ object Assembler {
           } else if(x.contains("mac")) {
             mac = true
           }
-      }
+      } //TODO check packetsize
+
     }
     code.toArray[Int]
   }
@@ -553,7 +641,8 @@ object LitVals {
   val MIN = 0x07 //000111
   val ABS = 0x08 //001000
   val MUL = 0x10 //010000
-  val MAC = 0x18 //011000
+  val MAC = 0x11 //010001
+  val RED = 0x13 //010011
   val DIV = 0x20 //100000
 
   //R-type modifiers
@@ -569,14 +658,34 @@ object LitVals {
   val IMM = true
   val NOIMM = false
 
-  //S-type op
-  val LD = 0x0
-  val ST = 0x3
+  //S-type load/store flag
+  val LOAD = 0x0
+  val STORE = 0x3
 
   //S-type modifier
-  val VEC =  0x0
-  val DOF =  0x1
-  val ELEM = 0x3
+  val ELEM = 0x2
+  val EDN1 = 0x4
+  val EDN2 = 0x5
+  val FCN  = 0x6
+  val SEL = 0x7
+  val DOF  = 0x8
+  val FDOF = 0x9
+  val VEC = 0xc
+
+  //S-type base address
+  val X = 0
+  val XPHYS = 1
+  val XNEW = 2
+  val DC = 3
+  val DV = 4
+  val F = 5
+  val U = 6
+  val R = 7
+  val Z = 8
+  val P = 9
+  val Q = 10
+  val INVD = 11
+  val TMP = 12
 
   //O-type modifier
   val PACKET = 0x1
@@ -588,8 +697,10 @@ object LitVals {
 
   //O-type instruction length
   val NDOF = 0x0
-  val NELEM = 0x1
   val SINGLE = 0x2
+  val NELEMVEC = 0x4
+  val NELEMDOF = 0x5
+  val NELEMSTEP = 0x6
 
   //O-type increment type
   val LINEAR = 0x0

@@ -2,10 +2,13 @@ package vector
 
 import arithmetic._
 import chisel3._
+import chisel3.util.log2Ceil
+import pipeline.Opcode
+import utils.Config.{NDOFLENGTH, NUM_PROCELEM}
 import utils.Fixed._
 //import ProcElemOpcode._
 import chisel3.util.RegEnable
-import Opcode._
+import pipeline.Opcode._
 
 //Takes up 28/342 DSP blocks when used with 2 stage3-reps
 //Allows us to work with 12 of these bad-boys, aww yeah
@@ -30,17 +33,18 @@ class ProcessingElement extends Module {
   //Modules in use
   val mul = Module(FixedPointMul(utils.MulTypes.SINGLECYCLE))
   val div = Module(FixedPointDiv(utils.DivTypes.NEWTONRAPHSON))
-  val asu = Module(new FixedPointALU)
+  val alu = Module(new FixedPointALU)
 
-  //Multiplier and divider. Inputs and outputs up to middle register
+  // --- STAGE 1, MULTIPLIER AND DIVISION ---
   mul.io.in.a := in.a
   mul.io.in.b := in.b
-  mul.io.in.valid := in.valid && (in.op === MUL || in.op === MAC)
+  mul.io.in.valid := in.valid && (in.op === MUL || in.op === MAC || in.op === RED)
 
   div.io.in.numer := in.a
   div.io.in.denom := in.b
   div.io.in.valid := in.valid && in.op === DIV
 
+  // --- STAGE 2, ADD/SUB ---
   //Middle register stage. Default to taking multiplier output (useful for MAC operations)
   val mulDivRes = Mux(in.op === DIV, div.io.out.res, mul.io.out.res)
   val mulDivValid = Mux(in.op === DIV, div.io.out.valid, mul.io.out.valid)
@@ -49,41 +53,41 @@ class ProcessingElement extends Module {
   val tmp = RegNext(in)
 
 
-  //Add/sub and result register.
-  val asu_a = Wire(SInt(FIXED_WIDTH.W))
-  val asu_b = Wire(SInt(FIXED_WIDTH.W))
-  asu.io.in.a := asu_a
-  asu.io.in.b := asu_b
-  asu.io.in.op := tmp.op //All operations not SUB, MAX, MIn will add the operands
-  asu.io.in.valid := Mux(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN || tmp.op === ABS, tmp.valid, mulDivValidReg)
-  val resReg = RegEnable(asu.io.out.res, asu.io.out.valid && tmp.op === MAC)
-  val macLimit = RegInit(0.U(32.W))
-  val macCnt = RegInit(0.U(32.W))
+  // --- ARITHMETIC AND MAC RESULT REGISTER ---
+  val alu_a = Wire(SInt(FIXED_WIDTH.W))
+  val alu_b = Wire(SInt(FIXED_WIDTH.W))
+  alu.io.in.a := alu_a
+  alu.io.in.b := alu_b
+  alu.io.in.op := tmp.op //All operations not SUB, MAX, MIN, ABS will add the operands
+  alu.io.in.valid := Mux(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN || tmp.op === ABS, tmp.valid, mulDivValidReg)
+  val resReg = RegEnable(alu.io.out.res, alu.io.out.valid && (tmp.op === MAC || tmp.op === RED))
+  val macLimit = RegInit(0.U(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W))
+  val macCnt = RegInit(0.U(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W))
 
 
-  //Signal multiplexers for asu and result reg
+  //Signal multiplexers for alu and result reg
   when(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN || tmp.op === ABS) {
-    asu_a := tmp.a
-    asu_b := tmp.b
-  } .elsewhen(tmp.op === MAC) {
-    asu_a := Mux(macCnt === 0.U, 0.S(FIXED_WIDTH.W), resReg) //Resets resReg when restarting a MAC operation
-    asu_b := mulDivResultReg
+    alu_a := tmp.a
+    alu_b := tmp.b
+  } .elsewhen(tmp.op === MAC || tmp.op === RED) {
+    alu_a := Mux(macCnt === 0.U, 0.S(FIXED_WIDTH.W), resReg) //Resets resReg when restarting a MAC operation
+    alu_b := mulDivResultReg
   } .otherwise { //mul, div, other operations
-    asu_a := 0.S(FIXED_WIDTH.W)
-    asu_b := mulDivResultReg
+    alu_a := 0.S(FIXED_WIDTH.W)
+    alu_b := mulDivResultReg
   }
 
-  //macLimit is set when macCnt=0 and a MAC operation is started
-  //macCnt is updated on each operation where op=MAC and valid
+  //macLimit is set when macCnt=0 and a MAC or RED operation is started
+  //macCnt is updated on each operation where op=MAC or RED and valid
   macLimit := Mux(macCnt === 0.U, tmp.macLimit, macLimit)
-  macCnt := Mux(tmp.op === MAC && tmp.valid, Mux(macCnt === macLimit-1.U, 0.U, macCnt + 1.U), macCnt)
-  when(macCnt === macLimit-1.U && tmp.op === MAC && tmp.valid) {
+  macCnt := Mux((tmp.op === MAC || tmp.op === RED) && tmp.valid, Mux(macCnt === macLimit-1.U, 0.U, macCnt + 1.U), macCnt)
+  when(macCnt === macLimit-1.U &&  tmp.valid && (tmp.op === MAC || tmp.op === RED)) {
     //Reset result register after each MAC operation
     resReg := 0.S(FIXED_WIDTH.W)
   }
   //Outputs
-  io.out.res := asu.io.out.res
-  io.out.valid := Mux(tmp.op === MAC, macCnt === macLimit-1.U && asu.io.out.valid, asu.io.out.valid)
+  io.out.res := alu.io.out.res
+  io.out.valid := Mux(tmp.op === MAC || tmp.op === RED, macCnt === macLimit-1.U && alu.io.out.valid, alu.io.out.valid)
   io.out.op := tmp.op
 }
 
@@ -105,11 +109,10 @@ class ProcElemIO extends Bundle {
     /** Data valid signal. Should be asserted for one clock cycle when the operands are valid */
     val valid = Bool()
     /** Operation to perform. See [[ProcessingElement]] for the operations available */
-//    val op = UInt(ProcElemOpcode.OP_WIDTH.W)
     val op = Opcode()
     /** The number of multiply/accumulates to perform before the summation is finished and the output should be presented.
      * This value should be set in the same clock cycle as op=MAC and valid=true to set the internal register. */
-    val macLimit = UInt(32.W) //Magic number for right now
+    val macLimit = UInt(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W)
   }
 
   /**

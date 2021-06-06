@@ -18,7 +18,7 @@ class AddrGenMemSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     dut.io.in.bits.validIndices(index).poke(valid.B)
   }
 
-  def expectValue(dut: AddrGenMem, index: Int, value: Int, valid: Boolean = true, baseAddress: StypeBaseAddress.Type = KE): Unit = {
+  def expectValue(dut: AddrGenMem, index: Int, value: Int, valid: Boolean = true, baseAddress: StypeBaseAddress.Type = X): Unit = {
     val e = if(valid) (value + baseAddress.litValue.toInt).S else 0.S
     dut.io.out.bits.rdData(index).expect(e)
   }

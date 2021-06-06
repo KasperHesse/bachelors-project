@@ -15,6 +15,8 @@ class VecMemoryFSM extends Module {
     val vec = Decoupled(new AddressGenProducerIO)
     /** Current state of parent Thread module */
     val threadState = Input(ThreadState())
+    /** Current state of the other Thread module */
+    val otherThreadState = Input(ThreadState())
     /** Asserted on the final clock cycle of memory loads related to this instruction */
     val finalCycle = Output(Bool())
 
@@ -39,7 +41,7 @@ class VecMemoryFSM extends Module {
   /** Total number of times the index should be incremented on one instruction */
   val cntMax = (VREG_SLOT_WIDTH * (VREG_DEPTH/NUM_MEMORY_BANKS) - 1).U
   /** High signal when outputs should be driven */
-  val outputState = (io.threadState === sLoad || io.threadState === sStore) && state === sOutput
+  val outputState = (io.threadState === sLoad || io.threadState === sStore) && state === sOutput && io.instr.fmt === InstructionFMT.STYPE
 
   //Next state and cnt logic
   switch(state) {

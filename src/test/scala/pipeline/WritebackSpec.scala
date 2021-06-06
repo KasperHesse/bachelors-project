@@ -4,7 +4,6 @@ import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
-import vector.Opcode
 import chisel3.experimental.BundleLiterals._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
@@ -52,6 +51,33 @@ class WritebackSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.io.id.rd.reg.expect(rd.U)
       dut.io.id.rd.rf.expect(VREG)
     }
+  }
+
+  //tests xreg output when the instruction was of the type RedVV
+  def testRedVV(dut: Writeback): Unit = {
+    //Generate XREG_DEPTH inputs. Each output should be a reduced version of the inputs
+    val inputs = Seq.fill(XREG_DEPTH)(Seq.fill(NUM_PROCELEM)(genDouble()))
+    val fixedInputs = inputs.map(i => i.map(double2fixed))
+    val results = fixedInputs.map(i => i.reduce((a,b) => fixedAdd(a,b)))
+
+    dut.io.ex.valid.poke(true.B)
+    val rd = (new RegisterBundle).Lit(_.reg -> 1.U, _.rf -> XREG, _.rfUint -> XREG.litValue.U, _.subvec -> 0.U)
+    dut.io.ex.dest.poke(rd)
+    dut.io.ex.reduce.poke(true.B)
+    for(i <- 0 until XREG_DEPTH) {
+      for (j <- 0 until NUM_PROCELEM) {
+        dut.io.ex.res(j).poke(fixedInputs(i)(j).S)
+      }
+      dut.clock.step()
+    }
+    while(!dut.io.id.we.peek.litToBoolean) {
+      dut.clock.step()
+    }
+    for(i <- results.indices) {
+      dut.io.id.wrData(i).expect(results(i).S)
+    }
+    dut.io.id.rd.expect(rd)
+
   }
 
   /**
@@ -123,6 +149,14 @@ class WritebackSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     simulationConfig()
     test(new Writeback) {dut =>
       testSingle(dut, SREG, true)
+    }
+  }
+
+  it should "reduce the result on red.vv instructions" in {
+    simulationConfig()
+    seed("Writeback, red.vv", Some(1L))
+    test(new Writeback).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      testRedVV(dut)
     }
   }
 }

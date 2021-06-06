@@ -5,8 +5,8 @@ import chiseltest._
 import utils.Config
 import utils.Config._
 import utils.Fixed._
-import vector.{KEWrapper, Opcode}
-import vector.Opcode._
+import vector.KEWrapper
+import pipeline.Opcode._
 import org.scalatest.{FlatSpec, Matchers}
 
 package object pipeline {
@@ -159,6 +159,8 @@ package object pipeline {
     res
   }
 
+
+
   /**
    * Calculates the outcome of a branch instruction
    * @param a The first operand
@@ -191,18 +193,16 @@ package object pipeline {
     import RegisterFileType._
     import Opcode._
     val mod = instr.mod.litValue
-    if(mod == SS.litValue || (mod == SV.litValue && instr.op.litValue == MAC.litValue)) {
-      SREG
-    } else if (Seq(SX.litValue, XX.litValue).contains(mod)) {
-      XREG
-    } else if (Seq(XV.litValue, SV.litValue, KV.litValue).contains(mod)) {
-      VREG
-    } else if (mod == VV.litValue) {
-      if(instr.op.litValue == MAC.litValue) {
+    if(mod == SS.litValue ||
+      (mod == SV.litValue && instr.op.litValue == MAC.litValue) ||
+      (mod == XX.litValue && instr.op.litValue == RED.litValue) ||
+      (mod == VV.litValue && instr.op.litValue == MAC.litValue)) {
         SREG
-      } else {
-        VREG
-      }
+    } else if (Seq(SX.litValue, XX.litValue).contains(mod) ||
+      mod == VV.litValue && instr.op.litValue == RED.litValue) {
+        XREG
+    } else if (Seq(XV.litValue, SV.litValue, KV.litValue, VV.litValue).contains(mod)) {
+      VREG
     } else {
       throw new IllegalArgumentException("Could not calculate result register type")
     }
@@ -313,10 +313,23 @@ package object pipeline {
     val rs2 = instr.rs2.litValue.toInt
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
     val imm = getImmediate(instr)
-    for(i <- 0 until VREG_DEPTH) {
-      val a = vReg(rs1*VREG_SLOT_WIDTH+rdOffset)(i)
-      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(i)
-      results(i) = calculateRes(instr, a, b)
+
+    if(instr.op.litValue == RED.litValue) { //RED.VV instructions require special care
+      //Multiply all VREG_DEPTH values in each register slot, and them sum them together. Place into result register
+      for(s <- 0 until VREG_SLOT_WIDTH) {
+        results(s) = 0.S(FIXED_WIDTH.W)
+        for(e <- 0 until VREG_DEPTH) {
+          val a = vReg(rs1*VREG_SLOT_WIDTH+s)(e)
+          val b = vReg(rs2*VREG_SLOT_WIDTH+s)(e)
+          results(s) = fixedAdd(results(s), fixedMul(a,b))
+        }
+      }
+    } else {
+      for(i <- 0 until VREG_DEPTH) {
+        val a = vReg(rs1*VREG_SLOT_WIDTH+rdOffset)(i)
+        val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(i)
+        results(i) = calculateRes(instr, a, b)
+      }
     }
   }
 
@@ -416,16 +429,20 @@ package object pipeline {
 
   /**
    * Wraps a load instruction with pstart, estart, eend and pend instructions to make a valid instruction packet
-   * @param instrs The load instruction to wrap
-   * @return An array of UInts representing the instructions in the packet
+   * @param ldInstrs The load instructions to wrap
+   * @param stInstrs An Option holding the store instructions to wrap. If None is given, no store instructions are wrapped
+   * @return An array of instructions representing a full instruction packet
    */
-  def wrapLoadInstructions(instrs: Array[StypeInstruction]): Array[Bundle with Instruction] = {
-    val pstart = Array(OtypeInstruction(se=OtypeSE.START, pe = OtypePE.PACKET)).asInstanceOf[Array[Bundle with Instruction]]
-    val estart = OtypeInstruction(se=OtypeSE.START, pe=OtypePE.EXEC)
-    val eend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.EXEC)
-    val pend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.PACKET)
+  def wrapLoadStoreInstructions(ldInstrs: Array[StypeInstruction], stInstrs: Option[Array[StypeInstruction]] = None, len: OtypeLen.Type = OtypeLen.SINGLE): Array[Bundle with Instruction] = {
+    val pstart = Array(OtypeInstruction(se=OtypeSE.START, pe = OtypePE.PACKET, len)).asInstanceOf[Array[Bundle with Instruction]]
+    val estart = OtypeInstruction(se=OtypeSE.START, pe=OtypePE.EXEC).asInstanceOf[Bundle with Instruction]
+    val eend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.EXEC).asInstanceOf[Bundle with Instruction]
+    val pend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.PACKET).asInstanceOf[Bundle with Instruction]
 
-    val a = Array.concat(pstart, instrs.asInstanceOf[Array[Bundle with Instruction]], Array(estart, eend, pend).asInstanceOf[Array[Bundle with Instruction]])
-    a
+    if(stInstrs.isEmpty) {
+      Array.concat(pstart, ldInstrs.asInstanceOf[Array[Bundle with Instruction]], Array(estart, eend, pend))
+    } else {
+      Array.concat(pstart, ldInstrs.asInstanceOf[Array[Bundle with Instruction]], Array(estart, eend), stInstrs.get.asInstanceOf[Array[Bundle with Instruction]], Array(pend))
+    }
   }
 }

@@ -17,7 +17,7 @@ class VecWrapper extends Module {
 
   val reg = RegEnable(io.in.bits, io.out.ready)
   val valid = RegEnable(io.in.valid, io.out.ready)
-  io.out.valid := valid
-  io.out.bits := reg
+  io.out.valid := RegNext(valid) //We require a 2 cycle delay for correct functionality when performing st.vec
+  io.out.bits := RegNext(reg)
   io.in.ready := io.out.ready
 }

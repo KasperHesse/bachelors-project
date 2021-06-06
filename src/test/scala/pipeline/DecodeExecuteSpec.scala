@@ -4,7 +4,6 @@ import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
-import vector.Opcode
 import chisel3.experimental.BundleLiterals._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
@@ -294,7 +293,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     } else if (len.litValue == NDOF.litValue) {
       maxProgress = NDOFLENGTH
       progressIncr = ELEMS_PER_VSLOT
-    } else if (len.litValue() == NELEM.litValue()) {
+    } else if (len.litValue() == NELEMVEC.litValue()) {
       maxProgress = NELEMLENGTH
       progressIncr = ELEMS_PER_VSLOT
     } else {
@@ -370,9 +369,9 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
 
-  it should "perform a single MAC instruction on stored values" in {
+  it should "calculate a single MAC instruction on stored values" in {
     simulationConfig()
-    test(new DecodeExecute) {dut =>
+    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("Decode/execute single MAC instruction")
       val instrs = Array(genRtype(MAC, RtypeMod.VV))
       val ops = wrapInstructions(instrs)
@@ -387,8 +386,8 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     test(new DecodeExecute) {dut =>
       seed("Decode/execute sum instruction")
       val instrs = Array(genRtype(MAC, RtypeMod.SV))
-      val ops = wrapInstructions(instrs, OtypeLen.NDOF)
-      MAClength = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else ((NDOF/ELEMS_PER_VSLOT)+1)*ELEMS_PER_VSLOT
+      val ops = wrapInstructions(instrs, OtypeLen.NELEMVEC)
+      MAClength = NELEMLENGTH
       loadInstructions(ops, dut)
       test(dut, instrs)
     }
@@ -400,20 +399,21 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("Decode/execute postpone MAC results")
       val instrs = Array(genRtype(MAC, RtypeMod.VV), genRtype(ADD, RtypeMod.VV))
-      val ops = wrapInstructions(instrs, OtypeLen.NELEM)
+      val ops = wrapInstructions(instrs, OtypeLen.NELEMVEC)
       MAClength = NELEMLENGTH
       loadInstructions(ops, dut)
-      test(dut, instrs, OtypeLen.NELEM)
+      test(dut, instrs, OtypeLen.NELEMVEC)
     }
   }
 
   it should "decode and execute a dot product (MAC.VV)" in {
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      dut.clock.setTimeout(500)
       seed("Decode/execute dot product")
       val instrs = Array(genRtype(MAC, RtypeMod.VV))
-      val ops = wrapInstructions(instrs, OtypeLen.NELEM)
-      MAClength = NELEMLENGTH
+      val ops = wrapInstructions(instrs, OtypeLen.NDOF)
+      MAClength = NDOFLENGTH
       loadInstructions(ops, dut)
       test(dut, instrs) //Testing with length SINGLE since we only expect one output. It will still swap threads
     }
@@ -426,9 +426,9 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       // On each thread swap, progress counter should increment by that amount
       seed("Decode/execute NELEM long instruction")
       val instrs = Array(genRtype(MAC, RtypeMod.KV), genRtype(MUL, RtypeMod.XX))
-      val ops = wrapInstructions(instrs, OtypeLen.NELEM)
+      val ops = wrapInstructions(instrs, OtypeLen.NELEMVEC)
       loadInstructions(ops, dut)
-      test(dut, instrs, OtypeLen.NELEM)
+      test(dut, instrs, OtypeLen.NELEMVEC)
     }
   }
 
@@ -480,7 +480,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  it should "execute VV V3" in {
+  it should "decode and execute VV instructions" in {
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("VV decode execute")
@@ -489,7 +489,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  it should "decode execute XV instructions V3" in {
+  it should "decode and execute XV instructions" in {
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       seed("XV decode/execute")
@@ -543,19 +543,10 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  it should "decode and execute a random instruction mix V3" in {
-    simulationConfig()
-    test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      seed("Decode/execute random mix")
-      val instrs = genAndPoke(dut)
-      test(dut, instrs)
-    }
-  }
-
   it should "decode and execute a random instruction mix" in {
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      seed("Decode/execute random mix", seed=Some(2L))
+      seed("Decode/execute random mix")
       val instrs = genAndPoke(dut)
       test(dut, instrs)
     }

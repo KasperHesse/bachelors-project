@@ -1,8 +1,8 @@
 package arithmetic
 
 import chisel3._
+import pipeline.Opcode
 import utils.Fixed._
-import vector.Opcode
 
 /**
  * A simple fixed point ALU which works on [[utils.Fixed.FIXED_WIDTH]]-bit values. Implements [[ASUIO]].

@@ -46,17 +46,17 @@ class Decode extends Module {
   /** State register */
   val state = RegInit(DecodeState.sIdle)
   /** Instruction buffer */
-  val iBuffer = RegInit(VecInit(Seq.fill(32)(0.U(INSTRUCTION_WIDTH.W))))
+  val iBuffer = RegInit(VecInit(Seq.fill(INSTRUCTION_BUFFER_SIZE)(0.U(INSTRUCTION_WIDTH.W))))
   /** Instruction pointer, used when filling iBuffer */
   val IP = RegInit(0.U(4.W))
   /** Number of instructions in iBuffer */
   val iCount = RegInit(0.U(4.W))
-  /** Progress when accessing vectors in linear fashion */
+  /** Progress when accessing vectors / the number of elements that have been loaded so far. */
   val progress = RegInit(0.U(log2Ceil(NDOF+ELEMS_PER_VSLOT+1).W))
-  /** Total number of operations to issue before instructions are finished */
+  /** Total number of operations to issue before instructions are finished / total number of elements to load */
   val maxProgress = RegInit(0.U(log2Ceil(NDOF+ELEMS_PER_VSLOT+1).W))
   /** The value by which progress counter should increment on every thread swap */
-  val progressIncr = RegInit(0.U(log2Ceil(NDOF*VREG_DEPTH*VREG_SLOT_WIDTH+1).W))
+  val progressIncr = RegInit(0.U(log2Ceil(ELEMS_PER_VSLOT+1).W))
   /** ID of thread which is currently accessing the execute stage */
   val execThread = RegInit(1.U(1.W))
   /** ID of thread which is currently accessing memory */
@@ -66,11 +66,28 @@ class Decode extends Module {
   /** Length of the current instruction */ //iBuffer(0) always holds an O-type instruction indicating packet length
   val instrLen = iBuffer(0).asTypeOf(new OtypeInstruction).len
 
-  private val VV = VREG_SLOT_WIDTH*VREG_DEPTH
-  /** LUT to decode vector lengths given in istart */
-  val lenDecode = VecInit(Array(NDOFLENGTH.U, NELEMLENGTH.U, 1.U))
+  /** LUT to decode instruction lengths given in pstart */
+  val lenDecode = VecInit(Array(
+    NDOFLENGTH.U, //len == NDOF
+    1.U, //Len is invalid
+    1.U, //len == SINGLE
+    1.U, //len is invalid
+    leastMultiple(ELEMS_PER_VSLOT, NELEMSIZE).U, //len == NELEMVEC
+    leastMultiple(XREG_DEPTH, NELEM).U, //len == NELEMDOF
+    NELEM.U, //len == NELEMSTEP
+    1.U //len is invalid
+  ))
   /** LUT mapping instruction length to progress increment */
-  val incrDecode = VecInit(Array(VV.U, VV.U, 1.U))
+  val incrDecode = VecInit(Array(
+    ELEMS_PER_VSLOT.U, //len == NDOF
+    1.U, //len is invalid
+    1.U, //len == SINGLE
+    1.U, //Len is invalid
+    ELEMS_PER_VSLOT.U, //len == NELEMVEC
+    XREG_DEPTH.U, //len == NELEMDOF
+    1.U, //len == NELEMSTEP
+    1.U //len is invalid
+  ))
   //When performing NDOF loads, we access VREG_DEPTH*VREG_SLOT_WIDTH elements per thread.
   //When performing i,j,k-based loads, we only load VREG_SLOT_WIDTH elements per thread.
   /** Current states of our threads */
@@ -121,7 +138,6 @@ class Decode extends Module {
 
   //Debug connections. TODO: Remove these
   io.ctrl.stateUint := state.asUInt()
-//  io.mem <> threads(0).io.mem
 
   //Assign shared resources to threads
   when(execThread === 0.U) {
@@ -139,16 +155,10 @@ class Decode extends Module {
     //Thread 1 accesses mem stage
     threads(1).io.mem <> io.mem
     threads(1).io.wb <> io.memWb
-//    threads(1).io.wb.rd := (new RegisterBundle).Lit(_.reg -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U, _.subvec -> 0.U)
-//    threads(1).io.wb.we := false.B
-//    threads(1).io.wb.wrData := DontCare
   } .otherwise {
     //Thread 0 accesses mem stage
     threads(0).io.mem <> io.mem
     threads(0).io.wb <> io.memWb
-//    threads(0).io.wb.we := false.B
-//    threads(0).io.wb.rd := (new RegisterBundle).Lit(_.reg -> 0.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U, _.subvec -> 0.U)
-//    threads(0).io.wb.wrData := DontCare
 
     //Thread 1 accesses execute and wb stage
     threads(1).io.ex <> io.ex
@@ -179,7 +189,7 @@ class Decode extends Module {
         iCount := IP
         start := true.B
 
-        maxProgress := lenDecode(instrLen.asUInt())
+        maxProgress := lenDecode(instrLen.asUInt()) //TODO ugly code, introduce some kind of error checking here?
         progressIncr := incrDecode(instrLen.asUInt())
         progress := 0.U
       }
@@ -189,7 +199,7 @@ class Decode extends Module {
       val swapThreads = (threadStates(memThread) === ThreadState.sEstart || threadStates(memThread) === ThreadState.sWait2)
           .&& (threadStates(execThread) === ThreadState.sEend || threadStates(execThread) === ThreadState.sWait1)
 
-      when(swapThreads) {
+      when(swapThreads) { //Progress is incremented whenever memThread moves from estart to exec
         progress := Mux(progress >= maxProgress, progress, progress + progressIncr)
         execThread := memThread
         memThread := execThread

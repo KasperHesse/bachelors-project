@@ -4,7 +4,7 @@ import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
-import vector.{KEWrapper, Opcode}
+import vector.KEWrapper
 import chisel3.experimental.BundleLiterals._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
@@ -18,6 +18,16 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   var xReg: Array[Array[SInt]] = _
   var vReg: Array[Array[SInt]] = _
   var MAClength: Int = _
+
+  /**
+   * Verifies that two fixed-point numbers represent the same value, to within some margin of error
+   * @param a The first value
+   * @param b The second value
+   * @param delta Maximum allowed deviation (not inclusive)
+   */
+  def assertEquals(a: SInt, b: SInt, delta: Double = 0.01): Unit = {
+    assert(math.abs(fixed2double((a.litValue-b.litValue).toLong)) < delta, s"[a=$a (${fixed2double(a)}), b=$b (${fixed2double(b)})]")
+  }
 
 
   /**
@@ -127,6 +137,21 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   /**
+   * Calculates the result of a red.xx instruction
+   * @param instr The instruction
+   * @param results The results registers
+   */
+  def calculateRedXXresult(instr: RtypeInstruction, results: Array[SInt]): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    for(i <- 0 until XREG_DEPTH) {
+      val a = xReg(rs1)(i)
+      val b = xReg(rs2)(i)
+      results(0) = fixedAdd(results(0), fixedMul(a,b))
+    }
+  }
+
+  /**
    * Expects the output of an instruction going into vector register file
    * @param dut The DUT
    * @param results Result buffer
@@ -164,23 +189,22 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       calculateSXresult(instr, results, sReg, xReg)
     } else if (instr.mod.litValue == RtypeMod.XX.litValue) {
       calculateXXresult(instr, results, xReg)
+    } else if (instr.mod.litValue == RtypeMod.VV.litValue) {
+      calculateVVresult(instr, results, 0.U, vReg) //Setting rd == 0 since we know all of the expected output data
     } else {
       throw new IllegalArgumentException("Cannot decode modtype with result being xreg")
     }
     dut.io.wb.rd.rf.expect(RegisterFileType.XREG)
     dut.io.wb.rd.subvec.expect(0.U)
     for (i <- 0 until NUM_PROCELEM) {
-      assert(math.abs(fixed2double((dut.io.wb.wrData(i).peek.litValue - results(i).litValue).toLong)) < 1e-2)
+      assertEquals(dut.io.wb.wrData(i).peek, results(i))
+//      assert(math.abs(fixed2double((dut.io.wb.wrData(i).peek.litValue - results(i).litValue).toLong)) < 1e-2)
       results(i) = dut.io.wb.wrData(i).peek
     }
     for (i <- NUM_PROCELEM until VREG_DEPTH) {
       dut.io.wb.wrData(i).expect(0.S)
     }
   }
-
-
-
-
 
   /**
    * Expects the output of an instruction going into scalar register file
@@ -196,17 +220,16 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       calculateDOTresult(instr, results)
     } else if(mod == RtypeMod.SV.litValue) {
       calculateSUMresult(instr, results)
+    } else if(mod == RtypeMod.XX.litValue) {
+      calculateRedXXresult(instr, results)
     } else {
       throw new IllegalArgumentException("R-type mod not recognized")
     }
     dut.io.wb.rd.rf.expect(RegisterFileType.SREG)
     dut.io.wb.rd.subvec.expect(0.U)
+    assertEquals(dut.io.wb.wrData(0).peek, results(0))
     for(i <- 0 until NUM_PROCELEM) {
-      assert(math.abs(fixed2double((dut.io.wb.wrData(i).peek.litValue - results(i).litValue).toLong)) < 1e-2)
       results(i) = dut.io.wb.wrData(i).peek
-    }
-    for (i <- NUM_PROCELEM until VREG_DEPTH) {
-      dut.io.wb.wrData(i).expect(0.S)
     }
   }
 
@@ -245,15 +268,15 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
    * @param dut The DUT
    * @param instrs The instructions to be used
    */
-  def test(dut: DecExWb, instrs: Array[RtypeInstruction]): Unit = {
-    val ops = wrapInstructions(instrs)
+  def test(dut: DecExWb, instrs: Array[RtypeInstruction], len: OtypeLen.Type = OtypeLen.SINGLE): Unit = {
+    val ops = wrapInstructions(instrs, len)
     loadInstructions(ops, dut)
     setRegisters(dut)
     val results = Array.fill(VREG_DEPTH)(0.S(FIXED_WIDTH.W))
 
     for(instr <- instrs) {
       println(instr)
-      //Every time a result is generated, store it. Only check VREG results for correctness every once in a while?
+      //Every time a result is generated, store it.
       waitForResult(dut, instr)
       //Update variables
       expectAndUpdate(dut, results, instr)
@@ -283,12 +306,30 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
+  it should "execute a red.vv instruction and get the result in an x-register" in {
+    simulationConfig()
+    test(new DecExWb).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      seed("DecExWb red.vv")
+      val instrs = Array(RtypeInstruction(0, 1, 2, RED, RtypeMod.VV))
+      test(dut, instrs, OtypeLen.NELEMDOF)
+    }
+  }
+
   "DecExWbSpec" should "execute an SREG instruction and store the result" in {
     simulationConfig()
     test(new DecExWb).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       seed("DecExWb SREG store result")
       val instrs = Array(RtypeInstruction(0, 0, 1, ADD, RtypeMod.SS), RtypeInstruction(0, 0, 1, ADD, RtypeMod.SS))
       test(dut, instrs)
+    }
+  }
+
+  it should "execute a red.xx instruction and get the result as a scalar" in {
+    simulationConfig()
+    test(new DecExWb).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      seed("DecExWb red.xx", Some(1L))
+      val instrs = Array(RtypeInstruction(1, 2, 3, RED, RtypeMod.XX))
+      test(dut, instrs, OtypeLen.NELEMSTEP)
     }
   }
 

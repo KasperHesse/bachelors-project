@@ -95,7 +95,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
    * @param indices The indices to poke. If indices.length < NUM_MEMORY_BANKS, the remaining indices are set false
    * @param baseAddr The base address to load from.
    */
-  def pokeVec(dut: MemoryStage, indices: Seq[Int], baseAddr: StypeBaseAddress.Type = StypeBaseAddress.KE): Unit = {
+  def pokeVec(dut: MemoryStage, indices: Seq[Int], baseAddr: StypeBaseAddress.Type = StypeBaseAddress.X): Unit = {
     for(i <- indices.indices) {
       dut.io.id.vec.bits.indices(i).poke(indices(i).U)
       dut.io.id.vec.bits.validIndices(i).poke(true.B)
@@ -205,37 +205,6 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   }
 
   /**
-   * Performs the logic necessary for a ld.dof operation
-   * @param dut The DUT
-   * @param pad Whether to assert the 'pad' flag or not
-   */
-  def performLdDof(dut: MemoryStage, pad: Boolean): Unit = {
-    val ijk = genIJK()
-    val edof = getEdof(ijk(0), ijk(1), ijk(2))
-    val rdReg = scala.util.Random.nextInt(NUM_VREG_SLOTS)
-    val rd = (new RegisterBundle).Lit(_.reg -> rdReg.U, _.rf -> RegisterFileType.VREG, _.rfUint -> 0.U, _.subvec -> 0.U)
-    val baseAddr = randomElement(baseAddresses)
-    def expData = if(pad) Seq.fill(24)(0L) else calculateExpectedData(edof, baseAddr)
-
-    var pokeCnt = 0
-    var readCnt = 0
-    while(readCnt < 1) {
-      if (pokeCnt == 0) pokeIJK(dut, ijk, baseAddr, pad=pad) else dut.io.id.neighbour.valid.poke(false.B)
-      pokeReadQueue(dut, rd, ijk(3), DOF)
-      if ((dut.io.id.neighbour.ready.peek.litToBoolean || pokeCnt > 0) && pokeCnt < 3) { //As soon as pokeCnt > 0, we have latched in ijk-values. Keep incrementing to poke readQueue thrice
-        pokeCnt += 1
-      } else {
-        dut.io.id.readQueue.valid.poke(false.B)
-      }
-      dut.clock.step()
-      if (dut.io.wb.we.peek.litToBoolean) {
-        expectData(dut, expData, rd)
-        readCnt += 1
-      }
-    }
-  }
-
-  /**
    * Performs some generic setup on the ready/valid interfaces of the memory stage, to make later processing easier
    * @param dut
    */
@@ -261,51 +230,6 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   }
 
   /**
-   * Generates an IJK input bundle for poking onto the DUT
-   * @param IJK An Option holding the IJK coordinates of the instruction. If None is given, generates a random ijk-coordinate pair. Defaults to None
-   * @param baseAddress An Option holding the base address of the instruction. If None is given, selects a random base address. Defaults to None
-   * @param pad Padding flag
-   * @param mod S-type modifier for the instruction
-   * @return An IJKGeneratorConsumerIO Bundle, ready to poke onto the IJK input port of the memory stage
-   */
-  def genIJKinput(IJK: Option[Array[Int]] = None, baseAddress: Option[StypeBaseAddress.Type] = None, pad: Boolean, mod: StypeMod.Type): IJKgeneratorConsumerIO = {
-    val ijk = IJK match {
-      case Some(x) => x
-      case None => genIJK()
-    }
-    val baseAddr = baseAddress match {
-      case Some(x) => x
-      case None => randomElement(baseAddresses)
-    }
-    val ijkBundle = (new IJKBundle).Lit(_.i -> ijk(0).U, _.j -> ijk(1).U, _.k -> ijk(2).U)
-    (new IJKgeneratorConsumerIO).Lit(_.baseAddr -> baseAddr, _.ijk -> ijkBundle, _.pad -> pad.B, _.mod -> mod)
-  }
-
-//  /**
-//   * Generates a number of VEC input bundles for poking onto the DUT. Given 24 indices into a vector, this method
-//   * returns a sequence of 3 bundles that can be used to execute that load operation.
-//   * @param indices The 24 indices to load data from
-//   * @param baseAddress The encoded base address from which data should be loaded
-//   * @return A Seq containing 3 bundles that represent the desired loads
-//   */
-  //This won't work until Chisel 3.5 when vec literals are introduced
-//  def genVecInput(indices: Seq[Int], baseAddress: Option[StypeBaseAddress.Type]): Seq[AddressGenProducerIO] = {
-//    val baseAddr = baseAddress match {
-//      case Some(x) => x
-//      case None => randomElement(baseAddresses)
-//    }
-//    val seq = Seq.fill(3)((new AddressGenProducerIO).Lit(_.baseAddr -> baseAddr))
-//    for(i <- 0 until 2) {
-//      for(j <- 0 until 8) {
-//        val ind = indices.slice(i*8, (i+1)*8)
-//        seq(i).indices
-//        seq(i).indices(j) = ind(j).U
-//        seq(i).validIndices(j) = true.B
-//      }
-//    }
-//  }
-
-  /**
    * Forks a new thread which will poll for we to be asserted, and then expects the given data on the output
    * @param dut The DUT
    * @param expData The output data to be expected
@@ -326,8 +250,8 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     s.zipWithIndex.collect {case (e,i) if ((i+1)%n) == 0 => e}
   }
 
-  val annos = Seq.empty[firrtl.annotations.Annotation]
-//  val annos = Seq(WriteVcdAnnotation)
+//  val annos = Seq.empty[firrtl.annotations.Annotation]
+  val annos = Seq(WriteVcdAnnotation)
 
   it should "perform a ld.vec" in {
     simulationConfig(true)
@@ -336,11 +260,22 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
       setupClock(dut)
       dut.clock.setTimeout(20)
-      performLdVec(dut)
 
-//      val indices = Seq.tabulate(VREG_SLOT_WIDTH)(n => Seq.range(VREG_SLOT_WIDTH*n,VREG_SLOT_WIDTH*(n+1)))
-//      val baseAddress = randomElement(baseAddresses)
-//      val vec = indices.map(a => genVecInput)
+      val baseAddress = randomElement(baseAddresses)
+      val readIndices = Seq.tabulate(ELEMS_PER_VSLOT/NUM_MEMORY_BANKS)(n => Seq.range[Long](n*NUM_MEMORY_BANKS, (n+1)*NUM_MEMORY_BANKS))
+      val rdq = Seq.tabulate(VREG_SLOT_WIDTH)(n => Seq.fill(3)(genReadQueueBundle(reg=n, rf=VREG, iter=0, mod=VEC))).flatten //iteration value is don'tcare in this scenario
+      val expectIndices = Seq.tabulate(VREG_SLOT_WIDTH)(n => Seq.range(n*VREG_DEPTH, (n+1)*VREG_DEPTH))
+      val expData = expectIndices.map(e => calculateExpectedData(e, baseAddress))
+
+      dut.io.id.ls.poke(StypeLoadStore.LOAD)
+      fork {
+        for(ri <- readIndices) {
+          enqueueVec(dut.io.id.vec, dut.clock, ri, baseAddress)
+        }
+      } .fork {
+        dut.io.id.readQueue.enqueueSeq(rdq)
+      }
+      (expData, takeNth(rdq, 3)).zipped.foreach((e,r) => waitAndExpect(dut, e, r.rd))
     }
   }
 
@@ -484,6 +419,58 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     }
   }
 
+  it should "perform a st.fdof" in {
+    simulationConfig(true)
+    initMemory()
+    seed("Memory stage st.fdof")
+    test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
+      setupClock(dut)
+      dut.clock.setTimeout(20)
+      val baseAddress = randomElement(baseAddresses)
+
+      val ijk = genIJKmultiple(start=Some(Array(0,4,2))) //Choosing these start coordinates will allow us to observe indices where DOF's are stored, and indices where they are not
+      val wrInstrs = ijk.map(e => genIJKinput(IJK=Some(e), pad=false, mod=FDOF, baseAddress=Some(baseAddress)))
+      val rdInstrs = ijk.map(e => genIJKinput(IJK=Some(e), pad=false, mod=DOF, baseAddress=Some(baseAddress)))
+      val rdq = Seq.tabulate(XREG_DEPTH)(n => Seq.fill(3)(genReadQueueBundle(reg=n, rf=VREG, iter=ijk(n)(3), mod=DOF))).flatten
+      val edof = getEdof(wrInstrs)
+      val expData = edof.map(e => calculateExpectedData(e, baseAddress).toArray)
+      //Storing all 1s for simplicity's sake
+      val wrData = Seq.fill(ELEMS_PER_VSLOT/NUM_MEMORY_BANKS)(Seq.fill(NUM_MEMORY_BANKS)(1L))
+      //Iterate through expData and ijk together. If ijk(0) == 0, set expData 0-3, 8-11 and 16-19 to 1's, otherwise keep intact
+      for(j <- expData.indices) {
+        val e = expData(j)
+        val i = ijk(j)
+        if(i(0) == 0) {
+          for(k <- 0 until 3) {
+            for(l <- 0 until 4) {
+              e(k*NUM_MEMORY_BANKS+l) = 1
+            }
+          }
+        }
+      }
+      //Write
+      dut.io.id.ls.poke(StypeLoadStore.STORE)
+      fork {
+        dut.io.id.edof.enqueueSeq(wrInstrs)
+      } .fork {
+        for(wd <- wrData) {
+          pokeWriteQueue(dut.io.id.writeQueue, dut.clock, wd, FDOF, 0)
+        }
+      }.join
+      while(dut.io.ctrl.wqCount.peek.litValue() > 0) {
+        dut.clock.step()
+      }
+      //read
+      dut.io.id.ls.poke(StypeLoadStore.LOAD)
+      fork {
+        dut.io.id.edof.enqueueSeq(rdInstrs)
+      } .fork {
+        dut.io.id.readQueue.enqueueSeq(rdq)
+      }
+      (expData, takeNth(rdq, 3)).zipped.foreach((e,r) => waitAndExpect(dut, e, r.rd))
+    }
+  }
+
   it should "perform a ld.elem" in {
     simulationConfig(true)
     initMemory()
@@ -494,10 +481,10 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       dut.clock.setTimeout(20)
       //Generate ijk-values and their corresponding iteration numbers. Poke this onto the DUT in a linear fashion
       val ijkVals = genIJKmultiple()
-      val ijk = ijkVals.map(a => genIJKinput(Some(a), Some(StypeBaseAddress.KE), pad=false, mod=ELEM))
+      val ijk = ijkVals.map(a => genIJKinput(Some(a), Some(StypeBaseAddress.X), pad=false, mod=ELEM))
       //Indices accessed are based on iteration values
       val rdq = ijkVals.map(a => genReadQueueBundle(reg=0, rf=XREG, iter=a(3), mod=ELEM))
-      val expData = calculateExpectedData(ijkVals.map(elementIndex), baseAddr = KE)
+      val expData = calculateExpectedData(ijkVals.map(elementIndex), baseAddr = X)
 
       //Poke input data and read queue
       fork {

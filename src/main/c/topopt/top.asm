@@ -14,11 +14,13 @@
     add.is s7, s0, FW_CENTRAL //filterweight for myself
     add.is s8, s0, FW_FACE //filterweight for face neighbours
     add.is s9, s0, FW_EDGE //filterweight for edge neighbours
+    mul.sx x7, s0, x7 //Reset x7
+    add.ix x7, x7, 1 //x7=1
     eend
     pend
 
     //perform computation
-    pstart nelem (ijk)
+    pstart nelemstep
     ld.fcn x1, X  //x1 = face neighbour values
     ld.edn1 x2, X //x2 = edge neighbour value
     ld.edn2 x3, X //x3 = edge neighbour values
@@ -28,14 +30,14 @@
         mul.ix x2, x2, FW_EDGE //multiply edge-neighbours with filterweights
         mul.ix x3, x3, FW_EDGE //multiply more edge-neighbours with filterweights
         mul.ix x4, x4, FW_CENTRAL //multiply central element with filterweight
-        mac.ix s2, x1, 1 //sum all face neighbours
-        mac.ix s3, x2, 1 //sum all edge neighbours
-        mac.ix s4, x3, 1 //sum more edge neighbours
-        mac.ix s5, x4, 1 //Sum central cell
+        red.xx s2, x1, x7 //sum/reduce all face neighbours
+        red.xx s3, x2, x7 //sum/reduce all edge neighbours
+        red.xx s4, x3, x7 //sum/reduce more edge neighbours
+        red.xx s5, x4, x7 //Sum/reduce central cell
         add.ss s3, s2, s3 //sum face and some edge neighbours
         add.ss s3, s3, s4 //add remaining edge neighbours
         add.ss s3, s3, s5 //add central element, s3=out[e1]
-        uns.ss s4, x1 //s4 = unityScale[x1]
+        uns.ss s4, x1 //s4 = unityScale[x1] //unityscale implemented by divisions, multiplication with filterweights and reduction
         div.ss s3, s3, s4 // out[e1] /= unityScale
         mul.sx x1, s0, x1 //Zero out x1
         add.sx x1, x3, x1 //Copy s-value into x1 for storage
@@ -57,11 +59,13 @@
     add.is s7, s0, FW_CENTRAL //filterweight for myself
     add.is s8, s0, FW_FACE //filterweight for face neighbours
     add.is s9, s0, FW_EDGE //filterweight for edge neighbours
+    mul.sx x7, s0, x7 //Clear x7
+    add.ix x7, x7, 1 //x7=1
     eend
     pend
 
     //perform computation 1
-    pstart nelem (ijk)
+    pstart nelemstep
     ld.sel s1, X //s1 = v[e1]
     estart
     uns.ss s4, x1 //s4 = unityScale
@@ -70,16 +74,26 @@
     st.sel s1, TMP
 
     //perform computation 2
-    pstart nelem (ijk)
+    pstart nelemstep
     ld.fcn x1, TMP
-    ld.edn x2, TMP
-    ld.sel s1, TMP
+    ld.edn1 x2, TMP
+    ld.edn2 x3, TMP
+    ld.sel x4, TMP
     estart
     mul.ix x1, x1, FW_FACE //multiply face-neighbours with filterweights
     mul.ix x2, x2, FW_EDGE //multiply edge-neighbours with filterweights
-    mul.is s1, s1, FW_CENTRAL //multiply central with filterweight
-    mac.sx s2, x3, s1 //sum all face neighbours
-    mac.sx s3, x4, s1 //sum all edge neighbours
+    mul.ix x3, x3, FW_EDGE //multiply more edge neighbour with filterweights
+    mul.ix x3, x3, FW_CENTRAL //multiply central with filterweight
+    red.xx s2, x2, x7 //sum/reduce some edge neighbours
+    red.xx s3, x3, x7 //sum/reduce remaning edge neighbours
+    add.ss s2, s2, s3 //add all edge neighbours
+    red.xx s3, x1, x7 //sum/reduce face neighbours
+    add.ss s2, s2, s3 //add face neighbours to edge neighbours
+    red.xx s3, x4, x7 //Sum/reduce central element
+    add.ss s2, s2, s3 //Add central element
+    red.xx s2, x3, s1 //sum all face neighbours
+    red.xx s3, x4, s1 //sum all edge neighbours
+    add.ss s2, s2, s3 //Add face and some edge neighbours
     add.ss s3, s2, s3 //sum all neighbours
     add.ss s3, s3, s1 //add central element, s3=v[e1]
     eend
@@ -98,7 +112,7 @@
     eend
     pend
 
-    pstart nelem
+    pstart nelemdof
     ld.dof v1, U
     ld.dof v2, Q
     ld.ele x1, X
@@ -127,7 +141,7 @@
     eend
     pend
 
-    pstart nelem
+    pstart nelemdof
     ld.dof v2, INVD
     ld.ele x1, X
     estart
@@ -150,12 +164,12 @@
     const E0 1
     const EMIN 1e-6
 
-    pstart nelem (ijk)
+    pstart nelemdof
     ld.dof v1, U
     ld.ele x1, X
     estart
     mac.kv v2, v1 //tmp = ke*ulocal
-    mac.vv x2, v1, v2 //clocal += u_local*tmp, mac into x-registers
+    red.vv x2, v1, v2 //clocal += u_local*tmp, reduction into x-registers
     mul.xx x1, x1, x1 //x1 = pow(x,2)
     add.is s1, s0, -PENAL //s1 = -3
     add.is s2, s0, E0 //s2 = e0
@@ -267,7 +281,8 @@
     add.is s10, s0, 1
     eend
     pend
-    pstart nedof
+
+    pstart ndof
     ld.vec v0, INVD
     estart
     div.sv v0, s10, v0 //v0 = 1/v0
@@ -397,7 +412,7 @@
     st.vec v0, U
 
     //populate design space
-    pstart nelem (linear)
+    pstart nelemvec
     estart
     add.iv v0, VOLFRAC
     add.iv v1, 1
@@ -412,6 +427,8 @@
     estart
     add.ss s1, s0, s0 //loop
     add.is s1, s0, 1 //change
+    eend
+    pend
 
     TOP3DCG:
     pstart single
@@ -424,13 +441,7 @@
     getComplianceAndSensitivity()
     applyDensityFilterGradient()
 
-    pstart single //load 1 for next operation
-    estart
-    add.is s2, 0, 1 //s2=1
-    eend
-    pend
-
-    pstart nelem (linear) //calculate sum of xphys
+    pstart nelemvec //calculate sum of xphys
     ld.vec v0, XPHYS
     estart
     mac.iv s4, v0, 1 //sum(xphys)
@@ -478,7 +489,7 @@
     eend
     pend
 
-    pstart nelem (linear)
+    pstart nelemvec
     ld.vec v0, X
     ld.vec v1, dc
     ld.vec v2, dv
@@ -497,6 +508,8 @@
     sub.vv v3, v1, v0 //v3 = xnew-x
     mac.vv s8, v2, v3 //s8 = dotProduct(dv, (xnew-x))
     add.ss s14, s14, s8 //gt += above
+    eend
+    pend
 
     blt s14, s0, GTNEG
     pstart single
@@ -523,7 +536,7 @@
     eend
     pend
 
-    pstart nelem
+    pstart nelemvec
     ld.vec v0, X
     ld.vec v1, XNEW
     estart
@@ -531,14 +544,15 @@
     abs.vv v0, v0 //v0 = abs(x-xnew)
     max.vv v2, v0, v2 //v2 = max(change, abs(x-xnew))
     eend
+    st.vec v1, X //x[i] = xnew[i]
     pend
 
     //To see if all 'change' value were less than 0.02,
     //we take max of all 'change' values and 0.02
     //if sum of vector is equal to ELEMS_PER_VSLOT*0.02, all values were less than 0.02
-    pstart single
+    pstart single //Using single to only operate on stored values. //TODO this won't work right now, as the previous op stores values in both thread 0 and 1, whereas this will only operate on thread 0
     estart
-    max.sv v2, v2, 0.02
+    max.iv v2, v2, 0.02
     mac.sv s13, s12, v2 //sum all values in v2
     eend
     pend
@@ -554,7 +568,7 @@
 
     beq s13, s12, END //If equal, all changes were less than tolerance
     beq s1, s15, END //if equal, we've run the max number of iterations
-    beq s0, s0, TOP3DCG //if neither branc was taken, go back
+    beq s0, s0, TOP3DCG //if neither branch was taken, go back
     END:
 }
 

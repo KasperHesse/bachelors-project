@@ -4,14 +4,13 @@ import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
-import vector.Opcode
 import chisel3.experimental.BundleLiterals._
 import chisel3.util.DecoupledIO
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 import utils.Config
 import utils.Config._
-import vector.Opcode._
+import Opcode._
 import pipeline.ThreadState._
 import pipeline.StypeMod._
 import pipeline.StypeBaseAddress._
@@ -260,7 +259,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   it should "generate outputs for an ELEM instruction" in {
     val elem = StypeInstruction(rsrd=0, mod=ELEM, baseAddr = XPHYS, ls=LOAD)
     val IJK = genIJKmultiple(start=Some(Array(0,0,0,0)))
-    val instrs = wrapLoadInstructions(Array(elem))
+    val instrs = wrapLoadStoreInstructions(Array(elem))
 
     test(new Thread(0)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       var fin: Boolean = false
@@ -307,7 +306,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val rd = 2
     val dof = StypeInstruction(rsrd=2, mod=DOF, baseAddr=P, ls=LOAD)
     val IJK = genIJKmultiple(start=Some(Array(0,0,0,0)))
-    val instrs = wrapLoadInstructions(Array(dof))
+    val instrs = wrapLoadStoreInstructions(Array(dof))
 
     test(new Thread(0)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       var fin: Boolean = false

@@ -8,11 +8,14 @@ class DecodeMemory(wordsPerBank: Int, memInitFileLocation: String) extends Modul
     val in = Flipped(new IfIdIO)
     val ex = new IdExIO
     val memWb = new WbIdIO
+    val idStateUint = Output(UInt(4.W))
   })
 
   val decode = Module(new Decode)
   val mem = Module(new MemoryStage(wordsPerBank, memInitFileLocation))
   val control = Module(new Control)
+
+  io.idStateUint := decode.io.ctrl.stateUint
 
   decode.io.fe <> io.in
   decode.io.mem <> mem.io.id
@@ -25,8 +28,12 @@ class DecodeMemory(wordsPerBank: Int, memInitFileLocation: String) extends Modul
   control.io.fe <> DontCare
   control.io.fe.instr := io.in.instr
   control.io.ex <> DontCare
+  control.io.ex.empty := true.B
+  control.io.ex.macEmpty := true.B
 
   decode.io.wb <> DontCare
   decode.io.wb.we := false.B
+
+
 
 }

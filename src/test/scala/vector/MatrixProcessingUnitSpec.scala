@@ -7,7 +7,8 @@ import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import Opcode._
+import pipeline.Opcode
+import pipeline.Opcode._
 
 class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Matrix processing unit"

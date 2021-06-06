@@ -1,6 +1,7 @@
 package vector
 
 import chisel3._
+import pipeline.Opcode
 import utils.Fixed.FIXED_WIDTH
 
 /**
@@ -28,7 +29,7 @@ class MatrixProcessingUnit(nelem: Int) extends Module {
     PE(i).io.out.valid
   }
   io.out.valid := valids.reduce((a, b) => a && b) //And reduction
-  io.out.macResult := PE(0).io.out.op === Opcode.MAC
+  io.out.macResult := PE(0).io.out.op === Opcode.MAC || PE(0).io.out.op === Opcode.RED
 }
 
 /**

@@ -28,7 +28,7 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
    * @return A handle to the read data.
    */
   def setReadPort(rs: UInt): Vec[SInt] = {
-    val rdData = mem.read(rs)
+    val rdData = mem(rs)
     val rdDataVec = Wire(Vec(depth, SInt(FIXED_WIDTH.W)))
     for(i <- 0 until depth) {
       rdDataVec(i) := rdData((i+1)*FIXED_WIDTH-1, i*FIXED_WIDTH).asSInt()
@@ -76,8 +76,8 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
 
   if(SIMULATION) {
     loadMemoryFromFile(mem, memInitFileLocation)
-  } else {
-    loadMemoryFromFileInline(mem, memInitFileLocation)
+//  } else {
+//    loadMemoryFromFileInline(mem, memInitFileLocation)
   }
 
 }

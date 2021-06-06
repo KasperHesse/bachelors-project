@@ -25,6 +25,6 @@ class WriteQueueWrapper extends Module {
   val cnt = RegInit(0.U(log2Ceil(XREG_DEPTH+1).W))
   cnt := Mux(io.in.valid && io.in.bits.mod === ELEM, Mux(cnt === (XREG_DEPTH-1).U, 0.U, cnt + 1.U), cnt)
   when(io.in.bits.mod === SEL || io.in.bits.mod === ELEM) {
-    io.out.bits.wrData(io.in.bits.iter) := io.in.bits.wrData(cnt)
+    io.out.bits.wrData(io.in.bits.iter) := io.in.bits.wrData(0)
   }
 }

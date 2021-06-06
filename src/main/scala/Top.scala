@@ -4,18 +4,21 @@ import chisel3.stage.{ChiselGeneratorAnnotation, ChiselStage}
 import memory.MemoryWriteback
 import memory._
 import pipeline._
-import test.{OnChipMemTest, UsingOnChipMemTest}
+import test._
+import utils.{Assembler, SynthesisMemInit}
+
+import scala.io.Source
 
 object Top extends App {
-//  utils.Config.NUM_MEMORY_BANKS = 1
+  //Assemble program
+  val source = Source.fromFile("resources/program.txt")
+  Assembler.writeMemInitFile("resources/im.txt", Assembler.assemble(source).map(_.toLong))
+  source.close()
+
+  SynthesisMemInit()
+
   (new chisel3.stage.ChiselStage).execute(
     Array("-X", "verilog", "-td", "target/gen"),
-    Seq(ChiselGeneratorAnnotation(() => new pipeline.ThreadV2(0))))
-  (new chisel3.stage.ChiselStage).execute(
-    Array("-X", "verilog", "-td", "target/gen"),
-    Seq(ChiselGeneratorAnnotation(() => new OnChipMemTest(true))))
-  (new chisel3.stage.ChiselStage).execute(
-    Array("-X", "verilog", "-td", "target/gen"),
-    Seq(ChiselGeneratorAnnotation(() => new OnChipMemTest(false))))
-  //-X verilog outputs verilog, -td target/gen sets target directory
+    Seq(ChiselGeneratorAnnotation(() => new TopLevel(IMsize=1024, IMinitFileLocation = "resources/im.txt", wordsPerBank=1671, memInitFileLocation = "resources"))))
+//  -X verilog outputs verilog, -td target/gen sets target directory
 }

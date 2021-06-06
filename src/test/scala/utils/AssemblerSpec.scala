@@ -4,8 +4,8 @@ import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import Config._
-import pipeline.{BtypeInstruction, OtypeInstruction, OtypeLen, RtypeInstruction}
-import vector.Opcode._
+import pipeline.{BtypeInstruction, OtypeInstruction, OtypeLen, RtypeInstruction, StypeInstruction}
+import pipeline.Opcode._
 import pipeline.RtypeMod._
 import pipeline.OtypePE._
 import pipeline.OtypeSE._
@@ -17,8 +17,8 @@ class AssemblerSpec extends FlatSpec with Matchers {
   behavior of "Assembler"
 
   val rand = scala.util.Random
-  val opStrings = Array("add", "sub", "mul", "div", "max", "min", "abs")
-  val opValues = Array(ADD, SUB, MUL, DIV, MAX, MIN, ABS)
+  val opStrings = Array("add", "sub", "mul", "div", "max", "min", "abs", "red")
+  val opValues = Array(ADD, SUB, MUL, DIV, MAX, MIN, ABS, RED)
   val modStrings = Array("vv", "xv", "sv", "xx", "sx", "ss")
   val modValues = Array(VV, XV, SV, XX, SX, SS)
   val prefixValues = Array(
@@ -121,23 +121,29 @@ class AssemblerSpec extends FlatSpec with Matchers {
   }
 
   it should "assemble O-type instructions" in {
-    val lines = Array("pstart single",
-    "pstart ndof",
-    "pstart nelem",
-    "estart",
-    "eend",
-    "pend")
+    val lines = Array(
+      "pstart single",
+      "pstart ndof",
+      "pstart nelemvec",
+      "pstart nelemdof",
+      "pstart nelemstep",
+      "estart",
+      "eend",
+      "pend"
+    )
     val instrs = Array(
       (START, PACKET, SINGLE),
       (START, PACKET, OtypeLen.NDOF),
-      (START, PACKET, OtypeLen.NELEM),
+      (START, PACKET, OtypeLen.NELEMVEC),
+      (START, PACKET, OtypeLen.NELEMDOF),
+      (START, PACKET, OtypeLen.NELEMSTEP),
       (START, EXEC, SINGLE),
       (END, EXEC, SINGLE),
       (END, PACKET, SINGLE)
     )
     for(i <- lines.indices) {
       val instr = OtypeInstruction(instrs(i)._1, instrs(i)._2, instrs(i)._3)
-      val parsed = Assembler.parseOtype(Assembler.split(lines(i)))
+      val parsed = Assembler.parseOtype(Assembler.split(lines(i)), Array(0))
       assert(parsed == instr.litValue.toInt)
     }
   }
@@ -227,27 +233,6 @@ class AssemblerSpec extends FlatSpec with Matchers {
       }
       case _: Exception => assert(false, "Did not catch duplicate label")
     }
-  }
-
-  it should "assemble S-type instructions" in {
-//
-//    val program = "add.vv v0, v1, v2\n" +
-//      "sub.xv v1, x3, v2\n" +
-//      "add.lv v0, v2, 3\n" +
-//      "\tbeq s4, s0, -4\n\n\n"
-//
-//    val instrs = Assembler.assemble(program)
-//    val INSTRS = Array(
-//      RtypeInstruction(0, 1, 2, ADD, VV),
-//      RtypeInstruction(1, 3, 2, SUB, XV),
-//      RtypeInstruction(0, 2, 3, 0, ADD, SV),
-//      BtypeInstruction(EQUAL, 0, 0, -12)
-//    )
-//
-//    for(i <- instrs.indices) {
-//      println(instrs(i) + " " + INSTRS(i).litValue.toInt)
-//    }
-
   }
 
   it should "disallow R-type instructions outside of execution packets" in {
@@ -484,16 +469,108 @@ class AssemblerSpec extends FlatSpec with Matchers {
     }
   }
 
+  it should "assemble S-type ld.vec instructions" in {
+    import pipeline.StypeMod._
+    import pipeline.StypeBaseAddress._
+    val lines = Array(
+      "ld.vec v0, x",
+      "ld.vec v1, xphys",
+      "ld.vec v2, xnew",
+      "ld.vec v3, dc",
+      "ld.vec v0, dv",
+      "ld.vec v1, f",
+      "ld.vec v2, u",
+      "ld.vec v3, r",
+      "ld.vec v0, z",
+      "ld.vec v1, p",
+      "ld.vec v2, q",
+      "ld.vec v3, invd",
+      "ld.vec v0, tmp"
+    )
+    val instrs = Array(
+      StypeInstruction(0, VEC, X),
+      StypeInstruction(1, VEC, XPHYS),
+      StypeInstruction(2, VEC, XNEW),
+      StypeInstruction(3, VEC, DC),
+      StypeInstruction(0, VEC, DV),
+      StypeInstruction(1, VEC, F),
+      StypeInstruction(2, VEC, U),
+      StypeInstruction(3, VEC, R),
+      StypeInstruction(0, VEC, Z),
+      StypeInstruction(1, VEC, P),
+      StypeInstruction(2, VEC, Q),
+      StypeInstruction(3, VEC, INVD),
+      StypeInstruction(0, VEC, TMP)
+    )
+
+    (lines,instrs).zipped.foreach((line,instr) =>
+    {
+      val parsed = Assembler.parseStype(Assembler.split(line), Array(LitVals.NDOF))
+      val i = instr.toUInt().litValue.toInt
+      assert(parsed == i)
+    })
+  }
+
+  it should "disallow ld.fdof instructions" in {
+    val instr = "ld.fdof v1, u"
+    try {
+      Assembler.parseStype(Assembler.split(instr), Array(LitVals.NELEMDOF))
+    } catch {
+      case e: IllegalArgumentException => if (e.getMessage.toLowerCase.contains("cannot perform")) assert(true) else assert(false)
+    }
+  }
+
+  it should "only allow dof/fdof operations to NDOF long vectors" in {
+    val prefix = "st.dof v0, "
+    val suffixPass = Array("f", "u", "r", "z", "p", "q", "invd", "tmp")
+    val suffixFail = Array("x", "xphys", "xnew", "dc", "dv")
+    val pass = suffixPass.map(prefix + _)
+    val fail = suffixFail.map(prefix + _)
+    for(p <- pass) {
+      val instr = Assembler.parseStype(Assembler.split(p), Array(LitVals.NELEMDOF)) //Should be fine
+    }
+    for(f <- fail) {
+      try {
+        Assembler.parseStype(Assembler.split(f), Array(LitVals.NELEMDOF))
+      } catch {
+        case e: IllegalArgumentException => if (!e.getMessage.toLowerCase.contains("cannot perform")) assert(false)
+      }
+    }
+  }
+
+  it should "only allow elem/sel/fcn/edn1/edn2 operations on NELEM long vectors" in {
+    val prefix = "ld.elem x0, "
+    val suffixPass = Array("x", "xphys", "xnew", "dc", "dv")
+    val suffixFail = Array("f", "u", "r", "z", "p", "q", "invd", "tmp")
+    val pass = suffixPass.map(prefix + _)
+    val fail = suffixFail.map(prefix + _)
+    for(p <- pass) {
+      Assembler.parseStype(Assembler.split(p), Array(LitVals.NELEMDOF)) //Should be fine
+    }
+    for(f <- fail) {
+      try {
+        Assembler.parseStype(Assembler.split(f), Array(LitVals.NELEMDOF))
+      } catch {
+        case e: IllegalArgumentException => if (!e.getMessage.toLowerCase.contains("cannot perform")) assert(false)
+      }
+    }
+  }
+
   it should "only allow instruction packets of a certain size" in {
-    //Probably 32
-    ???
-  }
+    val pstart = "pstart single\n"
+    val estart = "estart\n"
+    val instr = "add.vv v0, v1, v2\n"
+    val eend = "eend\n"
+    val pend = "pend"
+    val pass = s"$pstart$estart${instr * (INSTRUCTION_BUFFER_SIZE-4)}$eend$pend"
+    val fail = s"$pstart$estart${instr * (INSTRUCTION_BUFFER_SIZE-3)}$eend$pend"
 
-  it should "perform substituion of mvp pseudoinstructions" in {
-    ???
-  }
-
-  it should "perform substitution of sqrt pseudoinstruction" in {
-    ???
+    Assembler.assemble(pass) //Should be good
+    try {
+      Assembler.assemble(fail)
+      assert(false)
+    } catch {
+      case e: IllegalArgumentException => if (e.getMessage.contains("packet too large")) assert(true) else assert(false)
+    }
   }
 }

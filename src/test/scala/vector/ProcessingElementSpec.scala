@@ -6,7 +6,8 @@ import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import Opcode._
+import pipeline.Opcode
+import pipeline.Opcode._
 
 class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Processing elements"
@@ -114,7 +115,7 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
     val as = new Array[Long](iters)
     val bs = new Array[Long](iters)
     var result = 0L
-    val op = MAC
+    val op = if(scala.util.Random.nextBoolean()) MAC else RED
 
     //We need to scale down the values so they don't explode out of our range
     for (i <- 0 until iters ) {
@@ -151,7 +152,7 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
     val bs = Array.ofDim[Long](iters, macLimit)
     var results = new Array[Long](iters)
     var result = 0L
-    val op = MAC
+    val op = if(scala.util.Random.nextBoolean()) MAC else RED
 
     //We need to scale down the values so they don't explode out of our range
     for(i <- 0 until iters) {

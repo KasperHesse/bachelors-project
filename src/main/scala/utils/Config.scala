@@ -37,6 +37,8 @@ object Config {
   /** Total number of element DOF in the design domain */
   var NDOF = 3 * NX * NY * NZ
 
+  /** Maximum number of instructions that may be in one instruction packet (including pstart, estart, eend and pend) */
+  val INSTRUCTION_BUFFER_SIZE = 32
   /** The number of elements in the vector register file */
   var NUM_VREG = 32
   /** The number of vector register slots that are adressible from instructions */
@@ -62,15 +64,22 @@ object Config {
   /** The total number of elements stored in a vector register slot
    * This value is the increment amount used when processing vectors elementwise */
   var ELEMS_PER_VSLOT = VREG_SLOT_WIDTH*VREG_DEPTH
-  /** Number of elements parsed when performing an operation over NELEM-long vectors */
-  var NELEMLENGTH = if(NELEM % ELEMS_PER_VSLOT == 0) NELEM else (NELEM/ELEMS_PER_VSLOT+1)*ELEMS_PER_VSLOT
-  /** Number of elements parsed when performing an operation over NDOF-long vectors */
-  var NDOFLENGTH = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else (NDOF/ELEMS_PER_VSLOT+1)*ELEMS_PER_VSLOT
+  /** The number of elements in a memory bank holding an NDOF long vector. This value will always be > NDOF */
+  val NDOFSIZE = ((NX+1)/2)*((NY+1)/2)*((NZ+1)/2)*3*8 //NXH*NYH*NZH*3*8 (NXH*NYH*NZH = number of nodes with coluring 0. *3 gives total number of memory rows and *8 gives total number of values stored
+  /** The number of elements in a memory bank holding an NELEM long vector. This value should always be = NELEM */
+  val NELEMSIZE = NELEM
+  /** Number of elements parsed when performing an operation over NELEM-long vectors. Least muliple of ELEMS_PER_VSLOT and NELEMSIZE. Will be >= NELEMSIZE */
+  var NELEMLENGTH = leastMultiple(ELEMS_PER_VSLOT, NELEMSIZE)
+  /** Number of elements parsed when performing an operation over NDOF-long vectors. Least multiple of ELEMS_PER_VSLOT and NDOFSIZE. Will be >= NDOFSIZE */
+  var NDOFLENGTH = leastMultiple(ELEMS_PER_VSLOT, NDOFSIZE)
+
 
   /** The number of memory banks used / the number of values that can be loaded from memory at once */
   var NUM_MEMORY_BANKS = 8
   /** Width of memory addresses */
-  var MEM_ADDR_WIDTH = 32
+  var MEM_ADDR_WIDTH = 32 //TODO set this based on x*NELEMSIZE + Y*NDOFSIZE and log2Ceil
+  /** The number of different memory locations addressible from Stype instructions */
+  val NUM_MEMORY_LOCS = 13
 
   /** Simulation flag. Assert inside of a tester to use simulation-specific functionality */
   var SIMULATION = false
@@ -99,8 +108,8 @@ object Config {
     require(NELY % 2 == 0, s"NELY($NELY) must be even")
     require(NELZ % 2 == 0, s"NELZ($NELZ) must be even")
 
-    NELEMLENGTH = if(NELEM % ELEMS_PER_VSLOT == 0) NELEM else (NELEM/ELEMS_PER_VSLOT+1)*ELEMS_PER_VSLOT
-    NDOFLENGTH = if(NDOF % ELEMS_PER_VSLOT == 0) NDOF else (NDOF/ELEMS_PER_VSLOT+1)*ELEMS_PER_VSLOT
+    NELEMLENGTH = leastMultiple(ELEMS_PER_VSLOT, NELEM)
+    NDOFLENGTH = leastMultiple(ELEMS_PER_VSLOT, NDOFSIZE)
   }
 
   /**
@@ -122,6 +131,16 @@ object Config {
     INT_WIDTH = if(largeNumbers) 16 else 10
     FRAC_WIDTH = 15
     Config.checkRequirements()
+  }
+
+  /**
+   * Calculates the smallest number z such that z >= y and z % x == 0
+   * @param x The value that z should be a multiple of
+   * @param y The value that z should be greater than or equal to
+   * @return The value z
+   */
+  def leastMultiple(x: Int, y: Int): Int = {
+    if(y % x == 0) y else (y/x+1)*x
   }
 }
 

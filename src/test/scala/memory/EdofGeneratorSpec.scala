@@ -7,7 +7,8 @@ import utils.Config._
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import pipeline.seed
+import pipeline.StypeMod._
+import pipeline.{StypeMod, seed}
 
 
 class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers {
@@ -31,8 +32,10 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
     dut.io.in.bits.ijk.j.poke(j.U)
     dut.io.in.bits.ijk.k.poke(k.U)
     dut.io.in.valid.poke(true.B)
-    dut.io.in.ready.expect(true.B)
     dut.io.addrGen.ready.poke(true.B)
+    dut.io.in.bits.mod.poke(StypeMod.DOF)
+    dut.io.in.ready.expect(true.B)
+
 
     dut.clock.step() //latch in values
     dut.io.in.ready.expect(false.B)
@@ -40,14 +43,17 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
     for(i <- 0 until 8) {
       dut.io.addrGen.bits.indices(i).expect(edof(i).U)
+      dut.io.addrGen.bits.validIndices(i).expect(true.B)
     }
     dut.clock.step()
     for(i <- 0 until 8) {
       dut.io.addrGen.bits.indices(i).expect(edof(i+8).U)
+      dut.io.addrGen.bits.validIndices(i).expect(true.B)
     }
     dut.clock.step()
     for(i <- 0 until 8) {
       dut.io.addrGen.bits.indices(i).expect(edof(i+16).U)
+      dut.io.addrGen.bits.validIndices(i).expect(true.B)
     }
   }
 
@@ -75,6 +81,52 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
     NZ = NELZ + 1
     test(new EdofGenerator).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       edofGenTest(dut)
+    }
+  }
+
+  it should "deassert some valid signals when mod is fdof" in {
+    seed("Edof generator, fixed dof")
+    test(new EdofGenerator) {dut =>
+      dut.io.in.initSource().setSourceClock(dut.clock)
+      dut.io.addrGen.ready.poke(true.B)
+      val ijk = Array(0,0,0,0)
+      val instr = genIJKinput(IJK=Some(ijk), pad=false, mod=FDOF)
+      dut.io.in.enqueue(instr)
+      while(!dut.io.addrGen.valid.peek.litToBoolean) {
+        dut.clock.step()
+      }
+      //Expect lower 4 dof's to be valid, upper 4 should not be valid
+      for(i <- 0 until 3) {
+        for(i <- 0 until 8) {
+          dut.io.addrGen.bits.validIndices(i).expect((i < 4).B)
+        }
+        dut.io.addrGen.valid.expect(true.B)
+        dut.clock.step()
+      }
+      dut.io.addrGen.valid.expect(false.B)
+    }
+  }
+
+  it should "deassert all valid signals when mod=fdof and i>=1" in {
+    seed("Edof generator, fixed dof with nonzero i")
+    test(new EdofGenerator).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      dut.io.in.initSource().setSourceClock(dut.clock)
+      dut.io.addrGen.ready.poke(true.B)
+      var ijk: Array[Int] = genIJK()
+      while(ijk(0) == 0) {
+        ijk = genIJK()
+      }
+      val instr = genIJKinput(IJK=Some(ijk), pad=false, mod=FDOF)
+      dut.io.in.enqueue(instr)
+      while(!dut.io.addrGen.valid.peek.litToBoolean) {
+        dut.clock.step()
+      }
+      for(i <- 0 until 3) {
+        dut.io.addrGen.bits.validIndices.foreach(_.expect(false.B))
+        dut.io.addrGen.valid.expect(true.B)
+        dut.clock.step()
+      }
+      dut.io.addrGen.valid.expect(false.B)
     }
   }
 

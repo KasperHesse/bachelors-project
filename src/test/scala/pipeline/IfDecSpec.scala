@@ -1,12 +1,10 @@
 package pipeline
 
 import java.io.BufferedWriter
-
 import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
-import vector.Opcode
 import chisel3.experimental.BundleLiterals._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
@@ -14,8 +12,8 @@ import utils.Config._
 import Opcode._
 import utils.Config
 import BranchComp._
-import java.io._
 
+import java.io._
 import scala.io.Source
 
 class IfDecSpec  extends FlatSpec with ChiselScalatestTester with Matchers {

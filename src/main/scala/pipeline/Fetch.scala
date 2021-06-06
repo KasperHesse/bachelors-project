@@ -12,6 +12,11 @@ class FetchIO extends Bundle {
   val ctrl = new IfControlIO
 }
 
+/**
+ * The fetch stage
+ * @param memsize The number of instructions stored in instruction memory
+ * @param memfile Location of memory initialization file. If none is set, does not emit a readmemh statement.
+ */
 class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
   val io = IO(new FetchIO)
 
@@ -27,12 +32,12 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
 
 
   if(SIMULATION) {
-    require(!memfile.isEmpty, "Cannot simulate with empty memory init file")
+    require(memfile.nonEmpty, "Cannot simulate with empty memory init file")
     val src = Source.fromFile(memfile)
     require(src.getLines().length <= memsize, s"Memory file (${src.getLines.length}) too large for memory size ($memsize)")
     src.close()
     loadMemoryFromFile(imem, memfile)
-  } else if (!memfile.isEmpty) {
+  } else if (memfile.nonEmpty) {
     val src = Source.fromFile(memfile)
     require(src.getLines().length <= memsize, s"Memory file (${src.getLines.length}) too large for memory size ($memsize)")
     src.close()

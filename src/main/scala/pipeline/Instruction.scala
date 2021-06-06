@@ -3,8 +3,6 @@ package pipeline
 import chisel3._
 import chisel3.experimental.ChiselEnum
 import chisel3.experimental.BundleLiterals._
-import vector.Opcode
-import vector.Opcode._
 import utils.Config.NUM_SREG
 
 /**
@@ -42,6 +40,7 @@ class RtypeInstruction extends Bundle with Instruction {
 }
 
 object RtypeInstruction {
+  import Opcode._
   val OP_OFFSET = 0
   val FMT_OFFSET = 6
   val MOD_OFFSET = 8
@@ -113,10 +112,10 @@ object RtypeInstruction {
       MIN
     } else if (opval.litValue == ABS.litValue()) {
       ABS
+    } else if(opval.litValue == RED.litValue()) {
+      RED
     } else {
-//      print("ERR: Unable to decode op")
       throw new IllegalArgumentException("Unable to decode op")
-//      ADD
     }
 
     val mod = if(modval.litValue == VV.litValue()) {
@@ -194,6 +193,8 @@ object StypeInstruction {
    * @return An Stype instruction bundle with all fields set
    */
   def apply(rsrd: Int, mod: StypeMod.Type, baseAddr: StypeBaseAddress.Type, ls: StypeLoadStore.Type = LOAD): StypeInstruction = {
+    require(!(ls == LOAD && mod == FDOF), "You cannot perform ld.fdof operations")
+    require(!(ls == STORE && Seq(FCN, EDN1, EDN2).contains(mod)), "Cannot perform st.fcn, st.edn1 and st.edn2 operations")
     (new StypeInstruction).Lit(_.rsrd -> rsrd.U, _.mod -> mod, _.baseAddr -> baseAddr, _.fmt -> InstructionFMT.STYPE, _.ls -> ls, _.nu1 -> 0.U)
   }
 
@@ -209,23 +210,20 @@ object StypeInstruction {
       throw new IllegalArgumentException(s"Instruction format ($fmt) did not match S-type format")
     }
 
-
-
     val BaseAddr = baseAddrVal match {
-      case 0 => KE
-      case 1 => X
-      case 2 => XPHYS
-      case 3 => XNEW
-      case 4 => DC
-      case 5 => DV
-      case 6 => F
-      case 7 => U
-      case 8 => R
-      case 9 => Z
-      case 10 => P
-      case 11 => Q
-      case 12 => INVD
-      case 13 => TMP
+      case 0 => X
+      case 1 => XPHYS
+      case 2 => XNEW
+      case 3 => DC
+      case 4 => DV
+      case 5 => F
+      case 6 => U
+      case 7 => R
+      case 8 => Z
+      case 9 => P
+      case 10 => Q
+      case 11 => INVD
+      case 12 => TMP
       case _ => throw new IllegalArgumentException(s"Unable to decode S-type base address (got $baseAddrVal)")
     }
 
@@ -257,12 +255,10 @@ class OtypeInstruction extends Bundle with Instruction {
   val nu2 = UInt(24.W)        //31:8
   /** Instruction format */
   val fmt = InstructionFMT()  //7:6
-  /** Increment type */
-  val it = Bool()             //5
   /** Instruction length */
-  val len = OtypeLen()        //4:3
+  val len = OtypeLen()        //5:3
   /** Packet/execute flag */
-  val pe = OtypePE()        //2:1
+  val pe = OtypePE()          //2:1
   /** Start/end flag */
   val se = OtypeSE()          //0
 
@@ -279,7 +275,6 @@ object OtypeInstruction extends Bundle {
   val SE_OFFSET = 0
   val PE_OFFSET = 1
   val LEN_OFFSET = 3
-  val IT_OFFSET = 5
   val FMT_OFFSET = 6
   /** Generates an Otype-instruction with length [[OtypeLen.SINGLE]] */
   def apply(se: OtypeSE.Type, pe: OtypePE.Type): OtypeInstruction = {
@@ -287,7 +282,7 @@ object OtypeInstruction extends Bundle {
   }
   /** Generates an Otype instruction with a specified length */
   def apply(se: OtypeSE.Type, pe: OtypePE.Type, len: OtypeLen.Type): OtypeInstruction = {
-    (new OtypeInstruction).Lit(_.se -> se, _.pe -> pe, _.len -> len, _.fmt -> InstructionFMT.OTYPE, _.it -> false.B, _.nu2 -> 0.U)
+    (new OtypeInstruction).Lit(_.se -> se, _.pe -> pe, _.len -> len, _.fmt -> InstructionFMT.OTYPE, _.nu2 -> 0.U)
   }
 
   /**
@@ -300,7 +295,6 @@ object OtypeInstruction extends Bundle {
     o |= (v.se.litValue.toInt)
     o |= (v.pe.litValue().toInt << PE_OFFSET)
     o |= (v.len.litValue().toInt << LEN_OFFSET)
-    o |= (v.it.litValue.toInt << IT_OFFSET)
     o |= (v.fmt.litValue().toInt << FMT_OFFSET)
     o.U(32.W)
   }
@@ -308,33 +302,35 @@ object OtypeInstruction extends Bundle {
   def apply(v: UInt): OtypeInstruction = {
     val seval = v(0).litToBoolean
     val ievval = v(2,1).litValue.toInt
-    val lenval = v(4,3).litValue.toInt
-    val it = v(5)
+    val lenval = v(5,3).litValue.toInt
 
     val fmt = v(7,6).litValue().toInt
     if(fmt != InstructionFMT.OTYPE.litValue.toInt) {
-      throw new IllegalArgumentException(s"Instruction format ($fmt) did not match O-type format")
+      throw new IllegalArgumentException(s"Instruction format ($fmt) did not match O-type format (${InstructionFMT.OTYPE.litValue.toInt})")
     }
 
-    val se = seval match {
-      case false => OtypeSE.END
-      case true => OtypeSE.START
+    val se = if (seval) {
+      OtypeSE.START
+    } else {
+      OtypeSE.END
     }
 
     val iev = ievval match {
       case 1 => OtypePE.PACKET
       case 2 => OtypePE.EXEC
-      case _ => OtypePE.PACKET //This shouldn't happen
+      case _ => throw new IllegalArgumentException(s"Unable to decode O-type IEV flag ($ievval)") //This shouldn't happen
     }
 
     val len = lenval match {
       case 0 => OtypeLen.NDOF
-      case 1 => OtypeLen.NELEM
       case 2 => OtypeLen.SINGLE
-      case _ => OtypeLen.SINGLE //This shouldn't happen
+      case 4 => OtypeLen.NELEMVEC
+      case 5 => OtypeLen.NELEMDOF
+      case 6 => OtypeLen.NELEMSTEP
+      case _ => throw new IllegalArgumentException(s"Unable to decode O-type length ($lenval)") //This shouldn't happen
     }
 
-    (new OtypeInstruction).Lit(_.fmt -> InstructionFMT.OTYPE, _.se -> se, _.pe -> iev, _.len -> len, _.it -> it)
+    (new OtypeInstruction).Lit(_.fmt -> InstructionFMT.OTYPE, _.se -> se, _.pe -> iev, _.len -> len)
   }
 }
 
@@ -466,13 +462,14 @@ object RtypeMod extends ChiselEnum {
  * These define what kind of load/store operation should be performed
  */
 object StypeMod extends ChiselEnum {
-  val VEC =   Value("b0000".U)
-  val DOF =   Value("b0001".U)
   val ELEM =  Value("b0010".U)
   val EDN1 =  Value("b0100".U)
   val EDN2 =  Value("b0101".U)
   val FCN =   Value("b0110".U)
   val SEL =   Value("b0111".U)
+  val DOF =   Value("b1000".U)
+  val FDOF =  Value("b1001".U)
+  val VEC =   Value("b1100".U)
   val WIDTH = Value("b1111".U)
 }
 
@@ -489,20 +486,19 @@ object StypeLoadStore extends ChiselEnum {
  * is performed in hardware
  */
 object StypeBaseAddress extends ChiselEnum {
-  val KE = Value(0.U)
-  val X = Value(1.U)
-  val XPHYS = Value(2.U)
-  val XNEW = Value(3.U)
-  val DC = Value(4.U)
-  val DV = Value(5.U)
-  val F = Value(6.U)
-  val U = Value(7.U)
-  val R = Value(8.U)
-  val Z = Value(9.U)
-  val P = Value(10.U)
-  val Q = Value(11.U)
-  val INVD = Value(12.U)
-  val TMP = Value(13.U)
+  val X = Value(0.U)
+  val XPHYS = Value(1.U)
+  val XNEW = Value(2.U)
+  val DC = Value(3.U)
+  val DV = Value(4.U)
+  val F = Value(5.U)
+  val U = Value(6.U)
+  val R = Value(7.U)
+  val Z = Value(8.U)
+  val P = Value(9.U)
+  val Q = Value(10.U)
+  val INVD = Value(11.U)
+  val TMP = Value(12.U)
   val WIDTH = Value("b111111".U)
 }
 
@@ -529,8 +525,11 @@ object OtypeSE extends ChiselEnum {
  */
 object OtypeLen extends ChiselEnum {
   val NDOF = Value(0.U)
-  val NELEM = Value(1.U)
   val SINGLE = Value(2.U)
+  val NELEMVEC = Value(4.U)
+  val NELEMDOF = Value(5.U)
+  val NELEMSTEP = Value(6.U)
+  val WIDTH = Value("b111".U)
 }
 
 object BranchComp extends ChiselEnum {
@@ -539,4 +538,21 @@ object BranchComp extends ChiselEnum {
   val LT = Value("b000010".U)
   val GEQ = Value("b000011".U)
   val WIDTH = Value("b111111".U)
+}
+
+
+/**
+ * Opcodes supported by a processing element.
+ */
+object Opcode extends ChiselEnum {
+  val NOP = Value("b000000".U)
+  val ADD = Value("b000100".U)
+  val SUB = Value("b000101".U)
+  val MAX = Value("b000110".U)
+  val MIN = Value("b000111".U)
+  val ABS = Value("b001000".U)
+  val MUL = Value("b010000".U)
+  val MAC = Value("b010001".U)
+  val RED = Value("b010011".U)
+  val DIV = Value("b100000".U)
 }

@@ -25,7 +25,7 @@ class AddressGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matc
   }
 
   "Address generator" should "reorder inputs based on the LSB" in {
-    test(new AddressGenerator()) {dut =>
+    test(new AddressGenerator(true)) {dut =>
       //Generate input vectors
       val addr = Seq(1,2,3,4,5,6,7,0)
       val valid = Seq(true,false,true,false,true,false,true,false)
@@ -37,7 +37,9 @@ class AddressGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matc
       }
       dut.io.in.bits.baseAddr.poke(StypeBaseAddress.X)
       val baseAddr = AddressDecode.mapping(StypeBaseAddress.X.litValue().toInt)
-      dut.clock.step()
+      dut.io.mem.ready.poke(true.B)
+      dut.io.in.valid.poke(true.B)
+      dut.clock.step(1)
       expectAddr(dut, 0, baseAddr + 1, false)
       expectAddr(dut, 1, baseAddr + 1)
       expectAddr(dut, 2, baseAddr + 3, false)
@@ -50,10 +52,12 @@ class AddressGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matc
   }
 
   "Address generator" should "prioritize later inputs" in {
-    test(new AddressGenerator()) {dut =>
+    test(new AddressGenerator(true)) {dut =>
       for(i <- 0 until NUM_MEMORY_BANKS) {
         pokeIndex(dut, i, i << 3) //0, 8, 16, 24 etc. All have LSB 000
       }
+      dut.io.mem.ready.poke(true.B)
+      dut.io.in.valid.poke(true.B)
       dut.clock.step()
       //Expect the latest value to have be the only one that succeeded
       expectAddr(dut, 0, (NUM_MEMORY_BANKS-1) << 3)
@@ -64,7 +68,7 @@ class AddressGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matc
   }
 
   "Address generator" should "only reorder inputs that have the valid flag set" in {
-    test(new AddressGenerator()) {dut =>
+    test(new AddressGenerator(true)) {dut =>
       //Attempt to poke two elements that map to the same bank.
       //One is valid, the other is invalid
       pokeIndex(dut, 0, 2) //true

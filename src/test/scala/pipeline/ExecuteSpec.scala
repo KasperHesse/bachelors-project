@@ -6,7 +6,6 @@ import org.scalatest.{FlatSpec, Matchers}
 import utils.Config._
 import utils.Config
 import utils.Fixed._
-import vector.Opcode
 import chisel3.experimental.BundleLiterals._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
@@ -48,7 +47,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
    * Tests the Execute stage by applying two input vectors and observing the outputs.
  *
    * @param dut The DUT
-   * @param op Opcode. See [[vector.Opcode]]
+   * @param op Opcode. See [[Opcode]]
    */
   def testSubVector(dut: Execute, op: Opcode.Type): Unit = {
     val nelem = NUM_PROCELEM

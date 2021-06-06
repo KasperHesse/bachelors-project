@@ -21,7 +21,7 @@ class ImmGenSpec extends FlatSpec with ChiselScalatestTester with Matchers  {
         val y1 = fixed2double(x) //Rounded double value
         val immh = x.S(10,7).litValue.toInt
         val frac = x.S(6,0).litValue.toInt
-        val instr = RtypeInstruction(rd=0, rs1=0, immh, frac, op=vector.Opcode.ADD, mod=RtypeMod.VV)
+        val instr = RtypeInstruction(rd=0, rs1=0, immh, frac, op=Opcode.ADD, mod=RtypeMod.VV)
         dut.io.instr.poke(instr)
         dut.clock.step()
         simulationConfig()

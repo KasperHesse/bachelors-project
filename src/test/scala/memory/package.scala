@@ -1,10 +1,12 @@
+import chisel3._
+import chisel3.experimental.BundleLiterals._
 import utils.Config._
 import pipeline.StypeBaseAddress._
-import pipeline.StypeBaseAddress
+import pipeline.{StypeBaseAddress, StypeMod}
 
 package object memory {
 
-  val baseAddresses: Array[StypeBaseAddress.Type] = Array(KE, X, XPHYS, XNEW, DC, DV, F, U, R, Z, P, Q, INVD, TMP)
+  val baseAddresses: Array[StypeBaseAddress.Type] = Array(X, XPHYS, XNEW, DC, DV, F, U, R, Z, P, Q, INVD, TMP)
 
   /**
    * Compute the indices of the of the 24 degrees of freedom associated with the 8 corners of the element at (i,j,k) in the grid.
@@ -284,5 +286,26 @@ package object memory {
    */
   def randomElement[T <: Any](arr: Array[T]): T = {
     arr(scala.util.Random.nextInt(arr.length))
+  }
+
+  /**
+   * Generates an IJK input bundle for poking onto the DUT
+   * @param IJK An Option holding the IJK coordinates of the instruction. If None is given, generates a random ijk-coordinate pair. Defaults to None
+   * @param baseAddress An Option holding the base address of the instruction. If None is given, selects a random base address. Defaults to None
+   * @param pad Padding flag
+   * @param mod S-type modifier for the instruction
+   * @return An IJKGeneratorConsumerIO Bundle, ready to poke onto the IJK input port of the memory stage
+   */
+  def genIJKinput(IJK: Option[Array[Int]] = None, baseAddress: Option[StypeBaseAddress.Type] = None, pad: Boolean, mod: StypeMod.Type): IJKgeneratorConsumerIO = {
+    val ijk = IJK match {
+      case Some(x) => x
+      case None => genIJK()
+    }
+    val baseAddr = baseAddress match {
+      case Some(x) => x
+      case None => randomElement(baseAddresses)
+    }
+    val ijkBundle = (new IJKBundle).Lit(_.i -> ijk(0).U, _.j -> ijk(1).U, _.k -> ijk(2).U)
+    (new IJKgeneratorConsumerIO).Lit(_.baseAddr -> baseAddr, _.ijk -> ijkBundle, _.pad -> pad.B, _.mod -> mod)
   }
 }

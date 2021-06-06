@@ -47,7 +47,7 @@ class Control extends Module {
   // --- LOGIC ---
   //Logic signals for easier decode of O-type instructions
   val Oinst = io.fe.instr.asTypeOf(new OtypeInstruction)
-  val isInstr: Bool = Oinst.pe === OtypePE.PACKET
+  val isPacket: Bool = Oinst.pe === OtypePE.PACKET
   val isEnd = Oinst.se === OtypeSE.END
   val isOtype: Bool = Oinst.fmt === InstructionFMT.OTYPE
   val isBtype: Bool = Oinst.fmt === InstructionFMT.BTYPE
@@ -55,14 +55,14 @@ class Control extends Module {
 
   // --- INSTRUCTION FETCH/DECODE CONTROL SIGNALS ---
   //When idling and instructions are available, load them in
-  when((isStart && isInstr && isOtype && io.id.state === DecodeState.sIdle) || iload) {
+  when((isStart && isPacket && isOtype && io.id.state === DecodeState.sIdle) || iload) {
     io.id.iload := true.B
     io.fe.iload := true.B
     iload := true.B
   }
 
   //When we read the final instruction, stop loading after this one
-  when(isEnd && isInstr && isOtype && io.id.state === DecodeState.sLoad) {
+  when(isEnd && isPacket && isOtype && io.id.state === DecodeState.sLoad) {
     iload := false.B
   }
 
@@ -72,7 +72,10 @@ class Control extends Module {
   }
 
   // --- THREAD CONTROL SIGNALS ---
+  //Stall until read or write queue is empty once the final read/write operation has been issued
   when(memThread.state === ThreadState.sLoad && io.mem.rqCount =/= 0.U && memThread.fmt =/= InstructionFMT.STYPE) {
+    memThread.stall := true.B
+  } .elsewhen(memThread.state === ThreadState.sStore && memThread.fmt =/= InstructionFMT.STYPE && (io.mem.wqCount =/= 0.U) ) {
     memThread.stall := true.B
   }
 

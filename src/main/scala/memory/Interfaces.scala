@@ -87,7 +87,7 @@ class ReadQueueBundle extends Bundle {
 class WriteQueueBundle extends Bundle {
   /** The data to be written into the write queue */
   val wrData = Vec(NUM_MEMORY_BANKS, SInt(FIXED_WIDTH.W))
-  /** IJK generator iteration value. Used to access correct indices when performing st.sel and st.elem */
+  /** IJK generator iteration value. Only used to access correct indices when performing st.sel and st.elem */
   val iter = UInt(3.W)
   /** S-type modifier of the store operation being performed */
   val mod = StypeMod()

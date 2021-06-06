@@ -6,7 +6,7 @@ import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
-import vector.{KEWrapper, Opcode}
+import vector.KEWrapper
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.{FailedExpectException, WriteVcdAnnotation}
 import utils.Config._
@@ -251,7 +251,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       maxProgress = NDOFLENGTH
       progressIncr = ELEMS_PER_VSLOT
       MAClength = NDOFLENGTH
-    } else if (iBuffer.pstart.len.litValue == NELEM.litValue) {
+    } else if (iBuffer.pstart.len.litValue == NELEMVEC.litValue) {
       maxProgress = NELEMLENGTH
       progressIncr = ELEMS_PER_VSLOT
       MAClength = NELEMLENGTH
@@ -436,7 +436,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     }
   }
 
-  it should "perform MAC instructions V3" in {
+  it should "perform MAC instructions" in {
     simulationConfig()
     seed("Execute pipeline mac instructions")
     val memfile = "src/resources/meminit/mem5.hex.txt"
@@ -444,18 +444,18 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     pstart ndof
     estart
     sub.xv vs1, x0, vs3
-    mac.sv s2, s1, vs2
+    mac.sv s2, s1, vs2 //sum
     add.vv vs1, vs1, vs2
     eend
     iend
     pstart nelem
     estart
-    mac.vv s0, vs1, vs2
+    mac.vv s0, vs1, vs2 //dot product
     eend
     iend
      */
     val p1 = wrapInstructions(Array(RtypeInstruction(1, 0, 3, SUB, RtypeMod.XV), RtypeInstruction(2, 1, 2, MAC, RtypeMod.SV), RtypeInstruction(1, 1, 2, ADD, RtypeMod.VV)), OtypeLen.NDOF)
-    val p2 = wrapInstructions(Array(RtypeInstruction(0, 1, 2, MAC, RtypeMod.VV)), OtypeLen.NELEM)
+    val p2 = wrapInstructions(Array(RtypeInstruction(0, 1, 2, MAC, RtypeMod.VV)), OtypeLen.NELEMVEC)
     val instrs = Array.concat(p1,p2)
     writeMemInitFile(memfile, instrs)
     test(new ExecutePipeline(memfile=memfile)) {dut =>

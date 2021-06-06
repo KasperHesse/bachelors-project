@@ -2,6 +2,7 @@ package memory
 
 import chisel3._
 import chisel3.util._
+import pipeline.StypeMod
 import utils.Config._
 
 /**
@@ -12,6 +13,19 @@ class EdofGeneratorIO extends Bundle {
   val in = Flipped(Decoupled(new IJKgeneratorConsumerIO))
   /** Outputs to address generator */
   val addrGen = Decoupled(new AddressGenProducerIO)
+}
+
+class EdofWrapper extends Module {
+  val io = IO(new Bundle {
+    val in = Flipped(Decoupled(new IJKgeneratorConsumerIO))
+    val out = Decoupled(new IJKgeneratorConsumerIO)
+  })
+  val reg = RegEnable(io.in.bits, io.out.ready)
+  val valid = RegEnable(io.in.valid, io.out.ready)
+  io.out.valid := valid
+  io.out.bits := reg
+  io.in.ready := io.out.ready
+
 }
 
 /**
@@ -41,10 +55,12 @@ class EdofGenerator extends Module {
   val nIndex = Wire(Vec(8, UInt(log2Ceil(NDOF+1).W)))
   /** Asserted when this module is ready to receive new data */
   val readyInternal = WireDefault(false.B)
-  /** Asserted when the output from this module is valid */
   /** Pipeline register holding input values */
   val in = RegEnable(io.in.bits, io.in.valid && readyInternal)
-
+  /** Vector holding the indices being output to address generator */
+  val indices = Wire(Vec(NUM_MEMORY_BANKS, UInt(log2Ceil(NDOF+1).W)))
+  /** vector holding the valid flags for output indices */
+  val validIndices = Wire(Vec(NUM_MEMORY_BANKS, Bool()))
 
   // --- MODULES ---
   val nz0Lookup = Module(new NzLookup(NZL))
@@ -90,6 +106,7 @@ class EdofGenerator extends Module {
   }
   outputStep := Mux(processing && io.addrGen.ready, Mux(outputStep === 2.U, 0.U, outputStep + 1.U), outputStep)
 
+
   for(i <- 0 until 8) {
     //24*nIndex(i) + outputStep*8 + i
     //Performed as (nIndex(i)*3 + outputStep)*8, where *8 is performed by a later bitshift
@@ -97,18 +114,34 @@ class EdofGenerator extends Module {
     val indexX3 = (nIndex(i) << 1).asUInt + nIndex(i)
     val offset = i.U(3.W)
     val out = Cat(indexX3 + outputStep, offset) //Defined as separate value to make VCD outputs nicer
-    io.addrGen.bits.indices(i) := out
-    io.addrGen.bits.validIndices(i) := !in.pad
+    indices(i) := out
   }
-  io.addrGen.bits.baseAddr := in.baseAddr
-  io.addrGen.valid := processing
+  when(in.mod === StypeMod.DOF) {
+    for(i <- 0 until 8) {
+      validIndices(i) := !in.pad
+    }
+  } .otherwise { //Fixed DOF. Only the lower 4 outputs may be valid, only the case when nx1=0 (lower DOFs of layer 0)
+    for(i <- 0 until 4) {
+      validIndices(i) := nx1 === 0.U
+    }
+    for(i <- 4 until 8) {
+      validIndices(i) := false.B
+    }
+  }
+
+  //Must delay the output by one clock cycle to ensure that write data has arrived in write queue and
+  //this module is connected to address generator
+  io.addrGen.bits.validIndices := RegNext(validIndices)
+  io.addrGen.bits.indices := RegNext(indices)
+  io.addrGen.bits.baseAddr := RegNext(in.baseAddr)
+  io.addrGen.valid := RegNext(processing)
   io.in.ready := readyInternal
 }
 
 /**
  * A module implementing a lookup table for calculating {@code nz*NYH} and {@code nz*NYL}
  * @param entries The number of entries in the lookup table. If {@code nz0} is to be used as input, use {@code NZL}.
- *                For {@code nz1} as input, use {@code NZH}
+ *                For `nz1` as input, use {@code NZH}
  */
 class NzLookup(entries: Int) extends Module {
   val NYL = NY/2

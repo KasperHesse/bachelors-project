@@ -4,13 +4,12 @@ import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
-import vector.Opcode
 import chisel3.experimental.BundleLiterals._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 import utils.Config
 import utils.Config._
-import vector.Opcode._
+import Opcode._
 
 class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Decode stage"

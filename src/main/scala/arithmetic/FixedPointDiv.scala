@@ -2,10 +2,10 @@ package arithmetic
 
 import chisel3._
 import chisel3.util._
+import pipeline.Opcode
 import utils.Fixed._
 import utils.DivTypes._
 import utils.{Config, MulTypes}
-import vector.Opcode
 
 /**
  * Abstract base class for the fixed-point divider. Implements [[DivIO]]

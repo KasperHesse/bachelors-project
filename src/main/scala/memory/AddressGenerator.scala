@@ -1,7 +1,7 @@
 package memory
 
 import chisel3._
-import chisel3.util.{Decoupled, MuxLookup, is, switch}
+import chisel3.util.{Decoupled, MuxLookup, RegEnable, is, switch}
 import utils.Config._
 import pipeline.StypeBaseAddress._
 import pipeline._
@@ -21,23 +21,28 @@ class AddressGeneratorIO extends Bundle {
  * The given indices are reorderered such that the address ending in x000 is output at position 0, the address ending in x001 at position 1, etc.
  *
  *
- * @param registered Whether ready/valid signals should be transmitted directly through the module (purely combinational module)
+ * @param pipe Whether ready/valid signals should be transmitted directly through the module (purely combinational module)
  *                   or values should be registered in the middle. //TODO currently not implemented
  *
  * @note It is up to the user/previous hardware to ensure that all 8 indices are mutually exclusive (do not try to access the same memory banks)
  */
-class AddressGenerator(registered: Boolean = false) extends Module {
+class AddressGenerator(pipe: Boolean = false) extends Module {
   val io = IO(new AddressGeneratorIO)
-  val in = io.in.bits //Easier shorthand access
 
   // --- MODULES ---
   val vectorOrderer = Module(new VectorOrderer)
 
   // --- REGISTERS ---
+  /** Ready signal to producer */
+  val readyInternal = WireDefault(true.B)
+  /** Valid signal to consumer */
+  val validInternal = if(pipe) RegInit(false.B) else WireDefault(false.B)
+  val in = if(pipe) RegEnable(io.in.bits, io.in.valid && readyInternal) else io.in.bits
+
 
 //   --- SIGNALS AND WIRES ---
   /** Decoder vec used to translate base address + indices to global addresses */
-  val addrDecode = Wire(Vec(14, UInt(MEM_ADDR_WIDTH.W)))
+  val addrDecode = Wire(Vec(NUM_MEMORY_LOCS, UInt(MEM_ADDR_WIDTH.W)))
   for(i <- addrDecode.indices) {
     addrDecode(i) := AddressDecode.mapping(i).U
   }
@@ -60,8 +65,25 @@ class AddressGenerator(registered: Boolean = false) extends Module {
   io.mem.bits.addr := vectorOrderer.io.addressOut
   io.mem.bits.validAddress := vectorOrderer.io.validsOut
 
-  io.in.ready := io.mem.ready
-  io.mem.valid := io.in.valid
+  //Ready/valid handshake
+  if(pipe) {
+    when(!validInternal && io.in.valid && readyInternal) { //Not outputting valid data, but cons is valid and prod is ready
+      validInternal := true.B
+    } .elsewhen(validInternal /*&& io.mem.ready*/ && !io.in.valid) { //Outputting data, but prod does not have valid data
+      validInternal := false.B
+    }
+    when(!validInternal) { //When not outputting data, we're always ready
+      readyInternal := true.B
+    } .otherwise { //When outputting data, only ready if consumer is ready
+      readyInternal := io.mem.ready
+    }
+  } else {
+    validInternal := io.in.valid
+    readyInternal := io.mem.ready
+  }
+
+  io.in.ready := readyInternal
+  io.mem.valid := validInternal
 }
 
 /**
@@ -135,42 +157,19 @@ class VectorOrderer extends Module {
  * NUM_MEMORY_BANKS, such that the first element is always stored in bank 0, the next in bank 1, etc.
  */
 object AddressDecode {
-  /** NELEM padded to smallest multiple of NUM_MEMORY_BANKS >= NELEM */
-  val NELEM_PAD = if(NELEM % NUM_MEMORY_BANKS == 0) NELEM else (NELEM/NUM_MEMORY_BANKS+1)*NELEM
-  /** NDOF padded to smallest multiple of NUM_MEMORY_BANKS >= NDOF */
-  val NDOF_PAD = if(NDOF % NUM_MEMORY_BANKS == 0) NDOF else (NDOF/NUM_MEMORY_BANKS+1)*NUM_MEMORY_BANKS
-  /** ELEMS_PER_VSLOT padded to smallest multiple of NUM_MEMORY_BANKS >= ELEMS_PER_VSLOT */
- val ELEMS_PER_VSLOT_PAD = if(ELEMS_PER_VSLOT % NUM_MEMORY_BANKS == 0) ELEMS_PER_VSLOT else (ELEMS_PER_VSLOT/NUM_MEMORY_BANKS+1)*NUM_MEMORY_BANKS
-  //Defining the width of each memory region
-  val KE_WIDTH = ELEMS_PER_VSLOT_PAD
-  val X_WIDTH = NELEM_PAD
-  val XPHYS_WIDTH = NELEM_PAD
-  val XNEW_WIDTH = NELEM_PAD
-  val DC_WIDTH = NELEM_PAD
-  val DV_WIDTH = NELEM_PAD
-  val F_WIDTH = NDOF_PAD
-  val U_WIDTH = NDOF_PAD
-  val R_WIDTH = NDOF_PAD
-  val Z_WIDTH = NDOF_PAD
-  val P_WIDTH = NDOF_PAD
-  val Q_WIDTH = NDOF_PAD
-  val INVD_WIDTH = NDOF_PAD
-  val TMP_WIDTH = NDOF_PAD
-
   //Defining a mapping to make the chisel code more navigable
   val mapping = scala.collection.mutable.Map[Int, Int]()
-  mapping += (0 -> 0)
-  mapping += (1 -> (mapping(0) + KE_WIDTH))
-  mapping += (2 -> (mapping(1) + X_WIDTH))
-  mapping += (3 -> (mapping(2) + XPHYS_WIDTH))
-  mapping += (4 -> (mapping(3) + XNEW_WIDTH))
-  mapping += (5 -> (mapping(4) + DC_WIDTH))
-  mapping += (6 -> (mapping(5) + DV_WIDTH))
-  mapping += (7 -> (mapping(6) + F_WIDTH))
-  mapping += (8 -> (mapping(7) + U_WIDTH))
-  mapping += (9 -> (mapping(8) + R_WIDTH))
-  mapping += (10 -> (mapping(9) + Z_WIDTH))
-  mapping += (11 -> (mapping(10) + P_WIDTH))
-  mapping += (12 -> (mapping(11) + Q_WIDTH))
-  mapping += (13 -> (mapping(12) + INVD_WIDTH))
+  mapping += (0 -> 0) //base address for X
+  mapping += (1 -> (mapping(0) + NELEMSIZE)) //base address for XPHYS
+  mapping += (2 -> (mapping(1) + NELEMSIZE)) //Base address for XNEW
+  mapping += (3 -> (mapping(2) + NELEMSIZE)) //base address for DC
+  mapping += (4 -> (mapping(3) + NELEMSIZE)) //base address for DV
+  mapping += (5 -> (mapping(4) + NELEMSIZE)) //Base address for F
+  mapping += (6 -> (mapping(5) + NELEMSIZE)) //Base address for U
+  mapping += (7 -> (mapping(6) + NDOFSIZE)) //Base address for R
+  mapping += (8 -> (mapping(7) + NDOFSIZE)) //Base address for Z
+  mapping += (9 -> (mapping(8) + NDOFSIZE)) //Base address for P
+  mapping += (10 -> (mapping(9) + NDOFSIZE)) //Base addrss for Q
+  mapping += (11 -> (mapping(10) + NDOFSIZE)) //Base address for INVD
+  mapping += (12 -> (mapping(11) + NDOFSIZE)) //Base address for TMP
 }

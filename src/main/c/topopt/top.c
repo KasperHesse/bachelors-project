@@ -1024,10 +1024,10 @@ void top3dcg(const uint_fast32_t nelx, const uint_fast32_t nely,
   //? Why this block? 
   //! Smth. about setting up the force vector for this problem?
   for (int j = 0; j < ny; j++) {
-    const int i = nx - 1;
-    const int k = 0;
-    const uint_fast32_t nidx = i * ny * nz + k * ny + j;
-    F[3 * nidx + 2] = -1.0;
+    const int i = nx - 1; //Top layer of dof's. When gridsize is even, this is banks 0,1,2,3
+    const int k = 0; //Leftmost column, since k=0
+    const uint_fast32_t nidx = i * ny * nz + k * ny + j; //Getting indices
+    F[3 * nidx + 2] = -1.0; //All elements in F-vector at banks 0 and 2, top layer, get initialized to -1. Only the z-coordinate dof is initialized to -1
   }
 
   DTYPE *dc = malloc(sizeof(DTYPE) * nelem); //Change in c-value

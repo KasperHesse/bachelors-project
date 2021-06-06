@@ -3,7 +3,7 @@ package pipeline
 import chisel3._
 import vector._
 import utils.Config._
-import vector.Opcode._
+import Opcode._
 import chisel3.util._
 import utils.Fixed._
 
@@ -64,9 +64,9 @@ class Execute extends Module {
 
   //We need a SEPARATE destination for MAC instructions, to allow other instructions to be processed at the same time
   destinationQueue.io.destIn := io.id.dest
-  destinationQueue.io.enq := validSignal && opSignal =/= MAC
+  destinationQueue.io.enq := validSignal && !(opSignal === MAC || opSignal === RED)
   macDestQueue.io.enq.bits := io.id.dest
-  macDestQueue.io.enq.valid := validSignal && (opSignal === MAC) && (macDestQueue.io.count === 0.U)
+  macDestQueue.io.enq.valid := validSignal && (opSignal === MAC || opSignal === RED) && (macDestQueue.io.count === 0.U)
 
   //Output signals
   destinationQueue.io.deq := MPU.io.out.valid && !MPU.io.out.macResult
@@ -74,7 +74,7 @@ class Execute extends Module {
   io.wb.res := MPU.io.out.res
   io.wb.valid := MPU.io.out.valid
   io.wb.dest := Mux(MPU.io.out.macResult, macDestQueue.io.deq.bits, destinationQueue.io.destOut)
-  io.wb.reduce := MPU.io.out.macResult && (macDestQueue.io.deq.bits.rf === RegisterFileType.SREG)
+  io.wb.reduce := MPU.io.out.macResult && (macDestQueue.io.deq.bits.rf === RegisterFileType.SREG || macDestQueue.io.deq.bits.rf === RegisterFileType.XREG)
 
   io.fwd.rs1 := in.rs1
   io.fwd.rs2 := in.rs2

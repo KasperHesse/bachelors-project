@@ -13,6 +13,8 @@ class MemoryAccessFSMIO extends Bundle {
   val instr = Input(new StypeInstruction)
   /** Current state of parent Thread module */
   val threadState = Input(ThreadState())
+  /** Current state of the other Thread module */
+  val otherThreadState = Input(ThreadState())
   /** Values used when performing .dof operations that go through the EDOF generator */
   val edof = Decoupled(new IJKgeneratorConsumerIO)
   /** Values used when performing .elem, .fcn, .edn1, .edn2 and .sel operations that go to neighbour generator */
@@ -41,15 +43,15 @@ class IJKGeneratorFSM extends Module {
   /** Number of values that have been output on this instruction */
   val cnt = RegInit(0.U(4.W))
   /** Registered version of current instruction. Only updated when current threadState is sLoad */
-  val regSinstr = RegEnable(io.instr, io.threadState === sLoad || io.threadState === sStore)
+  val regSinstr = RegEnable(io.instr, io.instr.fmt === InstructionFMT.STYPE)
   /** Handle to most recent valid Stype instruction. If thread state is not sStore or sLoad, keeps the previous instruction saved */
-  val Sinstr = Mux(io.threadState === sLoad || io.threadState === sStore, io.instr, regSinstr)
+  val Sinstr = Mux(io.instr.fmt === InstructionFMT.STYPE, io.instr, regSinstr)
   /** Number of values total to output on this instruction */
   val cntMax = WireDefault(0.U(4.W))
   /** Ready signal received from the connected consumer module */
   val ready = Wire(Bool())
   /** True whenever the current state is one where an output should be generated */
-  val outputState = (io.threadState === sLoad || io.threadState === sStore) && state === sOutput
+  val outputState = (io.threadState === sLoad || io.threadState === sStore) && state === sOutput && io.instr.fmt === InstructionFMT.STYPE
   /** Valid signal for connected consumer module */
   val valid = outputState
   /** Load signal going into IJK generator */
@@ -58,17 +60,19 @@ class IJKGeneratorFSM extends Module {
   val restart = WireDefault(false.B)
   /** Next signal going into IJK generator */
   val next = WireDefault(false.B)
+  /** Valid signal indicating to other thread that ijk bundle may be sampled */
+  val ijkValid = RegInit(false.B)
 
   // --- LOGIC ---
   //Connect ready signal from correct consumer
-  when(Sinstr.mod === DOF) {
+  when(Sinstr.mod === DOF || Sinstr.mod === FDOF) {
     ready := io.edof.ready
   } .otherwise {
     ready := io.neighbour.ready
   }
 
   //Set cntMax based on instruction type
-  when(Sinstr.mod === DOF || Sinstr.mod === ELEM) {
+  when(Sinstr.mod === DOF || Sinstr.mod === ELEM || Sinstr.mod === FDOF) {
     cntMax := (VREG_SLOT_WIDTH-1).U
   } .otherwise { //SEL, FCN, EDN1, EDN2.
     cntMax := 0.U
@@ -85,20 +89,25 @@ class IJKGeneratorFSM extends Module {
       when(io.threadState === ThreadState.sEstart) { //end of load operation
         state := sCalcNext
         cnt := 0.U
-      } .elsewhen(io.threadState === ThreadState.sPend || io.threadState === sWait1) { //End of store / start of load
+      } .elsewhen(io.threadState === sWait1) { //End of store / start of load
         state := sWait
         cnt := 0.U
-      }
+      } /*.elsewhen(io.threadState === ThreadState.sPend) {
+        cnt := 0.U
+      }*/
     }
     is(sCalcNext) {
       cnt := cnt + 1.U
       when(cnt === cntMax) {
         cnt := 0.U
         state := sWait
+        ijkValid := true.B
       }
     }
     is(sWait) {
-      when(io.threadState === sStore || io.threadState === sLoad) {
+      val movingToStore = io.threadState === sEend && (io.otherThreadState === sEstart || io.otherThreadState === sWait2)
+      val firstLoad = (io.threadState === sWait1) && io.ijkIn.valid
+      when(movingToStore || firstLoad) {
         state := sOutput
       }
     }
@@ -114,6 +123,8 @@ class IJKGeneratorFSM extends Module {
       }
       when(io.threadState === sEstart) {
         restart := true.B
+      } .elsewhen(io.threadState === sPend) {
+        load := true.B
       }
     }
     is(sCalcNext) {
@@ -122,9 +133,13 @@ class IJKGeneratorFSM extends Module {
       }
     }
     is(sWait) {
-      when(io.threadState === sStore) {
+      val movingToStore = io.threadState === sEend && (io.otherThreadState === sEstart || io.otherThreadState === sWait2)
+      when(movingToStore) {
         restart := true.B
-      } .elsewhen(io.threadState === sLoad) {
+        ijkValid := false.B
+      } /*.elsewhen(io.threadState === sPend /*|| (io.threadState === sWait1 && */) { //TODO will the other module have updated its values if no store instructions are processed?
+        load := true.B
+      }*/ .elsewhen(io.threadState === sWait1 && io.ijkIn.valid) {
         load := true.B
       }
     }
@@ -137,6 +152,7 @@ class IJKGeneratorFSM extends Module {
   ijkGenerator.io.ctrl.next := next
 
   io.ijkOut := ijkGenerator.io.out
+  io.ijkOut.valid := ijkValid
 
   io.edof.bits.pad := ijkGenerator.io.ctrl.pad
   io.edof.bits.ijk := ijkGenerator.io.out.ijk
@@ -153,7 +169,7 @@ class IJKGeneratorFSM extends Module {
   //All output valid signals default to false. Overridden by when statement below
   io.edof.valid := false.B
   io.neighbour.valid := false.B
-  when(Sinstr.mod === DOF) {
+  when(Sinstr.mod === DOF || Sinstr.mod === FDOF) {
     io.edof.valid := valid
   } .elsewhen(Sinstr.mod === VEC) {
     //No assignments, letting defaults take place

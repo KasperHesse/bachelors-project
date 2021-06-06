@@ -33,7 +33,7 @@ class MemoryStage(wordsPerBank: Int, memInitFileLocation: String) extends Module
   val io = IO(new MemoryStageIO)
 
   // --- MODULES ---
-  val addrGen = Module(new AddressGenerator())
+  val addrGen = Module(new AddressGenerator(false))
   val mem = Module(new OnChipMemory(wordsPerBank, memInitFileLocation))
   val wb = Module(new MemoryWriteback)
   val edof = Module(new EdofGenerator)
@@ -57,7 +57,7 @@ class MemoryStage(wordsPerBank: Int, memInitFileLocation: String) extends Module
   indexGen.io.in <> neighbour.io.indexGen
   val vecActive = mod === VEC
   val neighbourActive: Bool = mod === ELEM || mod === SEL || mod === FCN || mod === EDN1 || mod === EDN2
-  val edofActive: Bool = mod === DOF
+  val edofActive: Bool = mod === DOF || mod === FDOF
 
   addrGen.io.in <> vec.io.out
   when(edofActive) {
@@ -80,8 +80,8 @@ class MemoryStage(wordsPerBank: Int, memInitFileLocation: String) extends Module
   io.wb <> wb.io.id
 
   readQueue.io.enq <> io.id.readQueue
-  writeQueueWrapper.io.in <> io.id.writeQueue
-  writeQueue.io.enq <> writeQueueWrapper.io.out
+  io.id.writeQueue <> writeQueueWrapper.io.in
+  writeQueueWrapper.io.out <> writeQueue.io.enq
 
   mem.io.we := io.id.ls === StypeLoadStore.STORE
   io.ctrl.rqCount := readQueue.io.count

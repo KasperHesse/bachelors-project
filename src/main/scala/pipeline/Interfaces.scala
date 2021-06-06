@@ -6,7 +6,6 @@ import chisel3.util.{Decoupled, log2Ceil}
 import memory.{AddressGenProducerIO, IJKgeneratorConsumerIO, ReadQueueBundle, WriteQueueBundle}
 import utils.Config._
 import utils.Fixed._
-import vector.Opcode
 
 /**
  * Interface between the instruction fetch and instruction decode stages.
@@ -38,7 +37,7 @@ class IdExIO extends Bundle {
   val rs1 = Output(new RegisterBundle())
   /** Register indicating where the second operand came form */
   val rs2 = Output(new RegisterBundle())
-  /** Operation to execute. See [[vector.Opcode]] */
+  /** Operation to execute. See [[Opcode]] */
   val op = Output(Opcode())
   /** UInt version of opcode. Debug purposes only */
   val opUInt = Output(UInt(6.W))
