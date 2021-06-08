@@ -24,7 +24,7 @@ class ThreadIO extends Bundle {
   /** Start flag. Asserted when a packet has been transferred from IM to instructionBuffer, and processing may begin */
   val start = Input(Bool())
   /** Instruction pointer of the current packet. Sent to IM in Decode stage */
-  val ip = Output(UInt(4.W))
+  val ip = Output(UInt(log2Ceil(INSTRUCTION_BUFFER_SIZE+1).W))
   /** Connections to other thread in Decode stage */
   val threadOut = Output(new ThreadThreadIO)
   /** Input connections from other thread in Decode stage */
@@ -78,7 +78,7 @@ class Thread(id: Int) extends Module {
 
   // --- REGISTERS ---
   /** Instruction pointer into the instruction buffer */
-  val IP = RegInit(0.U(4.W))
+  val IP = RegInit(0.U(log2Ceil(INSTRUCTION_BUFFER_SIZE+1).W))
   /** Current index into subvectors. Also gives the x-coordinate of the submatrix in the KE matrix */
   val X = RegInit(0.U(log2Ceil(VREG_DEPTH+1).W))
 //    val X = RegInit(0.U)
@@ -290,7 +290,6 @@ class Thread(id: Int) extends Module {
         IP := 1.U
         macLimit := macLimitDecode(Oinst.len.asUInt())
         maxIndex := maxIndexDecode(Oinst.len.asUInt())
-//        instrLen := lenDecode(Oinst.len.asUInt())
         if(id == 0) {
           state := sLoad
         } else {
@@ -330,8 +329,7 @@ class Thread(id: Int) extends Module {
       }
     }
     is(sStore) {
-      finalCycle := memAccess.io.finalCycle //Memory module handles most of the remaining logic
-      //Store data, increment IP as necessary
+      finalCycle := memAccess.io.finalCycle //Memory access module handles the remaining logic
       when(Oinst.pe === OtypePE.PACKET && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE) {
         state := sPend
       }
@@ -495,7 +493,8 @@ class Thread(id: Int) extends Module {
       }
       is(RtypeMod.SV) {
         for (i <- 0 until NUM_PROCELEM) {
-          a(i) := RegNext(io.sRegFile.rdData1) //TODO should probably just use memory for the sreg file as well. Right now, it is delayed by one cycle to match vector reg file
+          //a(i) := RegNext(io.sRegFile.rdData1) //TODO should probably just use memory for the sreg file as well. Right now, it is delayed by one cycle to match vector reg file
+          a(i) := io.sRegFile.rdData1
         }
         b := b_subvec(RegNext(X))
       }
@@ -505,14 +504,17 @@ class Thread(id: Int) extends Module {
       }
       is(RtypeMod.SX) {
         for(i <- 0 until NUM_PROCELEM) {
-          a(i) := RegNext(io.sRegFile.rdData1) //TODO use memory for sreg and remove this register
+          //a(i) := RegNext(io.sRegFile.rdData1) //TODO use memory for sreg and remove this register
+          a(i) := io.sRegFile.rdData1
         }
         b := xRegRdData2
       }
       is(RtypeMod.SS) {
         for (i <- 0 until NUM_PROCELEM) {
-          a(i) := RegNext(io.sRegFile.rdData1) //TODO remove registers
-          b(i) := RegNext(io.sRegFile.rdData2)
+          //a(i) := RegNext(io.sRegFile.rdData1) //TODO remove registers
+          //b(i) := RegNext(io.sRegFile.rdData2)
+          a(i) := io.sRegFile.rdData1
+          b(i) := io.sRegFile.rdData2
         }
       }
       is(RtypeMod.KV) {

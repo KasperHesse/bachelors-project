@@ -16,6 +16,7 @@ class ScalarRegisterFile extends Module {
   for(i <- 0 until NUM_SREG) {
     arr(i) = double2fixed(i).S(FIXED_WIDTH.W)
   }
+  /*
   val regFile: Vec[SInt] = if(SIMULATION) {
     RegInit(VecInit(arr))
   } else {
@@ -26,7 +27,15 @@ class ScalarRegisterFile extends Module {
     regFile(io.rd) := io.wrData
   }
   io.rdData1 := regFile(io.rs1)
-  io.rdData2 := regFile(io.rs2)
+  io.rdData2 := regFile(io.rs2) */
+
+  //Trying to map it down to syncreadmem instead
+  val mem = SyncReadMem(NUM_SREG, SInt(FIXED_WIDTH.W))
+  when(io.we && io.rd =/= 0.U) {
+    mem.write(io.rd, io.wrData)
+  }
+  io.rdData1 := mem.read(io.rs1)
+  io.rdData2 := mem.read(io.rs2)
 }
 
 class ScalarRegFileIO extends Bundle {

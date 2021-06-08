@@ -46,11 +46,11 @@ class Decode extends Module {
   /** State register */
   val state = RegInit(DecodeState.sIdle)
   /** Instruction buffer */
-  val iBuffer = RegInit(VecInit(Seq.fill(INSTRUCTION_BUFFER_SIZE)(0.U(INSTRUCTION_WIDTH.W))))
+  val iBuffer = for(i <- 0 until 2) yield {RegInit(VecInit(Seq.fill(INSTRUCTION_BUFFER_SIZE)(0.U(INSTRUCTION_WIDTH.W))))}
   /** Instruction pointer, used when filling iBuffer */
-  val IP = RegInit(0.U(4.W))
+  val IP = RegInit(0.U(log2Ceil(INSTRUCTION_BUFFER_SIZE+1).W))
   /** Number of instructions in iBuffer */
-  val iCount = RegInit(0.U(4.W))
+  val iCount = RegInit(0.U(log2Ceil(INSTRUCTION_BUFFER_SIZE+1).W))
   /** Progress when accessing vectors / the number of elements that have been loaded so far. */
   val progress = RegInit(0.U(log2Ceil(NDOF+ELEMS_PER_VSLOT+1).W))
   /** Total number of operations to issue before instructions are finished / total number of elements to load */
@@ -107,13 +107,14 @@ class Decode extends Module {
 
   // --- OUTPUTS AND CONNECTIONS --- //
   //Common thread connections
-  for(thread <- threads) {
+  for(i <- threads.indices) {
+    val thread = threads(i)
     thread.io.progress := progress
     thread.io.fin := fin
     thread.io.start := start
     thread.io.sRegFile.rdData1 := sRegFile.io.rdData1
     thread.io.sRegFile.rdData2 := sRegFile.io.rdData2
-    thread.io.instr := iBuffer(thread.io.ip)
+    thread.io.instr := iBuffer(i)(thread.io.ip)
   }
   //Specific thread connections
   threads(0).io.threadIn := threads(1).io.threadOut
@@ -181,7 +182,8 @@ class Decode extends Module {
       }
     }
     is(sLoad) {
-      iBuffer(IP) := fe_instr
+      iBuffer(0)(IP) := fe_instr
+      iBuffer(1)(IP) := fe_instr
       IP := IP + 1.U
       when(!io.ctrl.iload) {
         state := sExec
