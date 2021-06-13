@@ -213,7 +213,8 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
   }
 
   it should "divide a stream of numbers" in {
-    test(new ProcessingElement) {c =>
+    test(new ProcessingElement).withAnnotations(Seq(WriteVcdAnnotation)) {c =>
+      scala.util.Random.setSeed(1L)
       generateStimuliSingleOperation(c, DIV, iters)
     }
   }

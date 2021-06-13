@@ -43,7 +43,7 @@ object SynthesisMemInit {
     //Create memory initialization files
     for(i <- 0 until NUM_MEMORY_BANKS) {
       val memFile = s"resources/membank_$i.txt"
-      val contents = mem(i).map(double2fixed).map(c => c & ((1L << FIXED_WIDTH)-1))
+      val contents = mem(i).map(double2fixed).map(c => c & ((1L << FIXED_WIDTH)-1)) //Mask to preserve only FIXED_WIDTH lower bits
       writeMemInitFile(memFile, contents, 16)
     }
   }

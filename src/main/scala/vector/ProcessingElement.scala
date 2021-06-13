@@ -29,7 +29,7 @@ When MAC is deasserted, wait until  'done' output goes low, and then output the 
 class ProcessingElement extends Module {
   val io = IO(new ProcElemIO)
 
-  val in = io.in
+  val in = RegNext(io.in)
   //Modules in use
   val mul = Module(FixedPointMul(utils.MulTypes.SINGLECYCLE))
   val div = Module(FixedPointDiv(utils.DivTypes.NEWTONRAPHSON))

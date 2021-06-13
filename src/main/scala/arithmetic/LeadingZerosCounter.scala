@@ -20,7 +20,7 @@ class LeadingZerosCounter64Bit extends Module {
   io.cnt := Mux(LZC(1).io.Q, Cat(1.U, LZC(0).io.cnt), Cat(0.U, LZC(1).io.cnt))
 }
 /**
- * Counts the number of leading zeros in a 64-bit value. Based on the design presented by Milenkovic, Stankovic & Milic, 2015
+ * Counts the number of leading zeros in a 32-bit value. Based on the design presented by Milenkovic, Stankovic & Milic, 2015
  */
 class LeadingZerosCounter32Bit extends Module {
   val io = IO(new Bundle {
