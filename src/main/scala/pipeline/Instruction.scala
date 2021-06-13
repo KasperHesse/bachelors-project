@@ -18,11 +18,11 @@ trait Instruction {
  */
 class RtypeInstruction extends Bundle with Instruction {
   /** Source register 2 */
-  val rs2 = UInt(4.W) //31:28
+  val rs1 = UInt(4.W) //31:28
   /** Fractional part of immediate. Only used when immflag = true */
   val immfrac = UInt(7.W) //21:27
   /** Source register 1 */
-  val rs1 = UInt(4.W) //20:17
+  val rs2 = UInt(4.W) //20:17
   /** Destination register */
   val rd = UInt(4.W) //16:13
   /** Immediate flag */
@@ -46,9 +46,9 @@ object RtypeInstruction {
   val MOD_OFFSET = 8
   val IMMFLAG_OFFSET = 12
   val RD_OFFSET = 13
-  val RS1_OFFSET = 17
+  val RS2_OFFSET = 17
   val FRAC_OFFSET = 21
-  val RS2_OFFSET = 28
+  val RS1_OFFSET = 28
 
   /** Creates an R-type instruction which takes two register operands */
   def apply(rd: Int, rs1: Int, rs2: Int, op: Opcode.Type, mod: RtypeMod.Type): RtypeInstruction = {
@@ -56,10 +56,10 @@ object RtypeInstruction {
   }
 
   /** Creates an R-type instruction which takes a single register operand and an immediate */
-  def apply(rd: Int, rs1: Int, immh: Int, frac: Int, op: Opcode.Type, mod: RtypeMod.Type): RtypeInstruction = {
+  def apply(rd: Int, rs2: Int, immh: Int, frac: Int, op: Opcode.Type, mod: RtypeMod.Type): RtypeInstruction = {
     require(immh < 16, "Integer part of immediate must be less than 16")
     require(frac < 128, "Fractional part of immediate must be less than 128")
-    (new RtypeInstruction).Lit(_.rd -> rd.U, _.rs1 -> rs1.U, _.rs2 -> immh.U, _.op -> op, _.mod -> mod, _.fmt -> InstructionFMT.RTYPE, _.immflag -> true.B, _.immfrac -> frac.U)
+    (new RtypeInstruction).Lit(_.rd -> rd.U, _.rs1 -> immh.U, _.rs2 -> rs2.U, _.op -> op, _.mod -> mod, _.fmt -> InstructionFMT.RTYPE, _.immflag -> true.B, _.immfrac -> frac.U)
   }
 
   /** Converts an R-type instruction to its UInt representation */
@@ -70,7 +70,7 @@ object RtypeInstruction {
     r |= (v.mod.litValue.toInt << MOD_OFFSET)
     r |= (v.immflag.litValue.toInt << IMMFLAG_OFFSET)
     r |= (v.rd.litValue().toInt << RD_OFFSET)
-    r |= (v.rs1.litValue().toInt << RS1_OFFSET)
+    r |= (v.rs1.litValue().toLong << RS1_OFFSET)
     r |= (v.rs2.litValue().toInt << RS2_OFFSET)
     r |= (v.immfrac.litValue.toLong << FRAC_OFFSET)
     r.U(32.W)

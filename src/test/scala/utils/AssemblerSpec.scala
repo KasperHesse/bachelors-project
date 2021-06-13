@@ -17,8 +17,8 @@ class AssemblerSpec extends FlatSpec with Matchers {
   behavior of "Assembler"
 
   val rand = scala.util.Random
-  val opStrings = Array("add", "sub", "mul", "div", "max", "min", "abs", "red")
-  val opValues = Array(ADD, SUB, MUL, DIV, MAX, MIN, ABS, RED)
+  val opStrings = Array("add", "sub", "mul", "div", "max", "min", "abs")
+  val opValues = Array(ADD, SUB, MUL, DIV, MAX, MIN, ABS)
   val modStrings = Array("vv", "xv", "sv", "xx", "sx", "ss")
   val modValues = Array(VV, XV, SV, XX, SX, SS)
   val prefixValues = Array(
@@ -93,16 +93,16 @@ class AssemblerSpec extends FlatSpec with Matchers {
       val opString = opStrings(op)
       val opValue = opValues(op)
 
-      val rs1 = rand.nextInt(regMax)
+      val rs2 = rand.nextInt(regMax)
       val rd = rand.nextInt(regMax)
 
       val imm = genImmediate()
       val immparts = fixedImm2parts(imm2fixed(imm))
 
-      val line = s"$opString.$modString $prefix$rd, $prefix$rs1, $imm"
+      val line = s"$opString.$modString $prefix$rd, $prefix$rs2, $imm"
       val parsed = Assembler.parseRtype(Assembler.split(line))
 
-      val instr = RtypeInstruction(rd, rs1, immparts(0), immparts(1), opValue, modValue).litValue.toInt
+      val instr = RtypeInstruction(rd, rs2, immparts(0), immparts(1), opValue, modValue).litValue.toInt
       assert(parsed == instr)
     }
 
@@ -148,33 +148,6 @@ class AssemblerSpec extends FlatSpec with Matchers {
     }
   }
 
-  it should "assemble B-type instructions" in {
-    val compValues = Array(EQUAL, NEQ, LT, GEQ)
-    val compStrings = Array("beq", "bne", "blt", "bge")
-    //Branch type, registers and offset.
-    //Offset should be 2^15 and then multiplied by 4
-    val map = scala.collection.mutable.Map[String, Int]()
-    def testFun(compIndex: Int): Unit = {
-      val offset = rand.nextInt(math.pow(2,15).toInt) * 4 * (if(rand.nextBoolean()) 1 else -1)
-      val rs1 = rand.nextInt(NUM_SREG)
-      val rs2 = rand.nextInt(NUM_SREG)
-      val compValue = compValues(compIndex)
-      val compString = compStrings(compIndex)
-
-      val line = s"$compString s$rs1, s$rs2, $offset"
-      val instr = BtypeInstruction(compValue, rs1, rs2, offset)
-      val parsed = Assembler.parseBtype(Assembler.split(line), map, 0)
-      assert(parsed == instr.litValue().toInt)
-    }
-
-    for(i <- 0 until 10) {
-      testFun(0)
-      testFun(1)
-      testFun(2)
-      testFun(3)
-    }
-  }
-
   it should "throw an error if branch offset is not a multiple of 4" in {
     try {
       val map = scala.collection.mutable.Map[String, Int]()
@@ -195,7 +168,7 @@ class AssemblerSpec extends FlatSpec with Matchers {
       "eend\n" + //16
       "pend\n" + //20
       "bne s1, s2, L2\n" + //24
-      "beq s0, s0, -28\n" + //28
+      "beq s0, s0, L1\n" + //28
       "L2:\n" +
       "blt s1, s1, L1" //32
     val parsed = Assembler.assemble(program)
@@ -383,6 +356,16 @@ class AssemblerSpec extends FlatSpec with Matchers {
     } catch {
       case e: IllegalArgumentException => if(e.getMessage.contains("There can only be one mac instruction in each instruction packet")) assert(true) else assert(false, "Wrongly assembled two mac instructions")
     }
+  }
+
+  it should "ignore opening and closing curly braces" in {
+    val program = "{\n" +
+      "pstart single\n" +
+      "estart\n" +
+      "eend\n" +
+      "pend\n" +
+      "}"
+    Assembler.assemble(program)
   }
 
   it should "ignore comments" in {

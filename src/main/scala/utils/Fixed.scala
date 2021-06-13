@@ -214,7 +214,7 @@ object Fixed {
    * @return The square root of v
    */
   def fixedSqrt(S: SInt): SInt = {
-    var x0 = fixedDiv(S, double2fixed(2).S(FIXED_WIDTH.W)) //Initial estimate, S/2
+    var x0 = fixedMul(S, double2fixed(0.5).S(FIXED_WIDTH.W)) //Initial estimate, S/2
     val onehalf = double2fixed(0.5).S(FIXED_WIDTH.W) //Constant: 1/2
     var xnew = 0.S(FIXED_WIDTH.W) //New value
     for(i <- 0 until 6) {
@@ -344,7 +344,7 @@ object Fixed {
    * @return The immediate value encoded in the instruction
    */
   def getImmediate(instr: RtypeInstruction): SInt = {
-    val immh = instr.rs2.litValue.toInt
+    val immh = instr.rs1.litValue.toInt
     val immfrac = instr.immfrac.litValue.toInt
     val neg = (immh & 0x8) > 0
     //If negative, we utilize the fact that 16-immh gives the correct negative version of our value

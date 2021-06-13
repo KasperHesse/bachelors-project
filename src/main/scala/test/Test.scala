@@ -2,6 +2,7 @@ package test
 
 import chisel3._
 import chisel3.util._
+import utils.Fixed._
 
 class Test extends Module {
   val io = IO(new Bundle {
@@ -43,5 +44,10 @@ class Test extends Module {
 }
 
 object Test extends App {
-  print(s"Normal: ${0x8000000000000000L}. Shifted: ${(1L << (64-1))}")
+  val imm = imm2fixed(0.08578) //Smallest value that can be expressed in an immediate
+  val imm2 =
+//  val r = fixedMul(fixedMul(0.0078125, 0.015625), 0.015625)
+    println(s"$imm\t ${fixed2double(imm)} ${imm.toBinaryString}")
+//  println(r)
+//  print(s"Normal: ${0x8000000000000000L}. Shifted: ${(1L << (64-1))}")
 }

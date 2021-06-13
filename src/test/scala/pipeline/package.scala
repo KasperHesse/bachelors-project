@@ -44,7 +44,7 @@ package object pipeline {
     }
     val rand = scala.util.Random
     val rd = rand.nextInt(NUM_VREG_SLOTS)
-    val rs1 = rand.nextInt(NUM_VREG_SLOTS)
+    val rs2 = rand.nextInt(NUM_VREG_SLOTS)
 
     //Generate random immediate
     val imm = rand.nextDouble()*math.pow(2,3)*{if(rand.nextBoolean()) 1 else -1}
@@ -55,11 +55,11 @@ package object pipeline {
     val immh = ((immfixed & 0x780) >> 7).toInt //Bits 10:7
     print(s"Generated instruction with immediate ${immfixed*math.pow(2,-7)}\n")
 
-    val mods = Array(VV, XV, SV, XX, SX, SS)
+    val mods = Array(SV, SX, SS)
     val opcodes = Array(ADD, SUB, MUL, DIV, MAX, MIN)
     val mod = mods(rand.nextInt(mods.length))
     val op = opcodes(rand.nextInt(opcodes.length))
-    RtypeInstruction(rd, rs1, immh, immfrac, op, mod)
+    RtypeInstruction(rd, rs2, immh, immfrac, op, mod)
     //101 0001110
   }
 
@@ -103,7 +103,7 @@ package object pipeline {
    * Calculates the result of an ordinary arithmetic instruction
    *
    * @param instr The instruction being calculated
-   * @param a The first value / numerator
+   * @param A The first value / numerator
    * @param b The second value / denominator
    * @return The resultint value
    */
@@ -111,25 +111,30 @@ package object pipeline {
     val ol = instr.op.litValue
 
     //If instruction is immediate, replace b-value with immediate value
-    val B = if(instr.immflag.litToBoolean) {
+//    val b = if(instr.immflag.litToBoolean) {
+//      getImmediate(instr)
+//    } else {
+//      b
+//    }
+    val A = if(instr.immflag.litToBoolean) {
       getImmediate(instr)
     } else {
-      b
+      a
     }
     if (ol == ADD.litValue) {
-      fixedAdd(a, B)
+      fixedAdd(A, b)
     } else if (ol == SUB.litValue()) {
-      fixedSub(a, B)
+      fixedSub(A, b)
     } else if (ol == MUL.litValue) {
-      fixedMul(a, B)
+      fixedMul(A, b)
     } else if (ol == DIV.litValue) {
-      fixedDiv(a, B)
+      fixedDiv(A, b)
     } else if (ol == MIN.litValue) {
-      fixedMin(a, B)
+      fixedMin(A, b)
     } else if (ol == MAX.litValue) {
-      fixedMax(a, B)
+      fixedMax(A, b)
     } else if (ol == ABS.litValue) {
-      fixedAbs(a)
+      fixedAbs(A)
     } else {
         throw new IllegalArgumentException("Unknown opcode")
     }
@@ -243,8 +248,8 @@ package object pipeline {
     val rs2 = instr.rs2.litValue.toInt
     val imm = getImmediate(instr)
     for (i <- 0 until NUM_PROCELEM) {
-      val a = sReg(rs1)
-      val b = if(instr.immflag.litToBoolean) imm else sReg(rs2)
+      val a = if(instr.immflag.litToBoolean) imm else sReg(rs1)
+      val b = sReg(rs2)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -260,8 +265,8 @@ package object pipeline {
     val rs2 = instr.rs2.litValue.toInt
     val imm = getImmediate(instr)
     for (i <- 0 until NUM_PROCELEM) {
-      val a = sReg(rs1)
-      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(i)
+      val a = if(instr.immflag.litToBoolean) imm else sReg(rs1)
+      val b = xReg(rs2)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -277,8 +282,8 @@ package object pipeline {
     val rs2 = instr.rs2.litValue.toInt
     val imm = getImmediate(instr)
     for (i <- 0 until NUM_PROCELEM) {
-      val a = xReg(rs1)(i)
-      val b = if(instr.immflag.litToBoolean) imm else xReg(rs2)(i)
+      val a = if(instr.immflag.litToBoolean) imm else xReg(rs1)(i)
+      val b = xReg(rs2)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -296,8 +301,8 @@ package object pipeline {
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
     val imm = getImmediate(instr)
     for(i <- 0 until VREG_DEPTH) {
-      val a = sReg(rs1)
-      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(i)
+      val a = if(instr.immflag.litToBoolean) imm else sReg(rs1)
+      val b = vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }
@@ -326,8 +331,8 @@ package object pipeline {
       }
     } else {
       for(i <- 0 until VREG_DEPTH) {
-        val a = vReg(rs1*VREG_SLOT_WIDTH+rdOffset)(i)
-        val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(i)
+        val a = if(instr.immflag.litToBoolean) imm else vReg(rs1*VREG_SLOT_WIDTH+rdOffset)(i)
+        val b = vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(i)
         results(i) = calculateRes(instr, a, b)
       }
     }
@@ -344,10 +349,10 @@ package object pipeline {
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
-    val a = xReg(rs1)(rdOffset)
     val imm = getImmediate(instr)
+    val a = if(instr.immflag.litToBoolean) imm else xReg(rs1)(rdOffset)
     for(i <- 0 until VREG_DEPTH) {
-      val b = if(instr.immflag.litToBoolean) imm else vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(i)
+      val b = vReg(rs2*VREG_SLOT_WIDTH+rdOffset)(i)
       results(i) = calculateRes(instr, a, b)
     }
   }

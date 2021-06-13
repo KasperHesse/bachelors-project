@@ -121,7 +121,6 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
     //Poke default values
     dut.io.fin.poke(false.B)
-    dut.io.progress.poke(0.U)
     dut.io.threadIn.state.poke(sEstart)
     dut.io.instr.poke(0.U)
     dut.io.start.poke(true.B)

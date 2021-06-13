@@ -30,9 +30,9 @@ class OnChipMemoryIO extends Bundle {
  *
  * @param wordsPerBank The number of data words to store in *each* memory bank. The total amount of memory allotted
  *                     is NUM_MEMORY_BANKS*wordsPerBank, each of which is [[utils.Fixed.FIXED_WIDTH]] bits wide.
- * @param memInitFileLocation Location of memory initialization file. Each file must be named 'membank_x.txt', where 'x'
+ * @param memInitFileLocation Location of memory initialization file. Each file must be named 'membank_x.hex.txt', where 'x'
  *                            is a number [0;NUM_MEMORY_BANKS[. The parameter is the relative path to these files, to which the filename is appended.
- *                            If eg memInitFileLocation = "resources/meminit/", one file would be "resources/meminit/membank_0.txt"
+ *                            If eg memInitFileLocation = "resources/meminit/", one file would be "resources/meminit/membank_0.hex.txt"
  */
 class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src/test/scala/memory/membankinit/") extends Module {
   require(isPow2(NUM_MEMORY_BANKS), "Number of memory banks must be a power of 2")

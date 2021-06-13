@@ -74,7 +74,12 @@ object DensityFilterTest extends App {
 //each set of i,j,k values can only take on one of these 4 values (given that rmin=1.5)
 
 //Filter weight values
-//Same:             1.5
-//Side nNeighbour:  0.5
-//Far neighbour:    0.0
-//corner neighbour: 0.0857864376
+//Central element:  1.5
+//Face neighbour:   0.5
+//Edge neighbour:   0.08578
+//Corner neighbour: 0.0
+
+//Corners: 1.5+3*0.5*+3*0.0858
+//Design domain edge: central, 4 face neighbours, 5x edge neighbours
+//Design domain face:: central, 5 face neighbours, 8x edge neighbours
+//Internal: central, 6 face neighbours, 12 edge neighbours

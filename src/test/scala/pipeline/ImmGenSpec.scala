@@ -16,12 +16,12 @@ class ImmGenSpec extends FlatSpec with ChiselScalatestTester with Matchers  {
         INT_WIDTH = 3
         FRAC_WIDTH = 7
         FIXED_WIDTH = 11
-        val a = genDouble() //Original double value
+        val a = genDouble()*0.1 //Original double value
         val x = double2fixed(a)
         val y1 = fixed2double(x) //Rounded double value
         val immh = x.S(10,7).litValue.toInt
         val frac = x.S(6,0).litValue.toInt
-        val instr = RtypeInstruction(rd=0, rs1=0, immh, frac, op=Opcode.ADD, mod=RtypeMod.VV)
+        val instr = RtypeInstruction(rd=0, rs2=0, immh, frac, op=Opcode.ADD, mod=RtypeMod.VV)
         dut.io.instr.poke(instr)
         dut.clock.step()
         simulationConfig()

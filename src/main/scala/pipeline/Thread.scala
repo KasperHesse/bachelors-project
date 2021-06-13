@@ -15,8 +15,6 @@ import pipeline.RegisterFileType._
  * I/O Ports for "Thread" modules inside of the decode stage
  */
 class ThreadIO extends Bundle {
-  /** How far into the current vector we have progressed. Used when loading/storing with .vec suffix */
-  val progress = Input(UInt(log2Ceil(NDOF+1).W))
   /** The current instruction, fetched from instruction buffer in decode stage */
   val instr = Input(UInt(INSTRUCTION_WIDTH.W))
   /** Finished flag. Asserted when processing is finished and the thread should move to idle state after writing back */

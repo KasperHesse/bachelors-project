@@ -38,7 +38,7 @@ object Config {
   var NDOF = 3 * NX * NY * NZ
 
   /** Maximum number of instructions that may be in one instruction packet (including pstart, estart, eend and pend) */
-  val INSTRUCTION_BUFFER_SIZE = 32
+  val INSTRUCTION_BUFFER_SIZE = 40
   /** The number of elements in the vector register file */
   var NUM_VREG = 32
   /** The number of vector register slots that are adressible from instructions */
