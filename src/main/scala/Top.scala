@@ -15,6 +15,10 @@ object Top extends App {
   Assembler.writeMemInitFile("resources/im.txt", Assembler.assemble(source).map(_.toLong))
   source.close()
 
+  val source2 = Source.fromFile("resources/program1.txt")
+  Assembler.writeMemInitFile("resources/top2.txt", Assembler.assemble(source).map(_.toLong))
+  source.close()
+
   SynthesisMemInit()
 
   (new chisel3.stage.ChiselStage).execute(

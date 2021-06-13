@@ -190,6 +190,10 @@ object Assembler {
       case VV  | SV => sReg(tokens(1))
       case KV => vReg(tokens(1))
       case _ => throw new IllegalArgumentException("MAC instructions can only be executed with modifiers 'kv', 'sv', and 'vv'")
+    } else if (op == RED) mod match {
+      case VV => xReg(tokens(1))
+      case XX => sReg(tokens(1))
+      case _ => throw new IllegalArgumentException(s"RED instructions cannot be executed with modifier ${tokens(1)}, only with .vv and .xx")
     } else mod match {
       case VV | XV | SV | KV => vReg(tokens(1))
       case SS => sReg(tokens(1))
@@ -197,23 +201,43 @@ object Assembler {
       case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rd field")
     }
 
-    val rs1 = if(immflag) mod match {
-      case SV => vReg(tokens(2))
-      case SX => xReg(tokens(2))
-      case SS => sReg(tokens(2))
-      case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs1 field in immediate instruction")
-    } else mod match {
+//    val rs1 = if(immflag) mod match {
+//      case SV => vReg(tokens(2))
+//      case SX => xReg(tokens(2))
+//      case SS => sReg(tokens(2))
+//      case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs1 field in immediate instruction")
+//    } else mod match {
+//      case VV | KV => vReg(tokens(2))
+//      case XX | XV => xReg(tokens(2))
+//      case SS | SV | SX => sReg(tokens(2))
+//      case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs1 field")
+//    }
+//
+//    val rs2 = if(immflag) immint else mod match {
+//      case VV | SV | XV => vReg(tokens(3))
+//      case SS => sReg(tokens(3))
+//      case XX | SX => xReg(tokens(3))
+//      case KV => 0 //MVP instructions don't use rs2 to anything
+//      case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs2 field")
+//    }
+
+    val rs1 = if(immflag) immint else mod match {
       case VV | KV => vReg(tokens(2))
       case XX | XV => xReg(tokens(2))
       case SS | SV | SX => sReg(tokens(2))
-      case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs1 field")
+      case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs1 field in immediate instruction")
     }
 
-    val rs2 = if(immflag) immint else mod match {
+    val rs2 = if(immflag) mod match {
+      case SV => vReg(tokens(2))
+      case SX => xReg(tokens(2))
+      case SS => sReg(tokens(2))
+      case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs2 field")
+    } else mod match {
       case VV | SV | XV => vReg(tokens(3))
       case SS => sReg(tokens(3))
       case XX | SX => xReg(tokens(3))
-      case KV => 0 //MVP instructions don't use rs2 to anything
+      case KV => 0 //MVP instructions don't use rs2
       case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs2 field")
     }
 
@@ -330,7 +354,6 @@ object Assembler {
    */
   def parseStype(tokens: Array[String], incrementType: Array[Int]): Int = {
     import StypeInstruction._
-    require(tokens.length == 3, "S-type instructions must have exactly 3 tokens")
 
     val lsString = tokens(0).split("\\.")(0)
     val modString = tokens(0).split("\\.")(1)
@@ -350,7 +373,7 @@ object Assembler {
       throw new IllegalArgumentException(s"Cannot perform load operations with Stype modifier $modString")
     } else if (Seq(DOF, FDOF).contains(mod) && Seq(X, XPHYS, XNEW, DC, DV).contains(baseAddr)) {
       throw new IllegalArgumentException(s"Cannot perform dof/fdof operations to base address $baseAddrString")
-    } else if (Seq(ELEM, SEL, FCN, EDN1, EDN2).contains(mod) && !Seq(X, XPHYS, XNEW, DC, DV).contains(baseAddr)) {
+    } else if (Seq(ELEM, SEL, FCN, EDN1, EDN2).contains(mod) && !Seq(X, XPHYS, XNEW, DC, DV, TMP).contains(baseAddr)) {
       throw new IllegalArgumentException(s"Cannot perform $modString operations to base address $baseAddrString")
     } else if (it == NELEMSTEP && !Seq(SEL, FCN, EDN1, EDN2).contains(mod)) {
       throw new IllegalArgumentException(s"Cannot perform $modString operations when increment type is 'nelemstep'")
@@ -451,7 +474,7 @@ object Assembler {
    * @return The tokens making up that string
    */
   def split(line: String): Array[String] = {
-    line.split(",? +") //0 or 1 commas, followed by any number of spaces
+    line.split(",?\\s+") //0 or 1 commas, followed by any amount of whitespace
   }
 
   /**
@@ -518,6 +541,8 @@ object Assembler {
           val instr = tokens(0) match {
             case x if x.startsWith("//") => "" //Comment
             case x if x.trim().equals("") => "" //Blank line
+            case "{" => "" //Ignore grouping symbol
+            case "}" => "" //Ignore grouping symbol
             case symbolPattern(x) => if(!pass2) parseSymbol(symbols, pc, tokens)
             case "pstart" => parseOtype(tokens, incrementType)
             case "estart" => parseOtype(tokens, incrementType)
@@ -602,6 +627,7 @@ object Assembler {
           packetSize = 0
         }
         case "//" => return
+        case "{" | "}" => return
         case x: String =>
           if(Seq("add","sub", "mul", "div", "max", "min", "mac").contains(x.substring(0,3)) && (!estart || eend)) {
             throw new IllegalArgumentException("R-type instructions only allowed between estart and eend")

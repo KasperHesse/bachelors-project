@@ -24,7 +24,7 @@ class ImmediateGenerator extends Module {
   val topPadding = (INT_WIDTH + 1) - IMM_INT_WIDTH
   val bottomPadding = FRAC_WIDTH - IMM_FRAC_WIDTH
 
-  val int = io.instr.rs2
+  val int = io.instr.rs1
   val frac = io.instr.immfrac
 
   val sign = int(3)

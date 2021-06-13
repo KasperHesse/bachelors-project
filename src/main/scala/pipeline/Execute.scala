@@ -41,7 +41,7 @@ class Execute extends Module {
   // --- LOGIC ---
   //Must delay stall signal by one cc, since valid + op from decode stage are also delayed by 1 due to
   //the SyncReadMem implementation of the register file
-  val validSignal =  !io.ctrl.stall && io.id.op =/= Opcode.NOP && io.id.valid //normal version
+  val validSignal =  !io.ctrl.stall && io.id.op =/= Opcode.NOP && io.id.valid
   valid := validSignal
 
   //Stall / NOP overrides to ensure we don't process anything
@@ -56,18 +56,18 @@ class Execute extends Module {
     immVec(i) := in.imm
   }
   // --- CONNECTIONS ---
-  MPU.io.in.a := a
-  MPU.io.in.b := Mux(in.useImm, immVec, b)
+  MPU.io.in.a := Mux(in.useImm, immVec, a)
+  MPU.io.in.b := b
   MPU.io.in.valid := valid
   MPU.io.in.op := op
   MPU.io.in.macLimit := in.macLimit
 
   //We need a SEPARATE destination for MAC instructions, to allow other instructions to be processed at the same time
   destinationQueue.io.destIn := io.id.dest
-  destinationQueue.io.enq := validSignal && !(opSignal === MAC || opSignal === RED)
+  destinationQueue.io.enq := validSignal && !(opSignal === MAC || opSignal === RED) && macDestQueue.io.count === 0.U
+//  destinationQueue.io.enq := validSignal && (opSignal =/= MAC)
   macDestQueue.io.enq.bits := io.id.dest
   macDestQueue.io.enq.valid := validSignal && (opSignal === MAC || opSignal === RED) && (macDestQueue.io.count === 0.U)
-
   //Output signals
   destinationQueue.io.deq := MPU.io.out.valid && !MPU.io.out.macResult
   macDestQueue.io.deq.ready := MPU.io.out.valid && MPU.io.out.macResult

@@ -15,8 +15,6 @@ import pipeline.RegisterFileType._
  * I/O Ports for "Thread" modules inside of the decode stage
  */
 class ThreadIO extends Bundle {
-  /** How far into the current vector we have progressed. Used when loading/storing with .vec suffix */
-  val progress = Input(UInt(log2Ceil(NDOF+1).W))
   /** The current instruction, fetched from instruction buffer in decode stage */
   val instr = Input(UInt(INSTRUCTION_WIDTH.W))
   /** Finished flag. Asserted when processing is finished and the thread should move to idle state after writing back */
@@ -24,7 +22,7 @@ class ThreadIO extends Bundle {
   /** Start flag. Asserted when a packet has been transferred from IM to instructionBuffer, and processing may begin */
   val start = Input(Bool())
   /** Instruction pointer of the current packet. Sent to IM in Decode stage */
-  val ip = Output(UInt(4.W))
+  val ip = Output(UInt(log2Ceil(INSTRUCTION_BUFFER_SIZE+1).W))
   /** Connections to other thread in Decode stage */
   val threadOut = Output(new ThreadThreadIO)
   /** Input connections from other thread in Decode stage */
@@ -78,7 +76,7 @@ class Thread(id: Int) extends Module {
 
   // --- REGISTERS ---
   /** Instruction pointer into the instruction buffer */
-  val IP = RegInit(0.U(4.W))
+  val IP = RegInit(0.U(log2Ceil(INSTRUCTION_BUFFER_SIZE+1).W))
   /** Current index into subvectors. Also gives the x-coordinate of the submatrix in the KE matrix */
   val X = RegInit(0.U(log2Ceil(VREG_DEPTH+1).W))
 //    val X = RegInit(0.U)

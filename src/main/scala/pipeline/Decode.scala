@@ -48,7 +48,7 @@ class Decode extends Module {
   /** Instruction buffer */
   val iBuffer = RegInit(VecInit(Seq.fill(INSTRUCTION_BUFFER_SIZE)(0.U(INSTRUCTION_WIDTH.W))))
   /** Instruction pointer, used when filling iBuffer */
-  val IP = RegInit(0.U(4.W))
+  val IP = RegInit(0.U(log2Ceil(INSTRUCTION_BUFFER_SIZE+1).W))
   /** Number of instructions in iBuffer */
   val iCount = RegInit(0.U(4.W))
   /** Progress when accessing vectors / the number of elements that have been loaded so far. */
@@ -108,7 +108,6 @@ class Decode extends Module {
   // --- OUTPUTS AND CONNECTIONS --- //
   //Common thread connections
   for(thread <- threads) {
-    thread.io.progress := progress
     thread.io.fin := fin
     thread.io.start := start
     thread.io.sRegFile.rdData1 := sRegFile.io.rdData1

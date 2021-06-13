@@ -20,7 +20,11 @@ import java.io.{BufferedWriter, FileWriter}
  */
 class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: String) {
   val mem = SyncReadMem(width, SInt((depth*FIXED_WIDTH).W))
-  val arr: Array[Array[SInt]] = Array.ofDim[SInt](width,depth) //TODO set this to match contents given at compile time
+  val arr: Array[Array[SInt]] = Array.ofDim[SInt](width,depth)
+
+//  val mem2 = for(i <- 0 until width) yield {
+//    SyncReadMem(depth, SInt(FIXED_WIDTH.W))
+//  }
 
   /**
    * Creates a read port into the vector register file

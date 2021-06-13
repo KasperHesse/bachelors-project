@@ -21,7 +21,7 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
   val io = IO(new FetchIO)
 
   val PC: UInt = RegInit(0.U(32.W))
-  val imem: Mem[UInt] = Mem(memsize, UInt(32.W))
+  val imem: Mem[UInt] = Mem(memsize, UInt(INSTRUCTION_WIDTH.W))
 
   when(io.id.branch) {
     PC := io.id.branchTarget
@@ -41,7 +41,8 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
     val src = Source.fromFile(memfile)
     require(src.getLines().length <= memsize, s"Memory file (${src.getLines.length}) too large for memory size ($memsize)")
     src.close()
-    loadMemoryFromFileInline(imem, memfile)
+//    loadMemoryFromFileInline(imem, memfile)
+    loadMemoryFromFile(imem, memfile)
   }
 
   io.id.instr := instr

@@ -17,6 +17,8 @@ class Control extends Module {
   val iload = RegInit(false.B)
   /** Execution stall register. Used to hold the estall value for multiple cycles */
   val estall = RegInit(false.B)
+  /** Memory stall register. Used to hold memory stall value for multiple clock cycles */
+  val hasWaited = RegInit(false.B)
   /** Shortcut to executing thread's control signal */
   val execThread = io.id.threadCtrl(io.id.execThread)
   /** Shortcut to memory access thread's control signals */
@@ -75,9 +77,17 @@ class Control extends Module {
   //Stall until read or write queue is empty once the final read/write operation has been issued
   when(memThread.state === ThreadState.sLoad && io.mem.rqCount =/= 0.U && memThread.fmt =/= InstructionFMT.STYPE) {
     memThread.stall := true.B
-  } .elsewhen(memThread.state === ThreadState.sStore && memThread.fmt =/= InstructionFMT.STYPE && (io.mem.wqCount =/= 0.U) ) {
+  } .elsewhen(memThread.state === ThreadState.sStore && memThread.fmt =/= InstructionFMT.STYPE && (io.mem.wqCount =/= 0.U || !hasWaited) ) {
     memThread.stall := true.B
   }
+
+  when(memThread.state === ThreadState.sStore && memThread.fmt =/= InstructionFMT.STYPE && !hasWaited) {
+    hasWaited := true.B
+  } .elsewhen(memThread.state =/= ThreadState.sStore) {
+    hasWaited := false.B
+  }
+  //When memthread performs nothing but at st.sel, we don't have time to fill the write queue before moving on
+  //To fix this: either introduce a delay in control module, or wait one clock cycle if fmt =/= stype
 
 
   // --- EXECUTE STAGE STALLS ---
@@ -101,7 +111,6 @@ class Control extends Module {
 
   //When decoding XX, SX and SS instructions, stall for one clock cycle if the executing instruction
   //does not exactly match the decoding instruction. This ensures proper arrival into destination queue
-  //Stalls on *second* cycle after we've ensured delivery
   //See DecExWbSpec random instruction mix with seed -1059893295096578903L for why this is necessary
   val isSingleCycleOp: Bool = (execThread.rtypemod === RtypeMod.XX) || (execThread.rtypemod === RtypeMod.SX) || (execThread.rtypemod === RtypeMod.SS)
   val newOp: Bool = execThread.op =/= RegNext(execThread.op) && execThread.rtypemod =/= RegNext(execThread.rtypemod)

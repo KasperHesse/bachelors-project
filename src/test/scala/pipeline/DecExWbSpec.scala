@@ -384,11 +384,11 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  "DecExWbSpec" should "execute immediate instruction" in {
+  "DecExWbSpec" should "execute immediates" in {
     simulationConfig()
-    test(new DecExWb) {dut =>
-      seed("DecExWb immediates")
-      val instrs = Array.fill(8)(genRtype(scala.util.Random.nextBoolean()))
+    test(new DecExWb).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      seed("DecExWb immediates", Some(1L))
+      val instrs = Array.fill(2)(genRtype(true))
       test(dut, instrs)
     }
   }
