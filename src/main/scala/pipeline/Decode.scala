@@ -36,7 +36,7 @@ class Decode extends Module {
   val threads = for(i <- 0 until 2) yield {
     Module(new Thread(i))
   }
-  val sRegFile = Module(new ScalarRegisterFile())
+  val sRegFile = Module(new ScalarRegisterFile("src/resources/meminit/sreg.hex.txt"))
   val branchTargetGen = Module(new BranchTargetGenerator)
 
   // --- REGISTERS ---
@@ -109,7 +109,6 @@ class Decode extends Module {
   //Common thread connections
   for(i <- threads.indices) {
     val thread = threads(i)
-    thread.io.progress := progress
     thread.io.fin := fin
     thread.io.start := start
     thread.io.sRegFile.rdData1 := sRegFile.io.rdData1

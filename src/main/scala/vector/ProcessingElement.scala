@@ -31,7 +31,7 @@ class ProcessingElement extends Module {
 
   val in = RegNext(io.in)
   //Modules in use
-  val mul = Module(FixedPointMul(utils.MulTypes.SINGLECYCLE))
+  val mul = Module(FixedPointMul(utils.MulTypes.MULTICYCLE))
   val div = Module(FixedPointDiv(utils.DivTypes.NEWTONRAPHSON))
   val alu = Module(new FixedPointALU)
 
@@ -50,7 +50,7 @@ class ProcessingElement extends Module {
   val mulDivValid = Mux(in.op === DIV, div.io.out.valid, mul.io.out.valid)
   val mulDivResultReg = RegNext(mulDivRes)
   val mulDivValidReg = RegNext(mulDivValid)
-  val tmp = RegNext(in)
+  val tmp = RegNext(RegNext(in)) //Double regnext since multi-cycle multipliers have 1 register stage inside
 
 
   // --- ARITHMETIC AND MAC RESULT REGISTER ---

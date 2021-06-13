@@ -38,8 +38,6 @@ class MulIO extends Bundle {
     /** Output: The result of a*b */
     val res = SInt(FIXED_WIDTH.W)
   }
-
-
 }
 
 /**
@@ -64,6 +62,21 @@ class FixedMulSingleCycle extends FixedPointMul {
   io.out.valid := io.in.valid
 }
 
+class FixedMulMultiCycle extends FixedPointMul {
+  val prod = Wire(SInt((2*FIXED_WIDTH).W))
+  prod := io.in.a*io.in.b
+  val prod2 = (prod >> FRAC_WIDTH).asSInt()
+  val lastBit = Cat(0.S(1.W), prod(FRAC_WIDTH-1).asSInt()).asSInt()
+
+  val tmp = RegNext(prod2)
+  val validReg = RegNext(io.in.valid)
+  val lastBitReg = RegNext(lastBit)
+
+  io.out.res := tmp + lastBitReg
+  io.out.q := false.B //TODO set this correctly
+  io.out.valid := validReg
+}
+
 /**
  * Companion object for the fixed-point multipliers. Should be used to instantiate new multipliers
  */
@@ -76,6 +89,7 @@ object FixedPointMul {
   def apply(v: MulType): FixedPointMul = {
     v match {
       case SINGLECYCLE => new FixedMulSingleCycle
+      case MULTICYCLE => new FixedMulMultiCycle
       case _ => throw new IllegalArgumentException("Only single-cycle multipliers are supported as of right now")
     }
   }

@@ -61,8 +61,8 @@ class Thread(id: Int) extends Module {
   val io = IO(new ThreadIO)
 
   // --- MODULES ---
-  val vRegFile = new InlineVectorRegisterFile(width=NUM_VREG, depth=VREG_DEPTH, memInitFileLocation = s"src/resources/meminit/vreg$id.txt")
-  val xRegFile = new InlineVectorRegisterFile(width=NUM_XREG, depth=XREG_DEPTH, memInitFileLocation = s"src/resources/meminit/xreg$id.txt")
+  val vRegFile = new InlineVectorRegisterFile(width=NUM_VREG, depth=VREG_DEPTH, memInitFileLocation = s"src/resources/meminit/vreg$id")
+  val xRegFile = new InlineVectorRegisterFile(width=NUM_XREG, depth=XREG_DEPTH, memInitFileLocation = s"src/resources/meminit/xreg$id")
   if(SIMULATION) {
     vRegFile.initMemory()
     xRegFile.initMemory()

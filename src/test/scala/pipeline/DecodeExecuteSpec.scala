@@ -323,7 +323,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       progress += progressIncr
       print(s"\nProgress: $progress/$maxProgress\n")
     }
-    dut.clock.step(4)
+    dut.clock.step(6)
     assert(progress == maxProgress)
     dut.io.exctrl.empty.expect(true.B)
     dut.io.idctrl.threadCtrl(0).stateUint.expect(ThreadState.sIdle.litValue().U)
@@ -489,10 +489,10 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     }
   }
 
-  it should "decode and execute XV instructions" in {
+  it should "decode and execute XV instructions V2" in {
     simulationConfig()
     test(new DecodeExecute).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
-      seed("XV decode/execute")
+      seed("XV decode/execute", Some(1L))
       val instrs = genAndPoke(dut, RtypeMod.XV)
       test(dut, instrs)
     }

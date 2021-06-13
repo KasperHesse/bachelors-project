@@ -115,6 +115,12 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
+  it should "correct multiply numbers over multiple clock cycles" in {
+    test(FixedPointMul(utils.MulTypes.MULTICYCLE)) {dut =>
+      testMultiplication(dut, 20)
+    }
+  }
+
   "FixedPointAlu" should "correctly assert max or min" in {
     test(new FixedPointALU) {dut =>
       testMaxMin(dut, 20)

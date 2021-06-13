@@ -2,14 +2,17 @@ package pipeline
 
 import chisel3._
 import chisel3.util._
+import chisel3.util.experimental.loadMemoryFromFile
 import utils.Config._
 import utils.Fixed.FIXED_WIDTH
 import utils.Fixed.double2fixed
 
+import java.io.{BufferedWriter, FileWriter}
+
 /**
  * A scalar register file. Register at index 0 is always tied to the value 0. Implements [[ScalarRegFileIO]].
  */
-class ScalarRegisterFile extends Module {
+class ScalarRegisterFile(memInitFileLocation: String) extends Module {
   val io = IO(new ScalarRegFileIO)
 
   val arr: Array[SInt] = Array.ofDim[SInt](NUM_SREG)
@@ -36,6 +39,17 @@ class ScalarRegisterFile extends Module {
   }
   io.rdData1 := mem.read(io.rs1)
   io.rdData2 := mem.read(io.rs2)
+
+  if(SIMULATION) {
+    //Write mem init file
+    val writer = new BufferedWriter(new FileWriter(memInitFileLocation))
+    for(v <- arr) {
+      v.litValue.toByteArray.foreach(b => writer.write(f"$b%02x"))
+      writer.write("\n")
+    }
+    writer.close()
+    loadMemoryFromFile(mem, memInitFileLocation)
+  }
 }
 
 class ScalarRegFileIO extends Bundle {

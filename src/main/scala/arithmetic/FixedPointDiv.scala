@@ -181,23 +181,29 @@ class NRDivStage2 extends Module {
   val FORTYEIGHTOVERSEVENTEEN = double2fixed(48.0/17.0).S(FIXED_WIDTH.W)
   val THIRTYTWOOVERSEVENTEEN = double2fixed(32.0/17.0).S(FIXED_WIDTH.W)
 
-  val mul = Module(FixedPointMul(MulTypes.SINGLECYCLE))
-  val sub = Module(new FixedPointALU)
+  val mul = Module(FixedPointMul(MulTypes.MULTICYCLE))
+//  val sub = Module(new FixedPointALU)
 
   mul.io.in.a := in.denom
   mul.io.in.b := THIRTYTWOOVERSEVENTEEN
   mul.io.in.valid := in.valid
 
-  sub.io.in.a := FORTYEIGHTOVERSEVENTEEN
-  sub.io.in.b := mul.io.out.res
-  sub.io.in.op := Opcode.SUB
-  sub.io.in.valid := mul.io.out.valid
+  io.out.X := (FORTYEIGHTOVERSEVENTEEN - mul.io.out.res)
+  io.out.numer := RegNext(in.numer)
+  io.out.denom := RegNext(in.denom)
+  io.out.neg := RegNext(in.neg)
+  io.out.valid := mul.io.out.valid
 
-  io.out.X := sub.io.out.res
-  io.out.numer := in.numer
-  io.out.denom := in.denom
-  io.out.neg := in.neg
-  io.out.valid := sub.io.out.valid
+//  sub.io.in.a := FORTYEIGHTOVERSEVENTEEN
+//  sub.io.in.b := mul.io.out.res
+//  sub.io.in.op := Opcode.SUB
+//  sub.io.in.valid := mul.io.out.valid
+
+//  io.out.X := sub.io.out.res
+//  io.out.numer := in.numer
+//  io.out.denom := in.denom
+//  io.out.neg := in.neg
+//  io.out.valid := sub.io.out.valid
 }
 
 class Stage3IO extends Bundle {
@@ -216,56 +222,110 @@ class NRDivStage3 extends Module {
   val io = IO(new Stage3IO)
   val in = RegNext(io.in)
 
-  val mul1 = Module(FixedPointMul(MulTypes.SINGLECYCLE))
-  val mul2 = Module(FixedPointMul(MulTypes.SINGLECYCLE))
+  val mul1 = Module(FixedPointMul(MulTypes.MULTICYCLE))
+  val mul2 = Module(FixedPointMul(MulTypes.MULTICYCLE))
 
-  val asu1 = Module(new FixedPointALU)
-  val asu2 = Module(new FixedPointALU)
+  val queue1 = Module(new Queue(new Stage3InternalIO, 4, true, true))
+  val queue2 = Module(new Queue(new Stage3InternalIO, 4, true, true))
 
-  //Stage 3.1 - Calculate D'*X
+  //Stage 3.1 - Calculate D' * X
   mul1.io.in.a := in.X
   mul1.io.in.b := in.denom
   mul1.io.in.valid := in.valid
-
+  //Create bundle for first queue
   val step1 = Wire(new Stage3InternalIO)
   step1.X := in.X
   step1.numer := in.numer
   step1.denom := in.denom
   step1.neg := in.neg
-  step1.res := mul1.io.out.res //D' * X
-  step1.valid := mul1.io.out.valid
-  val step1Reg = RegNext(step1)
+  step1.valid := in.valid
+  step1.res := DontCare //We won't actually use this right now
+  queue1.io.enq.bits := step1
+  queue1.io.enq.valid := in.valid
+
+  val step1Result = RegNext(mul1.io.out)
+
 
   //Stage 3.2 - Calculate X*(1-D'*x)
-  asu1.io.in.op := Opcode.SUB
-  asu1.io.in.a := double2fixed(1).S(FIXED_WIDTH.W)
-  asu1.io.in.b := step1Reg.res
-  asu1.io.in.valid := step1Reg.valid
+  mul2.io.in.a := (double2fixed(1).S(FIXED_WIDTH.W) - step1Result.res)
+  mul2.io.in.b := queue1.io.deq.bits.X
+  mul2.io.in.valid := step1Result.valid
 
-  mul2.io.in.a := asu1.io.out.res
-  mul2.io.in.b := step1Reg.X
-  mul2.io.in.valid := asu1.io.out.valid
-
+  //Copy data from first to second queue
   val step2 = Wire(new Stage3InternalIO)
-  step2.X := step1Reg.X
-  step2.numer := step1Reg.numer
-  step2.denom := step1Reg.denom
-  step2.neg := step1Reg.neg
-  step2.res := mul2.io.out.res //X*(1-D' * X)
-  step2.valid := mul2.io.out.valid
-  val step2Reg = RegNext(step2)
+  step2.X := queue1.io.deq.bits.X
+  step2.denom := queue1.io.deq.bits.denom
+  step2.numer := queue1.io.deq.bits.numer
+  step2.neg := queue1.io.deq.bits.neg
+  step2.valid := step1Result.valid
+  step2.res := DontCare //Not being used
+  queue1.io.deq.ready := step1Result.valid //Copy data from Q1 to Q2
+  queue2.io.enq.valid := step1Result.valid
+  queue2.io.enq.bits := step2
 
-  //Stage 3.3 - Calculate 1+X*(1-D'*x)
-  asu2.io.in.a := step2Reg.X
-  asu2.io.in.b := step2Reg.res
-  asu2.io.in.op := Opcode.ADD
-  asu2.io.in.valid := step2Reg.valid
+  val step2Result = RegNext(mul2.io.out)
 
-  io.out.X := asu2.io.out.res
-  io.out.denom := step2Reg.denom
-  io.out.numer := step2Reg.numer
-  io.out.neg := step2Reg.neg
-  io.out.valid := asu2.io.out.valid
+  //Stage 3.3 - Calculate X+X*(1-D'*x)
+  io.out.X := (queue2.io.deq.bits.X + step2Result.res)
+  io.out.denom := queue2.io.deq.bits.denom
+  io.out.numer := queue2.io.deq.bits.numer
+  io.out.neg := queue2.io.deq.bits.neg
+  io.out.valid := step2Result.valid
+  //Dequeue data
+  queue2.io.deq.ready := step2Result.valid
+
+
+  //
+////  val asu1 = Module(new FixedPointALU)
+//  val asu2 = Module(new FixedPointALU)
+//
+//  //Stage 3.1 - Calculate D'*X
+//  mul1.io.in.a := in.X
+//  mul1.io.in.b := in.denom
+//  mul1.io.in.valid := in.valid
+//
+//  val step1 = Wire(new Stage3InternalIO)
+//  step1.X := in.X
+//  step1.numer := in.numer
+//  step1.denom := in.denom
+//  step1.neg := in.neg
+//  step1.res := mul1.io.out.res //D' * X
+//  step1.valid := mul1.io.out.valid
+//  val step1Reg = RegNext(step1)
+//
+//  //Stage 3.2 - Calculate X*(1-D'*x)
+////  asu1.io.in.op := Opcode.SUB
+////  asu1.io.in.a := double2fixed(1).S(FIXED_WIDTH.W)
+////  asu1.io.in.b := step1Reg.res
+////  asu1.io.in.valid := step1Reg.valid
+////
+////  mul2.io.in.a := asu1.io.out.res
+////  mul2.io.in.b := step1Reg.X
+////  mul2.io.in.valid := asu1.io.out.valid
+//  mul2.io.in.a := (double2fixed(1).S(FIXED_WIDTH.W) - step1Reg.res)
+//  mul2.io.in.b := step1Reg.X
+//  mul2.io.in.valid := step1Reg.valid
+//
+//  val step2 = Wire(new Stage3InternalIO)
+//  step2.X := step1Reg.X
+//  step2.numer := step1Reg.numer
+//  step2.denom := step1Reg.denom
+//  step2.neg := step1Reg.neg
+//  step2.res := mul2.io.out.res //X*(1-D' * X)
+//  step2.valid := mul2.io.out.valid
+//  val step2Reg = RegNext(step2)
+//
+//  //Stage 3.3 - Calculate 1+X*(1-D'*x)
+//  asu2.io.in.a := step2Reg.X
+//  asu2.io.in.b := step2Reg.res
+//  asu2.io.in.op := Opcode.ADD
+//  asu2.io.in.valid := step2Reg.valid
+//
+//  io.out.X := asu2.io.out.res
+//  io.out.denom := step2Reg.denom
+//  io.out.numer := step2Reg.numer
+//  io.out.neg := step2Reg.neg
+//  io.out.valid := asu2.io.out.valid
 }
 
 class Stage4IO extends Bundle {
@@ -288,14 +348,21 @@ class NRDivStage4 extends Module {
   val io = IO(new Stage4IO)
   val in = RegNext(io.in)
 
-  val mul = Module(FixedPointMul(MulTypes.SINGLECYCLE))
+  val mul = Module(FixedPointMul(MulTypes.MULTICYCLE))
   mul.io.in.a := in.numer
   mul.io.in.b := in.X
   mul.io.in.valid := in.valid
-  val temp = mul.io.out.res
+
+  val negQueue = Module(new Queue(Bool(), 4, true, true))
+  negQueue.io.enq.bits := in.neg
+  negQueue.io.enq.valid := in.valid
+  negQueue.io.deq.ready := mul.io.out.valid
+
+  val res = mul.io.out.res
+  val neg = negQueue.io.deq.bits
 
   //Invert the sign of the result if necessary
-  io.out.res := Mux(in.neg, (~temp).asSInt() + 1.S, temp)
+  io.out.res := Mux(neg, (~res).asSInt() + 1.S, res)
   io.out.valid := mul.io.out.valid
 }
 

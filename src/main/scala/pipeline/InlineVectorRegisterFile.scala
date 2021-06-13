@@ -19,12 +19,11 @@ import java.io.{BufferedWriter, FileWriter}
  *                            If [[utils.Config.SIMULATION]] is true, the non-inline version is used. false, the inlined version if used.
  */
 class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: String) {
-  val mem = SyncReadMem(width, SInt((depth*FIXED_WIDTH).W))
   val arr: Array[Array[SInt]] = Array.ofDim[SInt](width,depth)
 
-//  val mem2 = for(i <- 0 until width) yield {
-//    SyncReadMem(depth, SInt(FIXED_WIDTH.W))
-//  }
+//  val mem = SyncReadMem(width, SInt((depth*FIXED_WIDTH).W))
+  val mem2 = Array.fill(depth)(SyncReadMem(width, SInt(FIXED_WIDTH.W)))
+
 
   /**
    * Creates a read port into the vector register file
@@ -32,12 +31,17 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
    * @return A handle to the read data.
    */
   def setReadPort(rs: UInt): Vec[SInt] = {
-    val rdData = mem(rs)
-    val rdDataVec = Wire(Vec(depth, SInt(FIXED_WIDTH.W)))
+//    val rdData = mem(rs)
+//    val rdDataVec = Wire(Vec(depth, SInt(FIXED_WIDTH.W)))
+//    for(i <- 0 until depth) {
+//      rdDataVec(i) := rdData((i+1)*FIXED_WIDTH-1, i*FIXED_WIDTH).asSInt()
+//    }
+//    rdDataVec
+    val rdData = Wire(Vec(depth, SInt(FIXED_WIDTH.W)))
     for(i <- 0 until depth) {
-      rdDataVec(i) := rdData((i+1)*FIXED_WIDTH-1, i*FIXED_WIDTH).asSInt()
+      rdData(i) := mem2(i).read(rs+0.U) //Things break if we don't add 0.U ...
     }
-    rdDataVec
+    rdData
   }
 
   /**
@@ -47,8 +51,13 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
    * @param we Write enable flag
    */
   def setWritePort(rd: UInt, wrData: Vec[SInt], we: Bool): Unit = {
-    when(we) {
-      mem.write(rd, wrData.asUInt().asSInt())
+//    when(we) {
+//      mem.write(rd, wrData.asUInt().asSInt())
+//    }
+    for(i <- 0 until depth) {
+      when(we) {
+        mem2(i).write(rd, wrData(i))
+      }
     }
   }
 
@@ -61,27 +70,53 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
   def initMemory(): Unit = {
     //Create memory file
     //Each entry holds 'depth' values one after the other
-    val memArray = Array.fill[BigInt](width)(0)
-    for(w <- 0 until width) {
-      for(d <- 0 until depth) {
+//    val memArray = Array.fill[BigInt](width)(0)
+//    for(w <- 0 until width) {
+//      for(d <- 0 until depth) {
+//        val v = double2fixed(w*depth+d)
+//        memArray(w) |= BigInt(v) << (d*FIXED_WIDTH)
+//        arr(w)(d) = v.S(FIXED_WIDTH.W)
+//      }
+//    }
+//
+//    val writer = new BufferedWriter(new FileWriter(memInitFileLocation))
+//    for(m <- memArray) {
+//      m.toByteArray.foreach(b => writer.write(f"$b%02x"))
+//      writer.write("\n")
+//    }
+//    writer.close()
+//
+    //Create memory inits
+    //2D array, width*depth
+    val memArray = Array.ofDim[BigInt](depth, width)
+    for(d <- 0 until depth) {
+      for(w <- 0 until width) {
         val v = double2fixed(w*depth+d)
-        memArray(w) |= BigInt(v) << (d*FIXED_WIDTH)
         arr(w)(d) = v.S(FIXED_WIDTH.W)
+        memArray(d)(w) = BigInt(v)
       }
     }
 
-    val writer = new BufferedWriter(new FileWriter(memInitFileLocation))
-    for(m <- memArray) {
-      m.toByteArray.foreach(b => writer.write(f"$b%02x"))
-      writer.write("\n")
+    for(i <- 0 until depth) {
+      val mif = s"${memInitFileLocation}_$i.hex.txt"
+      val writer = new BufferedWriter(new FileWriter(mif))
+      for(v <- memArray(i)) {
+        v.toByteArray.foreach(b => writer.write(f"$b%02x"))
+        writer.write("\n")
+      }
+      writer.close()
     }
-    writer.close()
   }
 
   if(SIMULATION) {
-    loadMemoryFromFile(mem, memInitFileLocation)
+    for (w <- 0 until depth) {
+      loadMemoryFromFile(mem2(w), s"${memInitFileLocation}_$w.hex.txt")
+    }
+  }
+//  if(SIMULATION) {
+//    loadMemoryFromFile(mem, memInitFileLocation)
 //  } else {
 //    loadMemoryFromFileInline(mem, memInitFileLocation)
-  }
+//  }
 
 }

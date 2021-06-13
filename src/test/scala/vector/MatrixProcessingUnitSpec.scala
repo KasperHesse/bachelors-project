@@ -9,6 +9,7 @@ import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 import pipeline.Opcode
 import pipeline.Opcode._
+import utils.Config.simulationConfig
 
 class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Matrix processing unit"
@@ -99,6 +100,7 @@ class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with 
   }
 
   it should "subtract values in parallel at different widths" in {
+    simulationConfig()
     for(nelem <- sizes)
       test(new MatrixProcessingUnit(nelem)) { c =>
         generateStimuli(c, SUB, iters, nelem)

@@ -108,7 +108,12 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.io.in.denom.poke(dp.S)
       dut.io.in.numer.poke(np.S)
       dut.io.in.neg.poke(neg.B)
+      dut.io.in.valid.poke(true.B)
       dut.clock.step()
+      dut.io.in.valid.poke(false.B)
+      while(!dut.io.out.valid.peek.litToBoolean) {
+        dut.clock.step()
+      }
 
       dut.io.out.denom.expect(dp.S)
       dut.io.out.numer.expect(np.S)
@@ -132,7 +137,14 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.io.in.numer.poke(np.S)
       dut.io.in.denom.poke(dp.S)
       dut.io.in.neg.poke(neg.B)
-      dut.clock.step(4)
+      //Poke valid up/down
+      dut.io.in.valid.poke(true.B)
+      dut.clock.step()
+      dut.io.in.valid.poke(false.B)
+      while(!dut.io.out.valid.peek.litToBoolean) {
+        dut.clock.step()
+      }
+//      dut.clock.step(4)
 
       dut.io.out.X.expect(X1.S)
       dut.io.out.numer.expect(np.S)
@@ -158,8 +170,12 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.io.in.X.poke(X4.S)
       dut.io.in.numer.poke(np.S)
       dut.io.in.neg.poke(neg.B)
-
+      dut.io.in.valid.poke(true.B)
       dut.clock.step()
+      dut.io.in.valid.poke(false.B)
+      while(!dut.io.out.valid.peek().litToBoolean) {
+        dut.clock.step()
+      }
       dut.io.out.res.expect(res.S)
     }
   }
