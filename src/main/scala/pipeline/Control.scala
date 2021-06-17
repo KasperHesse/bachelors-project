@@ -49,7 +49,7 @@ class Control extends Module {
   // --- LOGIC ---
   //Logic signals for easier decode of O-type instructions
   val Oinst = io.fe.instr.asTypeOf(new OtypeInstruction)
-  val isPacket: Bool = Oinst.pe === OtypePE.PACKET
+  val isPacket: Bool = Oinst.mod === OtypePE.PACKET
   val isEnd = Oinst.se === OtypeSE.END
   val isOtype: Bool = Oinst.fmt === InstructionFMT.OTYPE
   val isBtype: Bool = Oinst.fmt === InstructionFMT.BTYPE

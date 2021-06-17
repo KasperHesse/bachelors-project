@@ -83,7 +83,7 @@ package object pipeline {
    * @param length The length of the instruction (single, Ndof or Nelem operations)
    */
   def wrapInstructions(instrs: Array[RtypeInstruction], length: OtypeLen.Type): Array[Bundle with Instruction] = {
-    val istart = OtypeInstruction(se = OtypeSE.START, pe = OtypePE.PACKET, length)
+    val istart = OtypeInstruction(se = OtypeSE.START, mod = OtypePE.PACKET, length)
     val estart = OtypeInstruction(OtypeSE.START, pe = OtypePE.EXEC)
     val eend = OtypeInstruction(OtypeSE.END, pe = OtypePE.EXEC)
     val iend = OtypeInstruction(OtypeSE.END, pe = OtypePE.PACKET)
@@ -439,7 +439,7 @@ package object pipeline {
    * @return An array of instructions representing a full instruction packet
    */
   def wrapLoadStoreInstructions(ldInstrs: Array[StypeInstruction], stInstrs: Option[Array[StypeInstruction]] = None, len: OtypeLen.Type = OtypeLen.SINGLE): Array[Bundle with Instruction] = {
-    val pstart = Array(OtypeInstruction(se=OtypeSE.START, pe = OtypePE.PACKET, len)).asInstanceOf[Array[Bundle with Instruction]]
+    val pstart = Array(OtypeInstruction(se=OtypeSE.START, mod = OtypePE.PACKET, len)).asInstanceOf[Array[Bundle with Instruction]]
     val estart = OtypeInstruction(se=OtypeSE.START, pe=OtypePE.EXEC).asInstanceOf[Bundle with Instruction]
     val eend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.EXEC).asInstanceOf[Bundle with Instruction]
     val pend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.PACKET).asInstanceOf[Bundle with Instruction]

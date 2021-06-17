@@ -64,7 +64,7 @@ class Execute extends Module {
 
   //We need a SEPARATE destination for MAC instructions, to allow other instructions to be processed at the same time
   destinationQueue.io.destIn := io.id.dest
-  destinationQueue.io.enq := validSignal && !(opSignal === MAC || opSignal === RED) && macDestQueue.io.count === 0.U
+  destinationQueue.io.enq := validSignal && !(opSignal === MAC || opSignal === RED)
 //  destinationQueue.io.enq := validSignal && (opSignal =/= MAC)
   macDestQueue.io.enq.bits := io.id.dest
   macDestQueue.io.enq.valid := validSignal && (opSignal === MAC || opSignal === RED) && (macDestQueue.io.count === 0.U)
