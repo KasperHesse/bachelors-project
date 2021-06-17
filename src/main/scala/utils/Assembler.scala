@@ -115,7 +115,11 @@ object Assembler {
    * @return The enum representing the correct modifier
    */
   def rMod(rmod: String): Int = {
-    val mod = rmod.split("\\.")(1) //Split at the period, take the second operand
+    val s = rmod.split("\\.") //Split at the period
+    if(s.length == 1) {
+      throw new IllegalArgumentException("Did not find an R-type modifier")
+    }
+    val mod = s(1)
 
     mod match {
       case "xx" => XX
@@ -201,26 +205,6 @@ object Assembler {
       case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rd field")
     }
 
-//    val rs1 = if(immflag) mod match {
-//      case SV => vReg(tokens(2))
-//      case SX => xReg(tokens(2))
-//      case SS => sReg(tokens(2))
-//      case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs1 field in immediate instruction")
-//    } else mod match {
-//      case VV | KV => vReg(tokens(2))
-//      case XX | XV => xReg(tokens(2))
-//      case SS | SV | SX => sReg(tokens(2))
-//      case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs1 field")
-//    }
-//
-//    val rs2 = if(immflag) immint else mod match {
-//      case VV | SV | XV => vReg(tokens(3))
-//      case SS => sReg(tokens(3))
-//      case XX | SX => xReg(tokens(3))
-//      case KV => 0 //MVP instructions don't use rs2 to anything
-//      case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs2 field")
-//    }
-
     val rs1 = if(immflag) immint else mod match {
       case VV | KV => vReg(tokens(2))
       case XX | XV => xReg(tokens(2))
@@ -233,12 +217,14 @@ object Assembler {
       case SX => xReg(tokens(2))
       case SS => sReg(tokens(2))
       case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs2 field")
-    } else mod match {
+    } else if (op != ABS) mod match {
       case VV | SV | XV => vReg(tokens(3))
       case SS => sReg(tokens(3))
       case XX | SX => xReg(tokens(3))
       case KV => 0 //MVP instructions don't use rs2
       case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs2 field")
+    } else {
+      0 //ABS instructions only take one operand
     }
 
     //Build the instruction
@@ -257,6 +243,8 @@ object Assembler {
   /**
    * Parses an Otype-instruction, returning an integer containing the bit pattern representing that instruction
    * @param tokens The tokens representing the currently parsed line
+   * @param incrementType The increment type / instruction length. Passed as an array to allow pass-by-reference.
+   *                      Used for error checks in other parts of the assembler
    * @return An integer representing that instruction
    */
   def parseOtype(tokens: Array[String], incrementType: Array[Int] = Array(0)): Int = {
@@ -300,7 +288,7 @@ object Assembler {
 
     var instr: Int = 0
     instr |= se << SE_OFFSET
-    instr |= pe << PE_OFFSET
+    instr |= pe << MOD_OFFSET
     instr |= len << LEN_OFFSET
     instr |= fmt << FMT_OFFSET
 

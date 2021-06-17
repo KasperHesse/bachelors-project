@@ -17,8 +17,8 @@ class AssemblerSpec extends FlatSpec with Matchers {
   behavior of "Assembler"
 
   val rand = scala.util.Random
-  val opStrings = Array("add", "sub", "mul", "div", "max", "min", "abs")
-  val opValues = Array(ADD, SUB, MUL, DIV, MAX, MIN, ABS)
+  val opStrings = Array("add", "sub", "mul", "div", "max", "min")
+  val opValues = Array(ADD, SUB, MUL, DIV, MAX, MIN)
   val modStrings = Array("vv", "xv", "sv", "xx", "sx", "ss")
   val modValues = Array(VV, XV, SV, XX, SX, SS)
   val prefixValues = Array(
@@ -142,10 +142,15 @@ class AssemblerSpec extends FlatSpec with Matchers {
       (END, PACKET, SINGLE)
     )
     for(i <- lines.indices) {
-      val instr = OtypeInstruction(instrs(i)._1, instrs(i)._2, instrs(i)._3)
+      val instr = OtypeInstruction(se=instrs(i)._1, mod=instrs(i)._2, len=instrs(i)._3)
       val parsed = Assembler.parseOtype(Assembler.split(lines(i)), Array(0))
       assert(parsed == instr.litValue.toInt)
+      assert(instr.litValue.toInt == OtypeInstruction(parsed.U).litValue.toInt)
     }
+  }
+
+  it should "only take one operand when parsing abs instruction" in {
+    Assembler.parseRtype(Assembler.split("abs.xx x0, x1"))
   }
 
   it should "throw an error if branch offset is not a multiple of 4" in {

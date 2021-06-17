@@ -17,11 +17,11 @@ trait Instruction {
  * A bundle defining the fields that constitute an R-type instruction
  */
 class RtypeInstruction extends Bundle with Instruction {
-  /** Source register 2 */
+  /** Source register 1 */
   val rs1 = UInt(4.W) //31:28
   /** Fractional part of immediate. Only used when immflag = true */
   val immfrac = UInt(7.W) //21:27
-  /** Source register 1 */
+  /** Source register 2 */
   val rs2 = UInt(4.W) //20:17
   /** Destination register */
   val rd = UInt(4.W) //16:13
@@ -86,10 +86,10 @@ object RtypeInstruction {
     import RtypeMod._
     val opval = v(5,0)
     val modval = v(11,8)
-    val immfrac = v(27,21)
     val rd = v(16,13)
-    val rs1 = v(20,17)
-    val rs2 = v(31,28)
+    val rs2 = v(20,17)
+    val immfrac = v(27,21)
+    val rs1 = v(31,28)
 
     val fmt = v(7,6).litValue().toInt
     if(fmt != InstructionFMT.RTYPE.litValue.toInt) {
@@ -251,16 +251,26 @@ object StypeInstruction {
  * A bundle defining the fields that constitute an O-type instruction
  */
 class OtypeInstruction extends Bundle with Instruction {
+//  /** Not used */
+//  val nu2 = UInt(24.W)        //31:8
+//  /** Instruction format */
+//  val fmt = InstructionFMT()  //7:6
+//  /** Instruction length */
+//  val len = OtypeLen()        //5:3
+//  /** Packet/execute flag */
+//  val pe = OtypePE()          //2:1
+//  /** Start/end flag */
+//  val se = OtypeSE()          //0
   /** Not used */
-  val nu2 = UInt(24.W)        //31:8
-  /** Instruction format */
-  val fmt = InstructionFMT()  //7:6
-  /** Instruction length */
-  val len = OtypeLen()        //5:3
-  /** Packet/execute flag */
-  val pe = OtypePE()          //2:1
+  val nu = UInt(19.W) //31:13
   /** Start/end flag */
-  val se = OtypeSE()          //0
+  val se = OtypeSE() //12
+  /** Modifier (packet/execute flag) */
+  val mod = OtypePE() //11:8
+  /** Instruction format */
+  val fmt = InstructionFMT() //7:6
+  /** Instruction length */
+  val len = OtypeLen() //5:0
 
   override def toUInt(): UInt = {
     OtypeInstruction.apply(this)
@@ -272,17 +282,17 @@ class OtypeInstruction extends Bundle with Instruction {
 }
 
 object OtypeInstruction extends Bundle {
-  val SE_OFFSET = 0
-  val PE_OFFSET = 1
-  val LEN_OFFSET = 3
+  val SE_OFFSET = 12
+  val MOD_OFFSET = 8
+  val LEN_OFFSET = 0
   val FMT_OFFSET = 6
   /** Generates an Otype-instruction with length [[OtypeLen.SINGLE]] */
   def apply(se: OtypeSE.Type, pe: OtypePE.Type): OtypeInstruction = {
     apply(se, pe, OtypeLen.SINGLE)
   }
   /** Generates an Otype instruction with a specified length */
-  def apply(se: OtypeSE.Type, pe: OtypePE.Type, len: OtypeLen.Type): OtypeInstruction = {
-    (new OtypeInstruction).Lit(_.se -> se, _.pe -> pe, _.len -> len, _.fmt -> InstructionFMT.OTYPE, _.nu2 -> 0.U)
+  def apply(se: OtypeSE.Type, mod: OtypePE.Type, len: OtypeLen.Type): OtypeInstruction = {
+    (new OtypeInstruction).Lit(_.se -> se, _.mod -> mod, _.len -> len, _.fmt -> InstructionFMT.OTYPE, _.nu -> 0.U)
   }
 
   /**
@@ -292,17 +302,18 @@ object OtypeInstruction extends Bundle {
    */
   def apply(v: OtypeInstruction): UInt = {
     var o = 0
-    o |= (v.se.litValue.toInt)
-    o |= (v.pe.litValue().toInt << PE_OFFSET)
     o |= (v.len.litValue().toInt << LEN_OFFSET)
     o |= (v.fmt.litValue().toInt << FMT_OFFSET)
+    o |= (v.mod.litValue().toInt << MOD_OFFSET)
+    o |= (v.se.litValue.toInt << SE_OFFSET)
+
     o.U(32.W)
   }
 
   def apply(v: UInt): OtypeInstruction = {
-    val seval = v(0).litToBoolean
-    val ievval = v(2,1).litValue.toInt
-    val lenval = v(5,3).litValue.toInt
+    val seval = v(12).litToBoolean
+    val modval = v(11,8).litValue.toInt
+    val lenval = v(5,0).litValue.toInt
 
     val fmt = v(7,6).litValue().toInt
     if(fmt != InstructionFMT.OTYPE.litValue.toInt) {
@@ -315,10 +326,10 @@ object OtypeInstruction extends Bundle {
       OtypeSE.END
     }
 
-    val iev = ievval match {
+    val mod = modval match {
       case 1 => OtypePE.PACKET
       case 2 => OtypePE.EXEC
-      case _ => throw new IllegalArgumentException(s"Unable to decode O-type IEV flag ($ievval)") //This shouldn't happen
+      case _ => throw new IllegalArgumentException(s"Unable to decode O-type modifier ($modval)") //This shouldn't happen
     }
 
     val len = lenval match {
@@ -330,7 +341,7 @@ object OtypeInstruction extends Bundle {
       case _ => throw new IllegalArgumentException(s"Unable to decode O-type length ($lenval)") //This shouldn't happen
     }
 
-    (new OtypeInstruction).Lit(_.fmt -> InstructionFMT.OTYPE, _.se -> se, _.pe -> iev, _.len -> len)
+    (new OtypeInstruction).Lit(_.fmt -> InstructionFMT.OTYPE, _.se -> se, _.mod -> mod, _.len -> len, _.nu -> 0.U)
   }
 }
 
@@ -510,6 +521,7 @@ object StypeBaseAddress extends ChiselEnum {
 object OtypePE extends ChiselEnum {
   val PACKET = Value(1.U)
   val EXEC = Value(2.U)
+  val WIDTH = Value("b1111".U)
 }
 
 /**
@@ -529,7 +541,7 @@ object OtypeLen extends ChiselEnum {
   val NELEMVEC = Value(4.U)
   val NELEMDOF = Value(5.U)
   val NELEMSTEP = Value(6.U)
-  val WIDTH = Value("b111".U)
+  val WIDTH = Value("b111111".U)
 }
 
 object BranchComp extends ChiselEnum {

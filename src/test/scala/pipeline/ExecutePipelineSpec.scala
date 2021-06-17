@@ -45,7 +45,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
    * @param delta Maximum allowed deviation (not inclusive)
    */
   def assertEquals(a: SInt, b: SInt, delta: Double = 0.01): Unit = {
-    assert(math.abs(fixed2double((a.litValue-b.litValue).toLong)) < delta)
+    assert(math.abs(fixed2double((a.litValue-b.litValue).toLong)) < delta, s"[a=$a (${fixed2double(a)}), b=$b (${fixed2double(b)})]")
   }
 
   /**
@@ -394,19 +394,44 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     }
   }
 
+  it should "execute simple branch instructions" in {
+    simulationConfig()
+    seed("Execute pipeline branching")
+    val memfile = "src/resources/meminit/simplebranch.hex.txt"
+    val program = "L0:\n" +
+      "beq s0, s1, L1\n" +
+      "pstart single\n" +
+      "estart\n" +
+      "add.is s0, s1, 1\n" +
+      "eend\n" +
+      "pend\n" +
+      "beq s0, s0, L0\n" +
+      "pstart single\n" +
+      "estart\n" +
+      "eend\n" +
+      "pend\n" +
+      "L1:\n"
+    val instrs = Assembler.assemble(program)
+//    writeMemInitFile(memfile, instrs)
+//    test(new ExecutePipeline(memfile)) {dut =>
+//      testFun(dut)
+//    }
+
+  }
+
   it should "use both threads" in {
     simulationConfig()
     seed("Execute pipeline both threads")
     val memfile = "src/resources/meminit/mem5.hex.txt"
     val program = "" +
-      "pstart ndof\n" +
+      "pstart nelemvec\n" +
       "estart\n" +
       "abs.vv v0, v1, v2\n" +
       "eend\n" +
       "pend"
     val instrs = Assembler.assemble(program)
     writeMemInitFile(memfile, instrs)
-    test(new ExecutePipeline(memfile=memfile)) {dut =>
+    test(new ExecutePipeline(memfile=memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       testFun(dut)
     }
   }
@@ -443,22 +468,22 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     /* Instructions
     pstart ndof
     estart
-    sub.xv vs1, x0, vs3
-    mac.sv s2, s1, vs2 //sum
-    add.vv vs1, vs1, vs2
+    sub.xv v1, x0, v3
+    mac.sv s2, s1, v2 //sum
+    add.vv v1, v1, v2
     eend
-    iend
+    iendv
     pstart nelem
     estart
-    mac.vv s0, vs1, vs2 //dot product
+    mac.vv s0, v1, v2 //dot product
     eend
     iend
      */
-    val p1 = wrapInstructions(Array(RtypeInstruction(1, 0, 3, SUB, RtypeMod.XV), RtypeInstruction(2, 1, 2, MAC, RtypeMod.SV), RtypeInstruction(1, 1, 2, ADD, RtypeMod.VV)), OtypeLen.NDOF)
+    val p1 = wrapInstructions(Array(RtypeInstruction(1, 0, 3, SUB, RtypeMod.XV), RtypeInstruction(2, 1, 2, MAC, RtypeMod.SV), RtypeInstruction(1, 1, 2, ADD, RtypeMod.VV)), OtypeLen.NELEMVEC)
     val p2 = wrapInstructions(Array(RtypeInstruction(0, 1, 2, MAC, RtypeMod.VV)), OtypeLen.NELEMVEC)
     val instrs = Array.concat(p1,p2)
     writeMemInitFile(memfile, instrs)
-    test(new ExecutePipeline(memfile=memfile)) {dut =>
+    test(new ExecutePipeline(memfile=memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       testFun(dut)
     }
   }

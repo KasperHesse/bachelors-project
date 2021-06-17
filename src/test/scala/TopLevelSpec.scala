@@ -28,7 +28,8 @@ class TopLevelSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     source.close()
     SynthesisMemInit()
     test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/mvp.hex.txt", wordsPerBank=1671, memInitFileLocation="resources")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      dut.clock.step(999)
+      dut.clock.setTimeout(2000)
+      dut.clock.step(1500)
     }
   }
 

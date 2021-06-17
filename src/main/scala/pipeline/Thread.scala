@@ -284,7 +284,7 @@ class Thread(id: Int) extends Module {
   switch(state) {
     is(sIdle) {
       IP := 0.U
-      when(Oinst.pe === OtypePE.PACKET && Oinst.se === OtypeSE.START && Oinst.fmt === InstructionFMT.OTYPE && io.start) {
+      when(Oinst.mod === OtypePE.PACKET && Oinst.se === OtypeSE.START && Oinst.fmt === InstructionFMT.OTYPE && io.start) {
         IP := 1.U
         macLimit := macLimitDecode(Oinst.len.asUInt())
         maxIndex := maxIndexDecode(Oinst.len.asUInt())
@@ -298,7 +298,7 @@ class Thread(id: Int) extends Module {
     is(sLoad) {
       finalCycle := memAccess.io.finalCycle //Memory access module handles the rest
       //Load data for this instruction, increment pointer as necessary
-      when(Oinst.pe === OtypePE.EXEC && Oinst.se === OtypeSE.START) {
+      when(Oinst.mod === OtypePE.EXEC && Oinst.se === OtypeSE.START) {
         finalCycle := false.B //This is funky, but required for correct functionality
         //Above is necessary since we should keep the IP when waiting in sEstart
         state := sEstart
@@ -314,7 +314,7 @@ class Thread(id: Int) extends Module {
       //Execute instructions, increment IP as necessary
       //When we load the eend instruction, move to that state once execute pipeline is empty
       //Only the ordinary destination queue has to be empty. If mac dest queue is non-empty and fin is not asserted, that's also OK
-      when(Oinst.pe === OtypePE.EXEC && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE
+      when(Oinst.mod === OtypePE.EXEC && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE
         && io.ctrl.empty && (io.ctrl.macEmpty || !io.fin)) {
         finalCycle := false.B //Deassert to avoid incrementing IP
         state := sEend
@@ -328,7 +328,7 @@ class Thread(id: Int) extends Module {
     }
     is(sStore) {
       finalCycle := memAccess.io.finalCycle //Memory access module handles the remaining logic
-      when(Oinst.pe === OtypePE.PACKET && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE) {
+      when(Oinst.mod === OtypePE.PACKET && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE) {
         state := sPend
       }
     }
