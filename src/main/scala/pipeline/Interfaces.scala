@@ -13,7 +13,7 @@ import utils.Fixed._
  */
 class IfIdIO extends Bundle {
   /** Instruction fetched from IM */
-  val instr = Output(UInt(32.W))
+  val instr = Output(UInt(INSTRUCTION_WIDTH.W))
   /** Current value of the program counter */
   val pc = Output(UInt(32.W))
   /** Address to jump to when branching */
