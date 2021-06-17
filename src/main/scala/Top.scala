@@ -11,18 +11,15 @@ import scala.io.Source
 
 object Top extends App {
   //Assemble program
-  val source = Source.fromFile("resources/program.txt")
-  Assembler.writeMemInitFile("resources/im.txt", Assembler.assemble(source).map(_.toLong))
+  val source = Source.fromFile("src/resources/programs/applystateoperator.txt")
+  Assembler.writeMemInitFile("src/resources/programs/applystateoperator.hex", Assembler.assemble(source).map(_.toLong))
   source.close()
 
-  val source2 = Source.fromFile("resources/program1.txt")
-  Assembler.writeMemInitFile("resources/top2.txt", Assembler.assemble(source).map(_.toLong))
-  source.close()
-
+  //Initialize starting values in memory for synthesis
   SynthesisMemInit()
 
   (new chisel3.stage.ChiselStage).execute(
     Array("-X", "verilog", "-td", "target/gen"),
-    Seq(ChiselGeneratorAnnotation(() => new TopLevel(IMsize=1024, IMinitFileLocation = "resources/im.txt", wordsPerBank=1671, memInitFileLocation = "resources"))))
+    Seq(ChiselGeneratorAnnotation(() => new TopLevel(IMsize=1024, IMinitFileLocation = "src/resources/programs/applystateoperator.hex", wordsPerBank=1671, memInitFileLocation="src/resources/memInit"))))
 //  -X verilog outputs verilog, -td target/gen sets target directory
 }
