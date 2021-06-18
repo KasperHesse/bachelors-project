@@ -1,6 +1,6 @@
 package utils
 
-import java.io.{BufferedWriter, FileWriter}
+import java.io.{BufferedWriter, FileWriter, File}
 import java.util.NoSuchElementException
 import chisel3._
 import pipeline.InstructionFMT._
@@ -47,6 +47,10 @@ object Assembler {
    * @param len The number of figures to print out for each line (if eg value=8 and len=4, it will print 0004)
    */
   def writeMemInitFile(memfile: String, instrs: Array[Long], len: Int = 8): Unit = {
+    val dir = new File(new File(memfile).getParent)
+    if(!dir.exists) {
+      dir.mkdir()
+    }
     val writer = new BufferedWriter(new FileWriter(memfile))
     for(instr <- instrs) {
       writer.write(("0000000000000000" + instr.toHexString).takeRight(len) + "\n")
