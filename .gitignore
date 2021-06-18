@@ -12,4 +12,4 @@ target
 quartus
 project/target
 src/resources/meminit
-resources
+/resources

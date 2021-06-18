@@ -1,0 +1,7 @@
+pstart ndof
+ld.vec v0, U
+ld.vec v1, R
+estart
+mac.vv s1, v0, v1
+eend //No store is required, value is put into s-register
+pend
