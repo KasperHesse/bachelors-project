@@ -1,7 +1,7 @@
 package utils
 
 import memory.AddressDecode.mapping
-import pipeline.StypeBaseAddress._
+import execution.StypeBaseAddress._
 import utils.Assembler.writeMemInitFile
 import utils.Config._
 import utils.Fixed._

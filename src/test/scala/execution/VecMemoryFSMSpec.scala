@@ -1,4 +1,4 @@
-package pipeline
+package execution
 
 import chiseltest.ChiselScalatestTester
 import org.scalatest.{FlatSpec, Matchers}
@@ -7,7 +7,7 @@ import chisel3._
 import chisel3.experimental.BundleLiterals._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
-import pipeline.ThreadState._
+import execution.ThreadState._
 import StypeLoadStore._
 import StypeMod._
 import InstructionFMT._

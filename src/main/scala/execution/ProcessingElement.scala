@@ -1,14 +1,13 @@
-package vector
+package execution
 
 import arithmetic._
 import chisel3._
 import chisel3.util.log2Ceil
-import pipeline.Opcode
 import utils.Config.{NDOFLENGTH, NUM_PROCELEM}
 import utils.Fixed._
 //import ProcElemOpcode._
 import chisel3.util.RegEnable
-import pipeline.Opcode._
+import execution.Opcode._
 
 //Takes up 28/342 DSP blocks when used with 2 stage3-reps
 //Allows us to work with 12 of these bad-boys, aww yeah

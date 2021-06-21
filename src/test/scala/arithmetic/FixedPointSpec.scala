@@ -4,9 +4,9 @@ import java.math.BigInteger
 import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
-import pipeline.Opcode
+import execution.Opcode
 import utils.Fixed._
-import pipeline.Opcode._
+import execution.Opcode._
 
 class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Fixed Point Circuitry"

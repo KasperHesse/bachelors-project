@@ -5,7 +5,7 @@
 //import chisel3.util._
 //import utils.Config._
 //import utils.Fixed.FIXED_WIDTH
-//import vector.KEWrapper
+//import execution.KEWrapper
 //import vector.Opcode._
 //import chisel3.experimental.BundleLiterals._
 //import memory.{IJKBundle, IJKgeneratorBundle}

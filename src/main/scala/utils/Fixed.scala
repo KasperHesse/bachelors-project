@@ -1,7 +1,7 @@
 package utils
 
 import chisel3._
-import pipeline.RtypeInstruction
+import execution.RtypeInstruction
 
 /**
  * This object contains all constants and methods relating to operating with fixed-point numbers.

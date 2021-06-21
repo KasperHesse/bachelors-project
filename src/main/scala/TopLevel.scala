@@ -1,7 +1,7 @@
 
 import chisel3._
 import memory.{MemWbIO, MemoryStage}
-import pipeline._
+import execution._
 
 /**
  * The top level module for the topological optimizer

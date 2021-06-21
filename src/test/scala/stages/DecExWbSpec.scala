@@ -1,15 +1,14 @@
-package execution
+package stages
 
 import chisel3._
 import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
-import utils.Fixed._
-import chisel3.experimental.BundleLiterals._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
+import execution.Opcode.{ADD, DIV, MAC, RED}
+import execution._
+import org.scalatest.{FlatSpec, Matchers}
 import utils.Config._
-import Opcode._
-import utils.Config
+import utils.Fixed._
 
 class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 

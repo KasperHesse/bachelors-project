@@ -1,11 +1,10 @@
-package vector
+package execution
 
 import chisel3._
 import chisel3.util._
-import utils.Fixed.FIXED_WIDTH
+import execution.KEWrapper.getKEslices
 import utils.Config.KE_SIZE
-import KEWrapper.{getKEslices}
-import utils.Fixed.double2fixed
+import utils.Fixed.{FIXED_WIDTH, double2fixed}
 
 /**
  * A wrapper around the KE-matrix, used to extract values from it. Implements [[KEWrapperIO]].

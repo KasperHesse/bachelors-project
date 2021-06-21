@@ -2,7 +2,9 @@ package test
 
 import chisel3._
 import chisel3.util._
+import utils.Assembler
 import utils.Fixed._
+import utils.Config._
 
 class Test extends Module {
   val io = IO(new Bundle {
@@ -44,6 +46,17 @@ class Test extends Module {
 }
 
 object Test extends App {
+  NX = 5
+  NY = 5
+  NZ = 5
+  val vals = for(i <- 0 until 1024) yield {
+    (scala.util.Random.nextDouble()*math.pow(2,32)).toLong
+  }
+  Assembler.writeMemInitFile("im.hex.txt", vals.toArray)
+
+
+  utils.SynthesisMemInit.getEdof(0,0,0).foreach(a => println(s"$a, ${a % 8}"))
+
   val imm = imm2fixed(0.08578) //Smallest value that can be expressed in an immediate
   val imm2 =
 //  val r = fixedMul(fixedMul(0.0078125, 0.015625), 0.015625)

@@ -6,8 +6,8 @@ import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import pipeline.Opcode
-import pipeline.Opcode._
+import execution.{Opcode, ProcessingElement}
+import execution.Opcode._
 
 class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Processing elements"

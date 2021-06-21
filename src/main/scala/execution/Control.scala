@@ -1,6 +1,7 @@
-package pipeline
+package execution
 
 import chisel3._
+import execution.RegisterBundle
 
 class ControlIO extends Bundle {
   val id = Flipped(new IdControlIO)
@@ -48,8 +49,10 @@ class Control extends Module {
 
   // --- LOGIC ---
   //Logic signals for easier decode of O-type instructions
-  val Oinst = io.fe.instr.asTypeOf(new OtypeInstruction)
-  val isPacket: Bool = Oinst.mod === OtypePE.PACKET
+
+  val Oinst = io.id.instr.asTypeOf(new OtypeInstruction)
+  val isPacket: Bool = Oinst.mod === OtypeMod.PACKET
+  val isTime: Bool = Oinst.mod === OtypeMod.TIME
   val isEnd = Oinst.se === OtypeSE.END
   val isOtype: Bool = Oinst.fmt === InstructionFMT.OTYPE
   val isBtype: Bool = Oinst.fmt === InstructionFMT.BTYPE
@@ -62,16 +65,37 @@ class Control extends Module {
     io.fe.iload := true.B
     iload := true.B
   }
-
   //When we read the final instruction, stop loading after this one
   when(isEnd && isPacket && isOtype && io.id.state === DecodeState.sLoad) {
+//    io.id.iload := false.B
+//    io.fe.iload := false.B
     iload := false.B
   }
-
-  //When branch instructions are encountered, toggle iload in fetch stage but don't keep high
-  when(io.id.state === DecodeState.sIdle && isBtype) {
+  //When handling branch or tstart/tend instructions, step past that instruction once triggered
+  when(io.id.state === DecodeState.sBranch || (isOtype && isTime && io.id.state === DecodeState.sIdle)) { //Must perform this check to avoid doubled instructions in sim
     io.fe.iload := true.B
   }
+
+/*
+  //When we read the final instruction, stop loading after this one
+  when(isEnd && isPacket && isOtype && io.id.state === DecodeState.sLoad) {
+    io.id.iload := false.B
+    io.fe.iload := false.B
+    iload := false.B
+    //When we spot a pstart instruction, or we're currently loading a packet, keep processing
+  } .elsewhen((isStart && isPacket && isOtype && io.id.state === DecodeState.sIdle) || iload) {
+    io.id.iload := true.B
+    io.fe.iload := true.B
+    iload := true.B
+    //When not executing or processing a branch, toggle fetch iload
+  } .elsewhen(!(io.id.state === DecodeState.sExec || io.id.state === DecodeState.sBranch2)) {
+    io.fe.iload := true.B
+  }
+  */
+
+
+
+
 
   // --- THREAD CONTROL SIGNALS ---
   //Stall until read or write queue is empty once the final read/write operation has been issued

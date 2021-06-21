@@ -1,15 +1,14 @@
 import java.io.{BufferedWriter, FileWriter}
-
 import chisel3._
 import chiseltest._
-import utils.Config
+import execution.KEWrapper
+import utils.{Assembler, Config}
 import utils.Config._
 import utils.Fixed._
-import vector.KEWrapper
-import pipeline.Opcode._
+import execution.Opcode._
 import org.scalatest.{FlatSpec, Matchers}
 
-package object pipeline {
+package object execution {
   /**
    * Generates a random Rtype-instruction (random mod+opcode)
    * @return
@@ -83,10 +82,10 @@ package object pipeline {
    * @param length The length of the instruction (single, Ndof or Nelem operations)
    */
   def wrapInstructions(instrs: Array[RtypeInstruction], length: OtypeLen.Type): Array[Bundle with Instruction] = {
-    val istart = OtypeInstruction(se = OtypeSE.START, mod = OtypePE.PACKET, length)
-    val estart = OtypeInstruction(OtypeSE.START, pe = OtypePE.EXEC)
-    val eend = OtypeInstruction(OtypeSE.END, pe = OtypePE.EXEC)
-    val iend = OtypeInstruction(OtypeSE.END, pe = OtypePE.PACKET)
+    val istart = OtypeInstruction(se = OtypeSE.START, mod = OtypeMod.PACKET, length)
+    val estart = OtypeInstruction(OtypeSE.START, mod = OtypeMod.EXEC)
+    val eend = OtypeInstruction(OtypeSE.END, mod = OtypeMod.EXEC)
+    val iend = OtypeInstruction(OtypeSE.END, mod = OtypeMod.PACKET)
 
     val a1 = Array(istart, estart).asInstanceOf[Array[Bundle with Instruction]]
     val a2 = Array(eend, iend).asInstanceOf[Array[Bundle with Instruction]]
@@ -401,20 +400,7 @@ package object pipeline {
    * @param instrs The instructions to write into that file
    */
   def writeMemInitFile(memfile: String, instrs: Array[Bundle with Instruction]): Unit = {
-    writeMemInitFile(memfile, instrs.map(_.litValue.toInt))
-  }
-
-  /**
-   * Initializes a memory file
-   * @param memfile Relative path to the memory file to initialize. Existing contents are overwritten, a new file is created if none exists
-   * @param instrs Encoded instruction to write into that file
-   */
-  def writeMemInitFile(memfile: String, instrs: Array[Int]): Unit = {
-    val writer = new BufferedWriter(new FileWriter(memfile))
-    for(instr <- instrs) {
-      writer.write(("00000000" + instr.toHexString).takeRight(8) + "\n")
-    }
-    writer.close()
+    Assembler.writeMemInitFile(memfile, instrs.map(_.litValue.toLong))
   }
 
   /**
@@ -439,10 +425,10 @@ package object pipeline {
    * @return An array of instructions representing a full instruction packet
    */
   def wrapLoadStoreInstructions(ldInstrs: Array[StypeInstruction], stInstrs: Option[Array[StypeInstruction]] = None, len: OtypeLen.Type = OtypeLen.SINGLE): Array[Bundle with Instruction] = {
-    val pstart = Array(OtypeInstruction(se=OtypeSE.START, mod = OtypePE.PACKET, len)).asInstanceOf[Array[Bundle with Instruction]]
-    val estart = OtypeInstruction(se=OtypeSE.START, pe=OtypePE.EXEC).asInstanceOf[Bundle with Instruction]
-    val eend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.EXEC).asInstanceOf[Bundle with Instruction]
-    val pend = OtypeInstruction(se=OtypeSE.END, pe=OtypePE.PACKET).asInstanceOf[Bundle with Instruction]
+    val pstart = Array(OtypeInstruction(se=OtypeSE.START, mod = OtypeMod.PACKET, len)).asInstanceOf[Array[Bundle with Instruction]]
+    val estart = OtypeInstruction(se=OtypeSE.START, mod=OtypeMod.EXEC).asInstanceOf[Bundle with Instruction]
+    val eend = OtypeInstruction(se=OtypeSE.END, mod=OtypeMod.EXEC).asInstanceOf[Bundle with Instruction]
+    val pend = OtypeInstruction(se=OtypeSE.END, mod=OtypeMod.PACKET).asInstanceOf[Bundle with Instruction]
 
     if(stInstrs.isEmpty) {
       Array.concat(pstart, ldInstrs.asInstanceOf[Array[Bundle with Instruction]], Array(estart, eend, pend))

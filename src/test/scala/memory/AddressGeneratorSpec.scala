@@ -8,7 +8,7 @@ import utils.Config._
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import pipeline.StypeBaseAddress
+import execution.StypeBaseAddress
 
 class AddressGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers  {
 

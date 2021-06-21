@@ -1,12 +1,12 @@
-package pipeline
+package execution
 
 import chisel3._
 import chisel3.experimental.ChiselEnum
 import chisel3.util._
 import memory.{AddressGenProducerIO, IJKgenerator, IJKgeneratorBundle, IJKgeneratorConsumerIO, ReadQueueBundle}
-import pipeline.StypeMod._
+import execution.StypeMod._
 import utils.Config._
-import pipeline.ThreadState._
+import execution.ThreadState._
 
 class MemoryAccessFSMIO extends Bundle {
   /** Instruction bits from Thread module */

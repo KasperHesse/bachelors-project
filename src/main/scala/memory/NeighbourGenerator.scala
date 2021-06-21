@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.experimental.ChiselEnum
 import chisel3.experimental.BundleLiterals._
 import chisel3.util._
-import pipeline.StypeMod._
+import execution.StypeMod._
 import utils.Config._
 
 /**
@@ -17,7 +17,7 @@ class NeighbourGeneratorIO extends Bundle {
 
 /**
  * This module takes a set of IJK-values and the current Stype modifier, and outputs the indices of the neighbouring elements.
- * It may either calculate face or edge neighbours, or it will output the given input coordinate tuple if [[pipeline.StypeMod.SEL]] or [[pipeline.StypeMod.ELEM]] is given as the modifier.
+ * It may either calculate face or edge neighbours, or it will output the given input coordinate tuple if [[execution.StypeMod.SEL]] or [[execution.StypeMod.ELEM]] is given as the modifier.
  * If the input modifier is not one of [[SEL]], [[ELEM]], [[FCN]], [[EDN1]] or [[EDN2]], the module will stay in the idle state
  */
 class NeighbourGenerator extends Module {

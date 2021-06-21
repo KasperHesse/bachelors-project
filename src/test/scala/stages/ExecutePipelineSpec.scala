@@ -1,16 +1,16 @@
-package execution
+package stages
 
-import java.io._
 import chisel3._
 import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
-import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.{FailedExpectException, WriteVcdAnnotation}
-import utils.Config._
-import Opcode._
+import chiseltest.internal.WriteVcdAnnotation
 import execution.BranchComp._
+import execution.Opcode.{ADD, MAC, MUL, SUB}
+import execution._
+import org.scalatest.{FlatSpec, Matchers}
 import utils.Assembler
+import utils.Config._
+import utils.Fixed._
 
 import scala.collection.mutable.ListBuffer
 
@@ -69,7 +69,10 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     val b = sReg(instr.rs2.litValue.toInt)
     val comp = instr.comp
     val branch = branchOutcome(a, b, comp)
+    dut.clock.step() //Branch outcomes are evaluated on next clock cycle
     dut.io.idctrl.branch.expect(branch.B)
+    dut.clock.step() //Another cc for next instruction be present
+
   }
 
   /**
@@ -303,7 +306,8 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     var instr: UInt = 0.U //Default value
     var fmt: InstructionFMT.Type = InstructionFMT.RTYPE //Default value
     do {
-      instr = dut.io.fectrl.instr.peek
+      instr = dut.io.idctrl.instr.peek
+//      instr = dut.io.
       fmt = InstructionFMT(instr(7, 6).litValue.toInt)
       if (fmt.litValue == InstructionFMT.OTYPE.litValue) {
         //Do nothing
@@ -317,7 +321,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       i += 1
       dut.clock.step()
       //Continue until we get iend instruction
-    } while(instr.litValue != OtypeInstruction(OtypeSE.END, OtypePE.PACKET).toUInt().litValue())
+    } while(instr.litValue != OtypeInstruction(OtypeSE.END, OtypeMod.PACKET).toUInt().litValue())
   }
 
   /**
@@ -326,12 +330,12 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
    */
   def testFun(dut: ExecutePipeline): Unit = {
     setGlobals(dut)
-    assert(dut.io.fectrl.instr.peek.litValue != 0, "Peeked instruction with value 0, did not init memory correctly")
-    while(dut.io.fectrl.instr.peek().litValue != 0) {
-      //Always snoop on instruction present at fetch stage register, and carry that over to decode stage
-      val instr = dut.io.fectrl.instr.peek()
+    dut.clock.step() //1 cycle to get instruction into decode stage
+    assert(dut.io.idctrl.instr.peek.litValue != 0, "Peeked instruction with value 0, did not init memory correctly")
+    while(dut.io.idctrl.instr.peek().litValue != 0) {
+      //Always snoop on instruction at decode stage
+      val instr = dut.io.idctrl.instr.peek()
       val fmt = InstructionFMT(instr(7,6).litValue.toInt)
-      dut.clock.step() //Step it into decode stage
 
       if (fmt.litValue == InstructionFMT.BTYPE.litValue) {
         verifyBranchOutcome(dut, BtypeInstruction(instr))
@@ -356,6 +360,27 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     seed("Execute pipeline payload")
     val memfile = "src/resources/meminit/mem4.hex.txt"
 
+    val program = "beq s0, s1, L1\n" +
+      "L1:\n" +
+      "pstart single\n" +
+      "estart\n" +
+      "add.vv v2, v1, v0\n" +
+      "eend\n" +
+      "pend\n" +
+      "beq s0, s1, L1\n" +
+      "bne s0, s1, L2\n" +
+      "pstart single\n" +
+      "estart\n" +
+      "sub.xx x3, x2, x0\n" +
+      "eend\n" +
+      "pend\n" +
+      "L2:\n" +
+      "pstart single\n" +
+      "estart\n" +
+      "mul.ss s1, s2, s3\n" +
+      "eend\n" +
+      "pend"
+
     /* Instructions
     beq s0, s1, L1 //+4 (not taken)
     L1: pstart single
@@ -377,44 +402,20 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     pend
   */
     //Write to memory file
-    val b0 = Array(BtypeInstruction(EQUAL, 0, 1, 4)).asInstanceOf[Array[Bundle with Instruction]]
-    val p1 = wrapInstructions(Array(RtypeInstruction(2, 1, 0, ADD, RtypeMod.VV)))
-    val b1 = Array(BtypeInstruction(EQUAL, 0, 1, -20)).asInstanceOf[Array[Bundle with Instruction]]
-    val b2 = Array(BtypeInstruction(NEQ, 0, 1, 24)).asInstanceOf[Array[Bundle with Instruction]]
-    val p2 = wrapInstructions(Array(RtypeInstruction(3, 2, 0, SUB, RtypeMod.XX)))
-    val p3 = wrapInstructions(Array(RtypeInstruction(1, 2, 3, MUL, RtypeMod.SS)))
-
-    val instrs = Array.concat(b0, p1, b1, b2, p2, p3)
-    writeMemInitFile(memfile, instrs)
+//    val b0 = Array(BtypeInstruction(EQUAL, 0, 1, 4)).asInstanceOf[Array[Bundle with Instruction]]
+//    val p1 = wrapInstructions(Array(RtypeInstruction(2, 1, 0, ADD, RtypeMod.VV)))
+//    val b1 = Array(BtypeInstruction(EQUAL, 0, 1, -20)).asInstanceOf[Array[Bundle with Instruction]]
+//    val b2 = Array(BtypeInstruction(NEQ, 0, 1, 24)).asInstanceOf[Array[Bundle with Instruction]]
+//    val p2 = wrapInstructions(Array(RtypeInstruction(3, 2, 0, SUB, RtypeMod.XX)))
+//    val p3 = wrapInstructions(Array(RtypeInstruction(1, 2, 3, MUL, RtypeMod.SS)))
+//
+//    val instrs = Array.concat(b0, p1, b1, b2, p2, p3)
+    val instrs = Assembler.assemble(program)
+    Assembler.writeMemInitFile(memfile, instrs)
     //Execute
-    test(new ExecutePipeline(memfile=memfile)) {dut =>
+    test(new ExecutePipeline(memfile=memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       testFun(dut)
     }
-  }
-
-  it should "execute simple branch instructions" in {
-    simulationConfig()
-    seed("Execute pipeline branching")
-    val memfile = "src/resources/meminit/simplebranch.hex.txt"
-    val program = "L0:\n" +
-      "beq s0, s1, L1\n" +
-      "pstart single\n" +
-      "estart\n" +
-      "add.is s0, s1, 1\n" +
-      "eend\n" +
-      "pend\n" +
-      "beq s0, s0, L0\n" +
-      "pstart single\n" +
-      "estart\n" +
-      "eend\n" +
-      "pend\n" +
-      "L1:\n"
-    val instrs = Assembler.assemble(program)
-//    writeMemInitFile(memfile, instrs)
-//    test(new ExecutePipeline(memfile)) {dut =>
-//      testFun(dut)
-//    }
-
   }
 
   it should "use both threads" in {
@@ -428,7 +429,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       "eend\n" +
       "pend"
     val instrs = Assembler.assemble(program)
-    writeMemInitFile(memfile, instrs)
+    Assembler.writeMemInitFile(memfile, instrs)
     test(new ExecutePipeline(memfile=memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       testFun(dut)
     }
@@ -451,10 +452,10 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       "add.is s2, s2, 1\n" + //32
       "eend\n" + //36
       "pend\n" + //40
-      "bne s2, s1, L1 //-20" //44
+      "bne s2, s1, L1 " //44
     val instrs = Assembler.assemble(program)
-    writeMemInitFile(memfile, instrs)
-    test(new ExecutePipeline(memfile=memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    Assembler.writeMemInitFile(memfile, instrs)
+    test(new ExecutePipeline(memfile=memfile)) {dut =>
       testFun(dut)
     }
   }

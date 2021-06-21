@@ -1,11 +1,11 @@
-package pipeline
+package execution
 
 import chisel3._
 import utils.Config._
 import chisel3.util._
 import memory.AddressGenProducerIO
-import pipeline.MemoryAccessFSMState._
-import pipeline.ThreadState._
+import execution.MemoryAccessFSMState._
+import execution.ThreadState._
 
 class VecMemoryFSM extends Module {
   val io = IO(new Bundle {

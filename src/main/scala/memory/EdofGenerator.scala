@@ -2,7 +2,7 @@ package memory
 
 import chisel3._
 import chisel3.util._
-import pipeline.StypeMod
+import execution.StypeMod
 import utils.Config._
 
 /**

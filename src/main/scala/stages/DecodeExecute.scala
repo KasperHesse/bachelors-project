@@ -1,6 +1,7 @@
-package execution
+package stages
 
 import chisel3._
+import execution._
 
 /**
  * A module encompassing the decode and execute stages. Mainly used for testing the two stages together.
@@ -28,7 +29,6 @@ class DecodeExecute(v3: Boolean = false) extends Module {
 
   control.io.id <> decode.io.ctrl
   control.io.ex <> execute.io.ctrl
-  control.io.fe.instr := io.in.instr
 
   execute.io.fwd.rs1swap := false.B
   execute.io.fwd.rs2swap := false.B

@@ -2,7 +2,7 @@ package memory
 
 import chisel3._
 import chisel3.util.{Decoupled, log2Ceil, switch}
-import pipeline.StypeMod._
+import execution.StypeMod._
 import utils.Config.XREG_DEPTH
 
 class WriteQueueWrapperIO extends Bundle {

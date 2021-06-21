@@ -2,7 +2,7 @@ package memory
 
 import chisel3._
 import chisel3.util._
-import pipeline.{RegisterBundle, StypeBaseAddress, StypeLoadStore, StypeMod}
+import execution.{RegisterBundle, StypeBaseAddress, StypeLoadStore, StypeMod}
 import utils.Config._
 import utils.Fixed._
 

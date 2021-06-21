@@ -7,8 +7,8 @@ import utils.Config._
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import pipeline.StypeMod._
-import pipeline.{StypeMod, seed}
+import execution.StypeMod._
+import execution.{StypeMod, seed}
 
 
 class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers {

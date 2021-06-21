@@ -1,4 +1,4 @@
-package pipeline
+package execution
 
 import chisel3._
 import chisel3.util.experimental.loadMemoryFromFile
@@ -21,14 +21,18 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
   val io = IO(new FetchIO)
 
   val PC: UInt = RegInit(0.U(32.W))
+  val PCnext: UInt = WireDefault(0.U(32.W))
   val imem: Mem[UInt] = Mem(memsize, UInt(INSTRUCTION_WIDTH.W))
 
   when(io.id.branch) {
-    PC := io.id.branchTarget
+    PCnext := io.id.branchTarget
   } .elsewhen(io.ctrl.iload) {
-    PC := PC + 4.U
+    PCnext := PC + 4.U
+  } .otherwise {
+    PCnext := PC
   }
-  val instr: UInt = imem((PC >> 2).asUInt())
+  PC := PCnext
+  val instr: UInt = imem((PCnext >> 2).asUInt())
 
 
   if(SIMULATION) {
@@ -46,6 +50,5 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
   }
 
   io.id.instr := instr
-  io.ctrl.instr := instr
-  io.id.pc := PC
+  io.id.pc := PCnext
 }

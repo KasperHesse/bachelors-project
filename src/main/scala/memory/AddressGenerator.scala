@@ -3,8 +3,8 @@ package memory
 import chisel3._
 import chisel3.util.{Decoupled, MuxLookup, RegEnable, is, switch}
 import utils.Config._
-import pipeline.StypeBaseAddress._
-import pipeline._
+import execution.StypeBaseAddress._
+import execution._
 
 /**
  * I/O ports for the address generator module

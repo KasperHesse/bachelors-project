@@ -1,4 +1,4 @@
-package pipeline
+package execution
 
 import chisel3.experimental.ChiselEnum
 

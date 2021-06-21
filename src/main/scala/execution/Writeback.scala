@@ -1,11 +1,11 @@
-package pipeline
+package execution
 
 import chisel3._
 import chisel3.experimental.ChiselEnum
 import chisel3.util._
 import utils.Config._
 import utils.Fixed._
-import pipeline.RegisterFileType._
+import execution.RegisterFileType._
 
 class WritebackIO extends Bundle {
   val ex = Flipped(new ExWbIO)

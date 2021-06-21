@@ -1,8 +1,8 @@
 import chisel3._
 import chisel3.experimental.BundleLiterals._
 import utils.Config._
-import pipeline.StypeBaseAddress._
-import pipeline.{StypeBaseAddress, StypeMod}
+import execution.StypeBaseAddress._
+import execution.{StypeBaseAddress, StypeMod}
 
 package object memory {
 

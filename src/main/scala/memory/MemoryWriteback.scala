@@ -3,8 +3,8 @@ package memory
 import chisel3._
 import chisel3.experimental.ChiselEnum
 import chisel3.util._
-import pipeline.StypeMod
-import pipeline.StypeMod._
+import execution.StypeMod
+import execution.StypeMod._
 import utils.Config._
 import utils.Fixed.FIXED_WIDTH
 
@@ -14,7 +14,7 @@ class MemWbIO extends Bundle {
   /** Inputs from the read queue */
   val readQueue = Flipped(Decoupled(new ReadQueueBundle))
   /** Outputs to the instruction decode stage / register files. Does not use ready/valid signalling */
-  val id = Output(new pipeline.WbIdIO)
+  val id = Output(new execution.WbIdIO)
 }
 
 /**

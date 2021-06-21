@@ -4,13 +4,13 @@ import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import Config._
-import pipeline.{BtypeInstruction, OtypeInstruction, OtypeLen, RtypeInstruction, StypeInstruction}
-import pipeline.Opcode._
-import pipeline.RtypeMod._
-import pipeline.OtypePE._
-import pipeline.OtypeSE._
-import pipeline.OtypeLen._
-import pipeline.BranchComp._
+import execution.{BtypeInstruction, OtypeInstruction, OtypeLen, RtypeInstruction, StypeInstruction}
+import execution.Opcode._
+import execution.RtypeMod._
+import execution.OtypeMod._
+import execution.OtypeSE._
+import execution.OtypeLen._
+import execution.BranchComp._
 import Fixed._
 
 class AssemblerSpec extends FlatSpec with Matchers {
@@ -129,7 +129,10 @@ class AssemblerSpec extends FlatSpec with Matchers {
       "pstart nelemstep",
       "estart",
       "eend",
-      "pend"
+      "pend",
+      "tstart run",
+      "tstart clear",
+      "tend"
     )
     val instrs = Array(
       (START, PACKET, SINGLE),
@@ -139,7 +142,10 @@ class AssemblerSpec extends FlatSpec with Matchers {
       (START, PACKET, OtypeLen.NELEMSTEP),
       (START, EXEC, SINGLE),
       (END, EXEC, SINGLE),
-      (END, PACKET, SINGLE)
+      (END, PACKET, SINGLE),
+      (START, TIME, OtypeLen.SINGLE),
+      (START, TIME, OtypeLen.NDOF),
+      (END, TIME, OtypeLen.SINGLE)
     )
     for(i <- lines.indices) {
       val instr = OtypeInstruction(se=instrs(i)._1, mod=instrs(i)._2, len=instrs(i)._3)
@@ -177,8 +183,8 @@ class AssemblerSpec extends FlatSpec with Matchers {
       "L2:\n" +
       "blt s1, s1, L1" //32
     val parsed = Assembler.assemble(program)
-    val p1 = pipeline.wrapInstructions(Array(RtypeInstruction(1, 1, 1, 0, ADD, SS), RtypeInstruction(2, 0, 5, 0, ADD, SS)))
-    val b1 = Array(BtypeInstruction(NEQ, 1, 2, 8), BtypeInstruction(EQUAL, 0, 0, -28), BtypeInstruction(LT, 1, 1, -32)).asInstanceOf[Array[Bundle with pipeline.Instruction]]
+    val p1 = execution.wrapInstructions(Array(RtypeInstruction(1, 1, 1, 0, ADD, SS), RtypeInstruction(2, 0, 5, 0, ADD, SS)))
+    val b1 = Array(BtypeInstruction(NEQ, 1, 2, 8), BtypeInstruction(EQUAL, 0, 0, -28), BtypeInstruction(LT, 1, 1, -32)).asInstanceOf[Array[Bundle with execution.Instruction]]
     val instrs = Array.concat(p1, b1)
     for(i <- instrs.indices) {
       assert(parsed(i) == instrs(i).litValue.toInt)
@@ -458,8 +464,8 @@ class AssemblerSpec extends FlatSpec with Matchers {
   }
 
   it should "assemble S-type ld.vec instructions" in {
-    import pipeline.StypeMod._
-    import pipeline.StypeBaseAddress._
+    import execution.StypeMod._
+    import execution.StypeBaseAddress._
     val lines = Array(
       "ld.vec v0, x",
       "ld.vec v1, xphys",

@@ -1,15 +1,13 @@
-package memory.substages
+package stages
 
 import chisel3._
-import chisel3.util._
 import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
-import utils.Config._
-import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import execution.StypeBaseAddress._
 import execution.StypeBaseAddress
+import execution.StypeBaseAddress._
+import org.scalatest.{FlatSpec, Matchers}
+import utils.Config._
 
 class AddrGenMemSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 

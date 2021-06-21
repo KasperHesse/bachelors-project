@@ -9,9 +9,9 @@ import utils.Config._
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import pipeline.{RegisterBundle, RegisterFileType, StypeBaseAddress, StypeMod}
-import pipeline.StypeMod._
-import pipeline.seed
+import execution.{RegisterBundle, RegisterFileType, StypeBaseAddress, StypeMod}
+import execution.StypeMod._
+import execution.seed
 
 
 class MemoryWritebackSpec extends FlatSpec with ChiselScalatestTester with Matchers {

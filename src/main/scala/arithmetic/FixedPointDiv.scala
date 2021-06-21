@@ -2,7 +2,7 @@ package arithmetic
 
 import chisel3._
 import chisel3.util._
-import pipeline.Opcode
+import execution.Opcode
 import utils.Fixed._
 import utils.DivTypes._
 import utils.{Config, MulTypes}

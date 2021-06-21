@@ -1,18 +1,19 @@
-package execution
+package stages
 
 import chisel3._
 import chisel3.util.log2Ceil
-import org.scalatest.{FlatSpec, Matchers}
 import chiseltest._
-import chiseltest.internal.WriteVcdAnnotation
 import chiseltest.experimental.TestOptionBuilder._
-import memory.{AddressDecode, baseAddresses, elementIndex, genIJK, genIJKmultiple, getEdn1Indices, getEdn2Indices, getEdof, getFcnIndices, randomElement}
-import execution.StypeMod._
+import chiseltest.internal.WriteVcdAnnotation
+import execution.RegisterFileType._
 import execution.StypeBaseAddress._
 import execution.StypeLoadStore._
+import execution.StypeMod._
+import execution._
+import memory._
+import org.scalatest.{FlatSpec, Matchers}
 import utils.Config._
 import utils.Fixed._
-import execution.RegisterFileType._
 
 class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Decode and memory stages"

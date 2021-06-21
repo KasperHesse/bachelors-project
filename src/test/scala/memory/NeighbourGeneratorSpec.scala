@@ -8,7 +8,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import pipeline.StypeMod
+import execution.StypeMod
 import utils.Config.NUM_MEMORY_BANKS
 
 class NeighbourGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers{

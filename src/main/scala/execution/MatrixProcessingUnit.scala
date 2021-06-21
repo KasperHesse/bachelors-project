@@ -1,7 +1,6 @@
-package vector
+package execution
 
 import chisel3._
-import pipeline.Opcode
 import utils.Fixed.FIXED_WIDTH
 
 /**

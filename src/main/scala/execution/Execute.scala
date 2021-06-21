@@ -1,7 +1,6 @@
-package pipeline
+package execution
 
 import chisel3._
-import vector._
 import utils.Config._
 import Opcode._
 import chisel3.util._

@@ -12,7 +12,7 @@ class IJKgeneratorIO extends Bundle {
   val out = Output(new IJKgeneratorBundle)
   /** Input values from other thread */
   val in = Flipped(new IJKgeneratorBundle)
-  /** Control signals from [[pipeline.IJKGeneratorFSM]] */
+  /** Control signals from [[execution.IJKGeneratorFSM]] */
   val ctrl = new IJKgeneratorControl
 }
 
@@ -30,7 +30,7 @@ class IJKgeneratorBundle extends Bundle {
 }
 
 /**
- * A bundle holding the control signals input to an [[IJKgenerator]] by a [[pipeline.IJKGeneratorFSM]]
+ * A bundle holding the control signals input to an [[IJKgenerator]] by a [[execution.IJKGeneratorFSM]]
  */
 class IJKgeneratorControl extends Bundle {
   /** Restart signal. Makes the generator restart iterating from its saved i,j,k,iteration values */

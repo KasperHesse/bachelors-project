@@ -1,6 +1,7 @@
-package execution
+package stages
 
 import chisel3._
+import execution._
 
 /**
  * A module encompassing all modules present in the execution logic.

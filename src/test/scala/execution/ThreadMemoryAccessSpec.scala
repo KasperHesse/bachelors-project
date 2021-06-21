@@ -1,4 +1,4 @@
-package pipeline
+package execution
 
 import chisel3._
 import chiseltest._
@@ -7,10 +7,10 @@ import chisel3.experimental.BundleLiterals._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
 import memory.{IJKBundle, genIJKmultiple}
-import pipeline.RegisterFileType._
-import pipeline.StypeBaseAddress._
-import pipeline.StypeMod._
-import pipeline.StypeLoadStore._
+import execution.RegisterFileType._
+import execution.StypeBaseAddress._
+import execution.StypeMod._
+import execution.StypeLoadStore._
 import utils.Config.{ELEMS_PER_VSLOT, NUM_MEMORY_BANKS, SUBVECTORS_PER_VREG, VREG_SLOT_WIDTH}
 
 class ThreadMemoryAccessSpec extends FlatSpec with ChiselScalatestTester with Matchers{

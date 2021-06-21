@@ -2,8 +2,8 @@ package memory
 
 import chisel3._
 import chisel3.util.{Decoupled, Queue, RegEnable, Valid}
-import pipeline.StypeMod._
-import pipeline.{IdMemIO, MemControlIO, StypeLoadStore, StypeMod, WbIdIO}
+import execution.StypeMod._
+import execution.{IdMemIO, MemControlIO, StypeLoadStore, StypeMod, WbIdIO}
 import utils.Config._
 import utils.Fixed.FIXED_WIDTH
 
@@ -20,7 +20,7 @@ class MemoryStageIO extends Bundle {
 }
 
 /**
- * A wrapper module around the entirety of the memory stage. Connects to the [[pipeline.Decode]] stage for reads and writes.
+ * A wrapper module around the entirety of the memory stage. Connects to the [[execution.Decode]] stage for reads and writes.
  * Implements [[MemoryStageIO]]
  *
  * @param wordsPerBank The number of data words to store in *each* memory bank. The total amount of memory allotted

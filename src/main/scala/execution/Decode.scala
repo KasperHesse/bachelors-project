@@ -1,4 +1,4 @@
-package pipeline
+package execution
 
 import chisel3._
 import chisel3.util._
@@ -6,6 +6,7 @@ import DecodeState._
 import utils.Config._
 import utils.Fixed._
 import chisel3.experimental.BundleLiterals._
+import execution.OtypeMod.TIME
 
 /**
  * I/O ports for the decode stage
@@ -23,6 +24,8 @@ class DecodeIO extends Bundle {
   val memWb = Flipped(new WbIdIO)
   /** Connections to control module */
   val ctrl = new IdControlIO
+  /** Connections to timing module */
+  val time = new IdTimingIO
 }
 
 /**
@@ -41,7 +44,10 @@ class Decode extends Module {
 
   // --- REGISTERS ---
   /** Pipeline stage register */
-  val fe_instr = RegNext(io.fe.instr)
+//  val fe_instr = RegNext(io.fe.instr)
+//  val fe_instr = RegEnable(next=io.fe.instr, enable = !reset.asBool())
+  val fe_instr = RegInit(0.U(INSTRUCTION_WIDTH.W))
+  fe_instr := io.fe.instr
   val fe_pc = RegNext(io.fe.pc)
   /** State register */
   val state = RegInit(DecodeState.sIdle)
@@ -61,6 +67,8 @@ class Decode extends Module {
   val execThread = RegInit(1.U(1.W))
   /** ID of thread which is currently accessing memory */
   val memThread = RegInit(0.U(1.W))
+  /** Enable signal to timing module */
+  val timerEnable = RegInit(false.B)
 
   // --- WIRES AND SIGNALS ---
   /** Length of the current instruction */ //iBuffer(0) always holds an O-type instruction indicating packet length
@@ -98,8 +106,14 @@ class Decode extends Module {
   val start = WireDefault(false.B)
   /** Instruction at pipeline register, interpreted as B-type instruction */
   val Binst = fe_instr.asTypeOf(new BtypeInstruction)
+  /** Registered version of the instruction. Used for branch computations */
+  val BinstReg = RegNext(Binst)
+  /** Instruction at pipeline register, interprested as O-type instruction */
+  val Oinst = fe_instr.asTypeOf(new OtypeInstruction)
   /** Branch signal going into fetch stage and control module */
   val branch = WireDefault(false.B)
+  /** Clear signal to timing module.  */
+  val timerClear = WireDefault(false.B)
 
   for(i <- 0 until 2) {
     threadStates(i) := threads(i).io.threadOut.state
@@ -125,16 +139,22 @@ class Decode extends Module {
   io.ctrl.state := state
   io.ctrl.execThread := execThread
   io.ctrl.branch := branch
+  io.ctrl.instr := fe_instr
 
   //Default connections to shared resources
   sRegFile.io.rd := io.wb.rd.reg
   sRegFile.io.wrData := io.wb.wrData(0)
   sRegFile.io.we := io.wb.we && io.wb.rd.rf === RegisterFileType.SREG
 
-  branchTargetGen.io.instr := Binst
-  branchTargetGen.io.pc := fe_pc
+  //Connections to branch target generator
+  branchTargetGen.io.instr := BinstReg
+  branchTargetGen.io.pc := RegNext(fe_pc) //Since data from sregfile is delayed by one cc
   io.fe.branchTarget := branchTargetGen.io.target
   io.fe.branch := branch
+
+  //Connections to timing module
+  io.time.en := timerEnable
+  io.time.clr := timerClear
 
   //Debug connections. TODO: Remove these
   io.ctrl.stateUint := state.asUInt()
@@ -176,8 +196,20 @@ class Decode extends Module {
   //Next state logic
   switch(state) {
     is(sIdle) {
-      when(io.ctrl.iload && !branch) {
+      sRegFile.io.rs1 := Binst.rs1
+      sRegFile.io.rs2 := Binst.rs2
+      when(io.ctrl.iload) {
+        iBuffer(0)(IP) := fe_instr
+        iBuffer(1)(IP) := fe_instr
+        IP := IP + 1.U
         state := sLoad
+      }
+      when(Binst.fmt === InstructionFMT.BTYPE) {
+        state := sBranch
+      }
+      when(Oinst.fmt === InstructionFMT.OTYPE && Oinst.mod === TIME) {
+        timerEnable := (Oinst.se === OtypeSE.START) //Should probably just be := Oinst.se, but this allows us to change encoding at a later point in time
+        timerClear := Oinst.len === OtypeLen.NDOF && Oinst.se === OtypeSE.START //Arbitrary choice
       }
     }
     is(sLoad) {
@@ -216,21 +248,21 @@ class Decode extends Module {
         memThread := 0.U
       }
     }
-  }
-
-  //Branch instruction logic
-  when(Binst.fmt === InstructionFMT.BTYPE && state === sIdle) {
-    sRegFile.io.rs1 := Binst.rs1
-    sRegFile.io.rs2 := Binst.rs2
-
-    when(Binst.comp === BranchComp.EQUAL) {
-      branch := sRegFile.io.rdData1 === sRegFile.io.rdData2
-    } .elsewhen(Binst.comp === BranchComp.NEQ) {
-      branch := sRegFile.io.rdData1 =/= sRegFile.io.rdData2
-    } .elsewhen(Binst.comp === BranchComp.GEQ) {
-      branch := sRegFile.io.rdData1 >= sRegFile.io.rdData2
-    } .elsewhen(Binst.comp === BranchComp.LT) {
-      branch := sRegFile.io.rdData1 < sRegFile.io.rdData2
+    is(sBranch) {
+      when(BinstReg.comp === BranchComp.EQUAL) {
+        branch := sRegFile.io.rdData1 === sRegFile.io.rdData2
+      } .elsewhen(BinstReg.comp === BranchComp.NEQ) {
+        branch := sRegFile.io.rdData1 =/= sRegFile.io.rdData2
+      } .elsewhen(BinstReg.comp === BranchComp.GEQ) {
+        branch := sRegFile.io.rdData1 >= sRegFile.io.rdData2
+      } .elsewhen(BinstReg.comp === BranchComp.LT) {
+        branch := sRegFile.io.rdData1 < sRegFile.io.rdData2
+      }
+      state := sIdle
+//      state := sBranch2 //No matter if branch was taken or not, next instruction won't be present until next clock cycle
+    }
+    is(sBranch2) {
+      state := sIdle
     }
   }
 

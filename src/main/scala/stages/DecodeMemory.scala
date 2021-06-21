@@ -1,6 +1,7 @@
-package execution
+package stages
 
 import chisel3._
+import execution._
 import memory.MemoryStage
 
 class DecodeMemory(wordsPerBank: Int, memInitFileLocation: String) extends Module {
@@ -26,7 +27,6 @@ class DecodeMemory(wordsPerBank: Int, memInitFileLocation: String) extends Modul
   control.io.id <> decode.io.ctrl
   control.io.mem <> mem.io.ctrl
   control.io.fe <> DontCare
-  control.io.fe.instr := io.in.instr
   control.io.ex <> DontCare
   control.io.ex.empty := true.B
   control.io.ex.macEmpty := true.B

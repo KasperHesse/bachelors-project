@@ -1,4 +1,4 @@
-package pipeline
+package execution
 
 import chisel3._
 import chisel3.util._
@@ -6,8 +6,8 @@ import memory.{AddressGenProducerIO, IJKgeneratorBundle, IJKgeneratorConsumerIO,
 import utils.Config._
 import ThreadState._
 import MemoryAccessFSMState._
-import pipeline.RegisterFileType._
-import pipeline.StypeMod._
+import execution.RegisterFileType._
+import execution.StypeMod._
 
 class ThreadMemoryAccessIO extends Bundle {
   /** Instruction from Thread module */

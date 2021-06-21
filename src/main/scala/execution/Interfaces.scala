@@ -1,4 +1,4 @@
-package pipeline
+package execution
 
 import chisel3._
 import chisel3.experimental.ChiselEnum
@@ -155,6 +155,8 @@ class ExControlIO extends Bundle {
 class IdControlIO extends Bundle {
   /** Asserted whenever the decode stage can load new instructions into its instruction buffer */
   val iload = Input(Bool())
+  /** The instruction currently present at the pipeline register */
+  val instr = Output(UInt(INSTRUCTION_WIDTH.W))
   /** The current state of the decoder*/
   val state = Output(DecodeState())
   /** The decoder state as UInt. For debug purposes only */
@@ -175,9 +177,7 @@ class IdControlIO extends Bundle {
  * Use as-is in fetch stage, use Flipped() in control module
  */
 class IfControlIO extends Bundle {
-  /** The instruction currently being fetched from IM */
-  val instr = Output(UInt(32.W))
-  /** Stall signal */
+  /** Instruction load signal. If toggled, will increment PC */
   val iload = Input(Bool())
 }
 
@@ -253,4 +253,14 @@ object RegisterFileType extends ChiselEnum {
   val SREG, VREG, XREG, KREG = Value
 }
 
+/**
+ * I/O bundle between [[Decode]] and [[utils.TimingModule]].
+ * Instantiate as-is in Decode stage, use Flipped() in timing module
+ */
+class IdTimingIO extends Bundle {
+  /** Enable signal. When pulled high, the timer is activated */
+  val en = Output(Bool())
+  /** Clear signal. When pulled high, all registers are reset. Must be pulled low to restart timing */
+  val clr = Output(Bool())
+}
 

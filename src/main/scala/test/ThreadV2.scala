@@ -2,8 +2,8 @@ package test
 
 import chisel3._
 import chisel3.util.log2Ceil
-import pipeline.{InlineVectorRegisterFile, RtypeInstruction, ThreadIO, ThreadState}
-import pipeline.ThreadState.sIdle
+import execution.{InlineVectorRegisterFile, RtypeInstruction, ThreadIO, ThreadState}
+import execution.ThreadState.sIdle
 import utils.Config._
 import utils.Fixed._
 

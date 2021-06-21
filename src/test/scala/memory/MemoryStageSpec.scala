@@ -9,11 +9,11 @@ import utils.Config._
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import pipeline.RegisterFileType.SREG
-import pipeline.{RegisterBundle, RegisterFileType, StypeBaseAddress, StypeLoadStore, StypeMod, WbIdIO, seed}
-import pipeline.StypeMod._
-import pipeline.StypeBaseAddress._
-import pipeline.RegisterFileType._
+import execution.RegisterFileType.SREG
+import execution.{RegisterBundle, RegisterFileType, StypeBaseAddress, StypeLoadStore, StypeMod, WbIdIO, seed}
+import execution.StypeMod._
+import execution.StypeBaseAddress._
+import execution.RegisterFileType._
 
 class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   behavior of "Memory stage"

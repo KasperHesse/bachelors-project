@@ -1,11 +1,13 @@
-package execution
+package stages
+
 import chisel3._
+import execution.{Control, Decode, Fetch, IdExIO}
 
 /**
  * A module containing only an instruction fetch + decode module
  * @param memfile
  */
-class IfDec(memfile: String) extends Module {
+class FetchDecode(memfile: String) extends Module {
   val io = IO(new IdExIO)
 
   val fetch = Module(new Fetch(memfile = memfile))
@@ -21,4 +23,10 @@ class IfDec(memfile: String) extends Module {
   decode.io.mem := DontCare
   decode.io.wb := DontCare
   control.io.ex := DontCare
+  control.io.mem.rqCount := 0.U
+  control.io.mem.wqCount := 0.U
+  decode.io.memWb := DontCare
+
+  control.io.ex.empty := true.B
+  control.io.ex.macEmpty := true.B
 }

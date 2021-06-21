@@ -1,13 +1,14 @@
 package test
 
 import chisel3._
+import execution.ProcessingElement
 class PEWrapper extends Module {
   val io = IO(new Bundle {
     val o = Output(Bool())
     val d = Output(Bool())
   })
 
-  val PE = Module(new vector.ProcessingElement)
+  val PE = Module(new ProcessingElement)
 
   val cntReg = RegInit(0.S(54.W))
   cntReg := Mux(cntReg === 100.S, 0.S, cntReg + 1.S)

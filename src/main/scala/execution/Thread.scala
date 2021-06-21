@@ -1,15 +1,14 @@
-package pipeline
+package execution
 
 import chisel3._
 import ThreadState._
 import chisel3.util._
 import utils.Config._
 import utils.Fixed.FIXED_WIDTH
-import vector.KEWrapper
 import Opcode._
 import chisel3.experimental.BundleLiterals._
 import memory.{IJKBundle, IJKgeneratorBundle}
-import pipeline.RegisterFileType._
+import execution.RegisterFileType._
 
 /**
  * I/O Ports for "Thread" modules inside of the decode stage
@@ -284,7 +283,7 @@ class Thread(id: Int) extends Module {
   switch(state) {
     is(sIdle) {
       IP := 0.U
-      when(Oinst.mod === OtypePE.PACKET && Oinst.se === OtypeSE.START && Oinst.fmt === InstructionFMT.OTYPE && io.start) {
+      when(Oinst.mod === OtypeMod.PACKET && Oinst.se === OtypeSE.START && Oinst.fmt === InstructionFMT.OTYPE && io.start) {
         IP := 1.U
         macLimit := macLimitDecode(Oinst.len.asUInt())
         maxIndex := maxIndexDecode(Oinst.len.asUInt())
@@ -298,7 +297,7 @@ class Thread(id: Int) extends Module {
     is(sLoad) {
       finalCycle := memAccess.io.finalCycle //Memory access module handles the rest
       //Load data for this instruction, increment pointer as necessary
-      when(Oinst.mod === OtypePE.EXEC && Oinst.se === OtypeSE.START) {
+      when(Oinst.mod === OtypeMod.EXEC && Oinst.se === OtypeSE.START) {
         finalCycle := false.B //This is funky, but required for correct functionality
         //Above is necessary since we should keep the IP when waiting in sEstart
         state := sEstart
@@ -314,7 +313,7 @@ class Thread(id: Int) extends Module {
       //Execute instructions, increment IP as necessary
       //When we load the eend instruction, move to that state once execute pipeline is empty
       //Only the ordinary destination queue has to be empty. If mac dest queue is non-empty and fin is not asserted, that's also OK
-      when(Oinst.mod === OtypePE.EXEC && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE
+      when(Oinst.mod === OtypeMod.EXEC && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE
         && io.ctrl.empty && (io.ctrl.macEmpty || !io.fin)) {
         finalCycle := false.B //Deassert to avoid incrementing IP
         state := sEend
@@ -328,7 +327,7 @@ class Thread(id: Int) extends Module {
     }
     is(sStore) {
       finalCycle := memAccess.io.finalCycle //Memory access module handles the remaining logic
-      when(Oinst.mod === OtypePE.PACKET && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE) {
+      when(Oinst.mod === OtypeMod.PACKET && Oinst.se === OtypeSE.END && Oinst.fmt === InstructionFMT.OTYPE) {
         state := sPend
       }
     }
@@ -491,7 +490,6 @@ class Thread(id: Int) extends Module {
       }
       is(RtypeMod.SV) {
         for (i <- 0 until NUM_PROCELEM) {
-          //a(i) := RegNext(io.sRegFile.rdData1) //TODO should probably just use memory for the sreg file as well. Right now, it is delayed by one cycle to match vector reg file
           a(i) := io.sRegFile.rdData1
         }
         b := b_subvec(RegNext(X))
@@ -502,15 +500,12 @@ class Thread(id: Int) extends Module {
       }
       is(RtypeMod.SX) {
         for(i <- 0 until NUM_PROCELEM) {
-          //a(i) := RegNext(io.sRegFile.rdData1) //TODO use memory for sreg and remove this register
           a(i) := io.sRegFile.rdData1
         }
         b := xRegRdData2
       }
       is(RtypeMod.SS) {
         for (i <- 0 until NUM_PROCELEM) {
-          //a(i) := RegNext(io.sRegFile.rdData1) //TODO remove registers
-          //b(i) := RegNext(io.sRegFile.rdData2)
           a(i) := io.sRegFile.rdData1
           b(i) := io.sRegFile.rdData2
         }

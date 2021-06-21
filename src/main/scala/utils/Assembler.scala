@@ -3,8 +3,8 @@ package utils
 import java.io.{BufferedWriter, FileWriter, File}
 import java.util.NoSuchElementException
 import chisel3._
-import pipeline.InstructionFMT._
-import pipeline.{Opcode, OtypeInstruction, _}
+import execution.InstructionFMT._
+import execution.{Opcode, OtypeInstruction, _}
 import utils.Config._
 import utils.Fixed._
 
@@ -49,7 +49,7 @@ object Assembler {
   def writeMemInitFile(memfile: String, instrs: Array[Long], len: Int = 8): Unit = {
     val dir = new File(new File(memfile).getParent)
     if(!dir.exists) {
-      dir.mkdir()
+      dir.mkdirs()
     }
     val writer = new BufferedWriter(new FileWriter(memfile))
     for(instr <- instrs) {
@@ -264,14 +264,12 @@ object Assembler {
       }
     }
 
-    def packetExecFlag(str: String): Int = {
-      if(str.substring(0,1).equals("p")) {
-        PACKET
-      } else if (str.substring(0,1).equals("e")) {
-        EXEC
-      } else {
-        throw new IllegalArgumentException("O-type instruction must start with 'p' or 'e'")
-      }
+    def modifier(str: String): Int = {
+      val str2 = str.substring(0,1)
+      val map = Map("p" -> PACKET,
+      "e" -> EXEC,
+      "t" -> TIME)
+      if(map.contains(str2)) map(str2) else throw new IllegalArgumentException(s"Unable to parse O-type modifier $str2")
     }
 
     def length(str: String): Int = {
@@ -279,20 +277,22 @@ object Assembler {
       "ndof" -> NDOF,
       "nelemvec" -> NELEMVEC,
       "nelemdof" -> NELEMDOF,
-      "nelemstep" -> NELEMSTEP)
+      "nelemstep" -> NELEMSTEP,
+      "clear" -> NDOF, //Clear, run are only used for tstart instructions
+      "run" -> SINGLE)
       if(map.contains(str)) map(str) else throw new IllegalArgumentException(s"Unable to parse instruction length $str")
     }
-    //Parse i/e and start/end values
+    //Parse mod and start/end values
     val se = startEndFlag(tokens(0))
-    val pe = packetExecFlag(tokens(0))
+    val mod = modifier(tokens(0))
 
-    val len = if (se == START && pe == PACKET) length(tokens(1)) else SINGLE //SINGLE is used as a placeholder value in estart, eend and pend instructions
-    incrementType(0) = len
+    val len = if (se == START && (mod == PACKET || mod == TIME)) length(tokens(1)) else SINGLE //SINGLE is used as a placeholder value in estart, eend and pend instructions
+    if (se == START && mod == PACKET) incrementType(0) = len
     val fmt = OTYPE
 
     var instr: Int = 0
     instr |= se << SE_OFFSET
-    instr |= pe << MOD_OFFSET
+    instr |= mod << MOD_OFFSET
     instr |= len << LEN_OFFSET
     instr |= fmt << FMT_OFFSET
 
@@ -487,7 +487,7 @@ object Assembler {
     }
   }
 
-  def assemble(source: Source): Array[Int] = {
+  def assemble(source: Source): Array[Long] = {
     val lines = source.mkString
     assemble(lines)
   }
@@ -498,7 +498,7 @@ object Assembler {
    * @param program A string holding the program to be assembled
    * @return An array containing the instructions
    */
-  def assemble(program: String): Array[Int] = {
+  def assemble(program: String): Array[Long] = {
     val prog = program.toLowerCase
     val lines: Array[String] = prog.trim.split("[\r\n]+") //Split at newlines
 
@@ -515,7 +515,7 @@ object Assembler {
     var mac = false
     val incrementType: Array[Int] = Array(0) //Using an array to allow modification and pass by reference
 
-    val code = ListBuffer.empty[Int]
+    val code = ListBuffer.empty[Long]
     assemblerPass(false)
     code.clear()
     pc = 0
@@ -540,6 +540,8 @@ object Assembler {
             case "estart" => parseOtype(tokens, incrementType)
             case "eend" => parseOtype(tokens, incrementType)
             case "pend" => parseOtype(tokens, incrementType)
+            case "tstart" => parseOtype(tokens, incrementType)
+            case "tend" => parseOtype(tokens, incrementType)
 
             case x if x.startsWith("st.") => parseStype(tokens, incrementType)
             case x if x.startsWith("ld.") => parseStype(tokens, incrementType)
@@ -638,7 +640,7 @@ object Assembler {
       } //TODO check packetsize
 
     }
-    code.toArray[Int]
+    code.toArray[Long]
   }
 }
 
@@ -708,6 +710,7 @@ object LitVals {
   //O-type modifier
   val PACKET = 0x1
   val EXEC = 0x2
+  val TIME = 0x4
 
   //O-type SE
   val END = 0x0

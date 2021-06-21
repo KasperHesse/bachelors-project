@@ -1,4 +1,4 @@
-package pipeline
+package execution
 
 import chisel3._
 import chisel3.util.experimental.loadMemoryFromFile
@@ -21,9 +21,9 @@ import java.io.{BufferedWriter, FileWriter}
 class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: String) {
   val arr: Array[Array[SInt]] = Array.ofDim[SInt](width,depth)
 
-//  val mem = SyncReadMem(width, SInt((depth*FIXED_WIDTH).W))
-  val mem2 = Array.fill(depth)(SyncReadMem(width, SInt(FIXED_WIDTH.W)))
-
+  //Creating 'depth' arrays, each of which holds 'width' SInts. When performing a read/write to an address,
+  //the n'th value of each of the 'depth' memories is output. This removes the need for any switching logic
+  val mem = Array.fill(depth)(SyncReadMem(width, SInt(FIXED_WIDTH.W)))
 
   /**
    * Creates a read port into the vector register file
@@ -31,15 +31,9 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
    * @return A handle to the read data.
    */
   def setReadPort(rs: UInt): Vec[SInt] = {
-//    val rdData = mem(rs)
-//    val rdDataVec = Wire(Vec(depth, SInt(FIXED_WIDTH.W)))
-//    for(i <- 0 until depth) {
-//      rdDataVec(i) := rdData((i+1)*FIXED_WIDTH-1, i*FIXED_WIDTH).asSInt()
-//    }
-//    rdDataVec
     val rdData = Wire(Vec(depth, SInt(FIXED_WIDTH.W)))
     for(i <- 0 until depth) {
-      rdData(i) := mem2(i).read(rs+0.U) //Things break if we don't add 0.U ...
+      rdData(i) := mem(i).read(rs+0.U) //Things break if we don't add 0.U ...
     }
     rdData
   }
@@ -51,12 +45,9 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
    * @param we Write enable flag
    */
   def setWritePort(rd: UInt, wrData: Vec[SInt], we: Bool): Unit = {
-//    when(we) {
-//      mem.write(rd, wrData.asUInt().asSInt())
-//    }
     for(i <- 0 until depth) {
       when(we) {
-        mem2(i).write(rd, wrData(i))
+        mem(i).write(rd, wrData(i))
       }
     }
   }
@@ -68,24 +59,6 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
    * Will also initalilize the [[arr]] field in this object to match the values in memory.
    */
   def initMemory(): Unit = {
-    //Create memory file
-    //Each entry holds 'depth' values one after the other
-//    val memArray = Array.fill[BigInt](width)(0)
-//    for(w <- 0 until width) {
-//      for(d <- 0 until depth) {
-//        val v = double2fixed(w*depth+d)
-//        memArray(w) |= BigInt(v) << (d*FIXED_WIDTH)
-//        arr(w)(d) = v.S(FIXED_WIDTH.W)
-//      }
-//    }
-//
-//    val writer = new BufferedWriter(new FileWriter(memInitFileLocation))
-//    for(m <- memArray) {
-//      m.toByteArray.foreach(b => writer.write(f"$b%02x"))
-//      writer.write("\n")
-//    }
-//    writer.close()
-//
     //Create memory inits
     //2D array, width*depth
     val memArray = Array.ofDim[BigInt](depth, width)
@@ -109,14 +82,9 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
   }
 
   if(SIMULATION) {
-    for (w <- 0 until depth) {
-      loadMemoryFromFile(mem2(w), s"${memInitFileLocation}_$w.hex.txt")
+    for (d <- 0 until depth) {
+      loadMemoryFromFile(mem(d), s"${memInitFileLocation}_$d.hex.txt")
     }
   }
-//  if(SIMULATION) {
-//    loadMemoryFromFile(mem, memInitFileLocation)
-//  } else {
-//    loadMemoryFromFileInline(mem, memInitFileLocation)
-//  }
 
 }

@@ -1,4 +1,4 @@
-package pipeline
+package execution
 
 import chisel3._
 import chisel3.experimental.ChiselEnum
@@ -251,22 +251,12 @@ object StypeInstruction {
  * A bundle defining the fields that constitute an O-type instruction
  */
 class OtypeInstruction extends Bundle with Instruction {
-//  /** Not used */
-//  val nu2 = UInt(24.W)        //31:8
-//  /** Instruction format */
-//  val fmt = InstructionFMT()  //7:6
-//  /** Instruction length */
-//  val len = OtypeLen()        //5:3
-//  /** Packet/execute flag */
-//  val pe = OtypePE()          //2:1
-//  /** Start/end flag */
-//  val se = OtypeSE()          //0
   /** Not used */
   val nu = UInt(19.W) //31:13
   /** Start/end flag */
   val se = OtypeSE() //12
   /** Modifier (packet/execute flag) */
-  val mod = OtypePE() //11:8
+  val mod = OtypeMod() //11:8
   /** Instruction format */
   val fmt = InstructionFMT() //7:6
   /** Instruction length */
@@ -287,11 +277,11 @@ object OtypeInstruction extends Bundle {
   val LEN_OFFSET = 0
   val FMT_OFFSET = 6
   /** Generates an Otype-instruction with length [[OtypeLen.SINGLE]] */
-  def apply(se: OtypeSE.Type, pe: OtypePE.Type): OtypeInstruction = {
-    apply(se, pe, OtypeLen.SINGLE)
+  def apply(se: OtypeSE.Type, mod: OtypeMod.Type): OtypeInstruction = {
+    apply(se, mod, OtypeLen.SINGLE)
   }
   /** Generates an Otype instruction with a specified length */
-  def apply(se: OtypeSE.Type, mod: OtypePE.Type, len: OtypeLen.Type): OtypeInstruction = {
+  def apply(se: OtypeSE.Type, mod: OtypeMod.Type, len: OtypeLen.Type): OtypeInstruction = {
     (new OtypeInstruction).Lit(_.se -> se, _.mod -> mod, _.len -> len, _.fmt -> InstructionFMT.OTYPE, _.nu -> 0.U)
   }
 
@@ -327,8 +317,9 @@ object OtypeInstruction extends Bundle {
     }
 
     val mod = modval match {
-      case 1 => OtypePE.PACKET
-      case 2 => OtypePE.EXEC
+      case 1 => OtypeMod.PACKET
+      case 2 => OtypeMod.EXEC
+      case 4 => OtypeMod.TIME
       case _ => throw new IllegalArgumentException(s"Unable to decode O-type modifier ($modval)") //This shouldn't happen
     }
 
@@ -516,11 +507,12 @@ object StypeBaseAddress extends ChiselEnum {
 
 
 /**
- * Defines the instrution/element/vector flags for O-type instructions
+ * Defines O-type modifiers
  */
-object OtypePE extends ChiselEnum {
+object OtypeMod extends ChiselEnum {
   val PACKET = Value(1.U)
   val EXEC = Value(2.U)
+  val TIME = Value(4.U)
   val WIDTH = Value("b1111".U)
 }
 

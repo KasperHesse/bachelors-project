@@ -1,6 +1,7 @@
-package execution
+package stages
 
 import chisel3._
+import execution._
 
 /**
  * A module encompassing the decode, execute and writeback stages + a control stage. Used for testing
@@ -34,7 +35,6 @@ class DecExWb extends Module {
 
   control.io.id <> decode.io.ctrl
   control.io.ex <> execute.io.ctrl
-  control.io.fe.instr := io.in.instr
 
   /** Dontcares */
   decode.io.mem := DontCare

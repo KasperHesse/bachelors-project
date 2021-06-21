@@ -1,4 +1,4 @@
-package pipeline
+package execution
 
 import chisel3._
 import chiseltest._
@@ -11,12 +11,12 @@ import chiseltest.internal.WriteVcdAnnotation
 import utils.Config
 import utils.Config._
 import Opcode._
-import pipeline.ThreadState._
-import pipeline.StypeMod._
-import pipeline.StypeBaseAddress._
-import pipeline.StypeLoadStore._
+import execution.ThreadState._
+import execution.StypeMod._
+import execution.StypeBaseAddress._
+import execution.StypeLoadStore._
 import memory.{IJKBundle, IJKgeneratorConsumerIO, ReadQueueBundle, genIJKmultiple}
-import pipeline.RegisterFileType._
+import execution.RegisterFileType._
 
 class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
@@ -96,10 +96,10 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   def genInstructions(dut: Thread, mod: RtypeMod.Type): Array[Bundle with Instruction] = {
-    val istart = OtypeInstruction(se = OtypeSE.START, pe = OtypePE.PACKET)
-    val estart = OtypeInstruction(OtypeSE.START, pe = OtypePE.EXEC)
-    val eend = OtypeInstruction(OtypeSE.END, pe = OtypePE.EXEC)
-    val iend = OtypeInstruction(OtypeSE.END, pe = OtypePE.PACKET)
+    val istart = OtypeInstruction(se = OtypeSE.START, mod = OtypeMod.PACKET)
+    val estart = OtypeInstruction(OtypeSE.START, mod = OtypeMod.EXEC)
+    val eend = OtypeInstruction(OtypeSE.END, mod = OtypeMod.EXEC)
+    val iend = OtypeInstruction(OtypeSE.END, mod = OtypeMod.PACKET)
     val add = genRtype(ADD, mod)
     val sub = genRtype(SUB, mod)
     val mul = genRtype(MUL, mod)
@@ -199,7 +199,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     SIMULATION = true
     Config.checkRequirements()
     test(new Thread(1)) {dut =>
-      val istart = OtypeInstruction(se = OtypeSE.START, pe = OtypePE.PACKET)
+      val istart = OtypeInstruction(se = OtypeSE.START, mod = OtypeMod.PACKET)
 
       dut.io.start.poke(true.B)
       dut.io.fin.poke(true.B)
