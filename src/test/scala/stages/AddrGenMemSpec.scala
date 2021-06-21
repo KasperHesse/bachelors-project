@@ -8,8 +8,8 @@ import utils.Config._
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import pipeline.StypeBaseAddress._
-import pipeline.StypeBaseAddress
+import execution.StypeBaseAddress._
+import execution.StypeBaseAddress
 
 class AddrGenMemSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 

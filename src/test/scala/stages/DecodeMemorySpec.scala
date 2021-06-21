@@ -1,4 +1,4 @@
-package pipeline
+package execution
 
 import chisel3._
 import chisel3.util.log2Ceil
@@ -7,12 +7,12 @@ import chiseltest._
 import chiseltest.internal.WriteVcdAnnotation
 import chiseltest.experimental.TestOptionBuilder._
 import memory.{AddressDecode, baseAddresses, elementIndex, genIJK, genIJKmultiple, getEdn1Indices, getEdn2Indices, getEdof, getFcnIndices, randomElement}
-import pipeline.StypeMod._
-import pipeline.StypeBaseAddress._
-import pipeline.StypeLoadStore._
+import execution.StypeMod._
+import execution.StypeBaseAddress._
+import execution.StypeLoadStore._
 import utils.Config._
 import utils.Fixed._
-import pipeline.RegisterFileType._
+import execution.RegisterFileType._
 
 class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Decode and memory stages"

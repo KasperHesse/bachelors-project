@@ -1,17 +1,15 @@
-package pipeline
+package execution
 
 import java.io._
-
 import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
-import vector.KEWrapper
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.{FailedExpectException, WriteVcdAnnotation}
 import utils.Config._
 import Opcode._
-import pipeline.BranchComp._
+import execution.BranchComp._
 import utils.Assembler
 
 import scala.collection.mutable.ListBuffer
@@ -456,7 +454,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       "bne s2, s1, L1 //-20" //44
     val instrs = Assembler.assemble(program)
     writeMemInitFile(memfile, instrs)
-    test(new ExecutePipeline(memfile=memfile)) {dut =>
+    test(new ExecutePipeline(memfile=memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       testFun(dut)
     }
   }
