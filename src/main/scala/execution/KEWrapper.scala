@@ -3,8 +3,10 @@ package execution
 import chisel3._
 import chisel3.util._
 import execution.KEWrapper.getKEslices
-import utils.Config.KE_SIZE
+import utils.Config.{KE_SIZE, SIMULATION}
 import utils.Fixed.{FIXED_WIDTH, double2fixed}
+
+import scala.io.Source
 
 /**
  * A wrapper around the KE-matrix, used to extract values from it. Implements [[KEWrapperIO]].
@@ -12,10 +14,8 @@ import utils.Fixed.{FIXED_WIDTH, double2fixed}
  *              (nelem x nelem)
  * @param sync Whether the output is synchronous or asynchronous. If sync=false, the output is immediatedly available after
  *             issuing a read. If sync=true, the output is available on the following clock cycle
- * @param simulation Whether the wrapper should be instantiated for simulation or synthesis. When simulating, values are
- *                   assigned continuously (0, 1, 2, 3 etc). When synthezising, the actual KE-values are loaded instead
  */
-class KEWrapper(val nelem: Int, val sync: Boolean = false, val simulation: Boolean = true) extends Module {
+class KEWrapper(val nelem: Int, val sync: Boolean = false) extends Module {
   val io = IO(new KEWrapperIO(nelem))
 
   //Setup constants
@@ -38,32 +38,43 @@ class KEWrapper(val nelem: Int, val sync: Boolean = false, val simulation: Boole
 
   //Creating width*subMatricesPerRow memory slices, each holding one slice of their respective submatrix
   //Depending on whether we're simulating or synthesizing, we'll want this memory to be instantiated as vec vs. Mem
-  if(simulation) {
-    val keMem = Wire(Vec(numSlices, Vec(nelem, SInt(FIXED_WIDTH.W))))
-    for(i <- 0 until numSlices) {
-      for(j <- 0 until nelem) {
-        keMem(i)(j) := double2fixed(KE(i)(j)).S(FIXED_WIDTH.W)
-      }
-    }
-    if(sync) {
-      io.keVals := RegNext(keMem(readLocation))
-    } else {
-      io.keVals := keMem(readLocation)
-    }
-  } else {
-    //TODO SHould load actual KE values
-    val keMem = Wire(Vec(numSlices, Vec(nelem, SInt(FIXED_WIDTH.W))))
-    for(i <- 0 until numSlices) {
-      for(j <- 0 until nelem) {
-        keMem(i)(j) := double2fixed(KE(i)(j)).S(FIXED_WIDTH.W)
-      }
-    }
-    if(sync) {
-      io.keVals := RegNext(keMem(readLocation))
-    } else {
-      io.keVals := keMem(readLocation)
+  val keMem = Wire(Vec(numSlices, Vec(nelem, SInt(FIXED_WIDTH.W))))
+  for(i <- 0 until numSlices) {
+    for(j <- 0 until nelem) {
+      keMem(i)(j) := double2fixed(KE(i)(j)).S(FIXED_WIDTH.W)
     }
   }
+  if(sync) {
+    io.keVals := RegNext(keMem(readLocation))
+  } else {
+    io.keVals := keMem(readLocation)
+  }
+//  if(SIMULATION) {
+//    val keMem = Wire(Vec(numSlices, Vec(nelem, SInt(FIXED_WIDTH.W))))
+//    for(i <- 0 until numSlices) {
+//      for(j <- 0 until nelem) {
+//        keMem(i)(j) := double2fixed(KE(i)(j)).S(FIXED_WIDTH.W)
+//      }
+//    }
+//    if(sync) {
+//      io.keVals := RegNext(keMem(readLocation))
+//    } else {
+//      io.keVals := keMem(readLocation)
+//    }
+//  } else {
+//    //TODO SHould load actual KE values
+//    val keMem = Wire(Vec(numSlices, Vec(nelem, SInt(FIXED_WIDTH.W))))
+//    for(i <- 0 until numSlices) {
+//      for(j <- 0 until nelem) {
+//        keMem(i)(j) := double2fixed(KE(i)(j)).S(FIXED_WIDTH.W)
+//      }
+//    }
+//    if(sync) {
+//      io.keVals := RegNext(keMem(readLocation))
+//    } else {
+//      io.keVals := keMem(readLocation)
+//    }
+//  }
 }
 
 /**
@@ -87,10 +98,27 @@ object KEWrapper {
    * @return A 2D-array of doubles representing the KE-matrix values
    */
   def getKEMatrix(): Array[Array[Double]] = {
-    val KE = Array.ofDim[Double](KE_SIZE,KE_SIZE)
-    for(i <- 0 until KE_SIZE) {
-      for (j <- 0 until KE_SIZE) {
-        KE(i)(j) = i*KE_SIZE + j
+    val KE = Array.ofDim[Double](KE_SIZE, KE_SIZE)
+    if(!SIMULATION) {
+      val src = Source.fromFile("src/resources/ke.csv")
+      val lines = src.getLines().toArray
+      if(lines.length != KE_SIZE) {
+        throw new IllegalArgumentException("KE matrix CSV file must have exactly 24 lines")
+      }
+      for(i <- 0 until KE_SIZE) {
+        val tokens = lines(i).split(",")
+        if(tokens.length != KE_SIZE) {
+          throw new IllegalArgumentException("Each line of the KE matrix in the CSV file must have exactly 24 items")
+        }
+        for(j <- 0 until KE_SIZE) {
+          KE(i)(j) = tokens(j).toDouble
+        }
+      }
+    } else {
+      for (i <- 0 until KE_SIZE) {
+        for (j <- 0 until KE_SIZE) {
+          KE(i)(j) = i * KE_SIZE + j
+        }
       }
     }
     KE
@@ -127,17 +155,17 @@ object KEWrapper {
     val KE = getKEMatrix()
 
     val numSlices = (math.pow(width/nelem,2)*nelem).toInt
-    val retVal = Array.ofDim[Double](numSlices, nelem)
+    val keSlices = Array.ofDim[Double](numSlices, nelem)
 
     for(y <- 0 until width/nelem) {
       for(x <- 0 until width/nelem) {
         for(c <- 0 until nelem) {
           for(r <- 0 until nelem) {
-            retVal(y*width + x*nelem + c)(r) = KE(y*nelem+r)(x*nelem+c)
+            keSlices(y*width + x*nelem + c)(r) = KE(y*nelem+r)(x*nelem+c)
           }
         }
       }
     }
-    retVal
+    keSlices
   }
 }

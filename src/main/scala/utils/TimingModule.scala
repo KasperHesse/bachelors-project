@@ -20,15 +20,6 @@ class TimingModule(clkFreq: Int) extends Module {
     val s = Output(UInt(log2Ceil(60).W))
     /** Minutes value */
     val m = Output(UInt(log2Ceil(240).W))
-
-//    val msGround = Output(UInt(log2Ceil(1000).W))
-//    val sGround = Output(UInt(log2Ceil(1000).W))
-//    val mGround = Output(UInt(log2Ceil(1000).W))
-//
-//    val blink = Output(Bool())
-//
-//    val clrPassthrough = Output(Bool())
-//    val enPassthrough = Output(Bool())
   })
 
   val blinkReg = RegInit(false.B)
@@ -36,7 +27,7 @@ class TimingModule(clkFreq: Int) extends Module {
   val cntReg = RegInit(0.U(log2Ceil(clkFreq/1000+1).W))
   val msReg = RegInit(0.U(log2Ceil(1000).W))
   val sReg = RegInit(0.U(log2Ceil(60).W))
-  val mReg = RegInit(0.U(log2Ceil(240).W))
+  val mReg = RegInit(0.U(8.W))
 
   val cntTick = cntReg === (clkFreq / 1000 - 1).U
   val msTick =  if(SIMULATION) msReg === 5.U else msReg === 1000.U
@@ -57,16 +48,6 @@ class TimingModule(clkFreq: Int) extends Module {
   io.ms := msReg
   io.s := sReg
   io.m := mReg
-
-//  io.msGround := 0.U
-//  io.sGround := 0.U
-//  io.mGround := 0.U
-//
-//  io.clrPassthrough := io.clr
-//  io.enPassthrough := io.en
-//
-//  blinkReg := Mux(cntTick && msTick, !blinkReg, blinkReg)
-//  io.blink := blinkReg
 }
 
 /**

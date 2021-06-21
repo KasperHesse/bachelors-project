@@ -21,25 +21,6 @@ import scala.collection.mutable
 object Assembler {
   import LitVals._
 
-  def main(args: Array[String]): Unit = {
-    val p = "istart\n" +
-      "estart\n" +
-      "mvp vs0, vs1 \n" +
-      "mul.xv vs0, x1, vs2\n" +
-      "eend\n" +
-      "iend"
-
-    val code = assemble(p);
-    val z = "00000000000000000000000000000000"
-    println("                             mod")
-    println("                 rd   rs2 rs1 | fmt        op")
-    println("                 |    |    |  | |           |")
-    println("                 v    v    v  v v           v")
-    code.foreach(a =>
-      print(s"0x${(z + a.toHexString).takeRight(8)} / ${(z + a.toBinaryString).takeRight(32)}\n")
-    )
-  }
-
   /**
    * Initializes a memory file
    * @param memfile Relative path to the memory file to initialize. Existing contents are overwritten, a new file is created if none exists
@@ -56,7 +37,7 @@ object Assembler {
       writer.write(("0000000000000000" + instr.toHexString).takeRight(len) + "\n")
     }
     writer.close()
-    println(s"\tWrote ${instrs.length} instructions to $memfile")
+    println(s"\tWrote ${instrs.length} lines to $memfile")
   }
 
   /**
@@ -389,7 +370,7 @@ object Assembler {
   }
 
   def parsePseudoInstruction(tokens: Array[String]): Int = {
-    throw new IllegalArgumentException("Pseudo-instruction decode is not support yet.")
+    throw new IllegalArgumentException("Pseudo-instruction decode is not supported yet.")
   }
 
   /**

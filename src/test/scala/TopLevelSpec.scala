@@ -16,8 +16,8 @@ class TopLevelSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     val source = Source.fromFile("resources/setupandelementwise.txt")
     Assembler.writeMemInitFile("resources/setupandelementwise.hex.txt", Assembler.assemble(source).map(_.toLong))
     source.close()
-    SynthesisMemInit()
-    test(new TopLevel(IMsize=128, IMinitFileLocation = "resources/setupandelementwise.hex.txt", wordsPerBank=1671, memInitFileLocation="resources")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    SynthesisMemInit("src/resources/meminit")
+    test(new TopLevel(IMsize=128, IMinitFileLocation = "resources/setupandelementwise.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       dut.clock.step(500)
     }
   }
@@ -26,8 +26,8 @@ class TopLevelSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     val source = Source.fromFile("resources/mvp.txt")
     Assembler.writeMemInitFile("resources/mvp.hex.txt", Assembler.assemble(source).map(_.toLong))
     source.close()
-    SynthesisMemInit()
-    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/mvp.hex.txt", wordsPerBank=1671, memInitFileLocation="resources")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    SynthesisMemInit("src/resources/meminit")
+    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/mvp.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       dut.clock.setTimeout(2000)
       dut.clock.step(1500)
     }
@@ -37,8 +37,8 @@ class TopLevelSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     val source = Source.fromFile("resources/asosetup.txt")
     Assembler.writeMemInitFile("resources/asosetup.hex.txt", Assembler.assemble(source).map(_.toLong))
     source.close()
-    SynthesisMemInit()
-    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/asosetup.hex.txt", wordsPerBank=1671, memInitFileLocation="resources")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    SynthesisMemInit("src/resources/meminit")
+    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/asosetup.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       dut.clock.step(500)
     }
   }
@@ -47,8 +47,8 @@ class TopLevelSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     val source = Source.fromFile("resources/innerproduct.txt")
     Assembler.writeMemInitFile("resources/innerproduct.hex.txt", Assembler.assemble(source).map(_.toLong))
     source.close()
-    SynthesisMemInit()
-    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/innerproduct.hex.txt", wordsPerBank=1671, memInitFileLocation="resources")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    SynthesisMemInit("src/resources/meminit")
+    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/innerproduct.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       dut.clock.step(200)
     }
   }
@@ -57,8 +57,8 @@ class TopLevelSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     val source = Source.fromFile("resources/applydensityfilter.txt")
     Assembler.writeMemInitFile("resources/applydensityfilter.hex.txt", Assembler.assemble(source).map(_.toLong))
     source.close()
-    SynthesisMemInit()
-    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/applydensityfilter.hex.txt", wordsPerBank=1671, memInitFileLocation="resources")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    SynthesisMemInit("src/resources/meminit")
+    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/applydensityfilter.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       dut.clock.step(300)
     }
   }

@@ -24,13 +24,14 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val rd = inst.rd.litValue.toInt
     for(s <- 0 until VREG_SLOT_WIDTH) {
       for (i <- 0 until VREG_DEPTH by NUM_PROCELEM) {
-        dut.io.ex.a(0).expect(vReg(s + rs1 * VREG_SLOT_WIDTH)(i))
-        dut.io.ex.b(0).expect(vReg(s + rs2 * VREG_SLOT_WIDTH)(i))
+        //Destination register and opcode arrive before data
         dut.io.ex.dest.reg.expect((rd*VREG_SLOT_WIDTH + s).U)
         dut.io.ex.dest.subvec.expect((i / NUM_PROCELEM).U)
         dut.io.ex.dest.rf.expect(RegisterFileType.VREG)
         dut.io.ex.op.expect(inst.op)
         dut.clock.step()
+        dut.io.ex.a(0).expect(vReg(s + rs1 * VREG_SLOT_WIDTH)(i))
+        dut.io.ex.b(0).expect(vReg(s + rs2 * VREG_SLOT_WIDTH)(i))
       }
     }
   }
@@ -180,13 +181,19 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
 
   def loadInstructions(ops: Array[Bundle with Instruction], dut: Decode): Unit = {
-    dut.io.ctrl.iload.poke(true.B)
+//    for(i <- ops.indices) {
+//      dut.io.fe.instr.poke(ops(i).toUInt())
+//      dut.clock.step()
+//      dut.io.ctrl.iload.poke(true.B)
+//    }
+
     for(op <- ops) {
       dut.io.fe.instr.poke(op.toUInt())
       dut.clock.step()
+      dut.io.ctrl.iload.poke(true.B)
     }
-    dut.io.ctrl.iload.poke(false.B)
     dut.clock.step()
+    dut.io.ctrl.iload.poke(false.B)
   }
 
   /**
@@ -233,12 +240,14 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
 
   def testDecode(dut: Decode, mod: RtypeMod.Type): Unit = {
+    dut.clock.setTimeout(150)
     val instrs = genAndPokeRtype(dut, mod)
     //Step until outputs are available
-    while(dut.io.ctrl.threadCtrl(0).stateUint.peek.litValue() != ThreadState.sExec.litValue()) {
-      dut.clock.step()
-    }
     for(inst <- instrs) {
+      while(!dut.io.ex.valid.peek.litToBoolean) {
+        dut.clock.step()
+      }
+//      dut.clock.step() //One more for output to be present
       expectValues(dut, inst)
     }
     dut.clock.step(5)
@@ -246,10 +255,11 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
 
   it should "test KV instruction load and decode" in {
-    SIMULATION = true
+//    SIMULATION = true
     Config.checkRequirements()
     seed("KV decode")
     test(new Decode).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      dut.clock.setTimeout(100)
       val instrs = Array(genRtype(MAC, RtypeMod.KV))
       val ops = wrapInstructions(instrs)
       loadInstructions(ops, dut)
@@ -258,6 +268,11 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
         dut.clock.step()
       }
       for(inst <- instrs) {
+        while(!dut.io.ex.valid.peek.litToBoolean) {
+          dut.clock.step()
+        }
+        //One more step to allow for data to be output
+        dut.clock.step()
         expectValues(dut, inst)
       }
       dut.clock.step(5)

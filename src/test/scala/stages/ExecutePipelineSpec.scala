@@ -380,36 +380,6 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       "mul.ss s1, s2, s3\n" +
       "eend\n" +
       "pend"
-
-    /* Instructions
-    beq s0, s1, L1 //+4 (not taken)
-    L1: pstart single
-    estart
-    add.vv vs2, vs1, vs0
-    eend
-    pend
-    beq s0, s1, L1 //-20 (not taken)
-    bne s0, s1, L2 //+24 (taken)
-    pstart single
-    estart
-    sub.xx x3, x2, x0
-    eend
-    pend
-    L2: istart single
-    estart
-    mul.ss s1, s2, s3
-    eend
-    pend
-  */
-    //Write to memory file
-//    val b0 = Array(BtypeInstruction(EQUAL, 0, 1, 4)).asInstanceOf[Array[Bundle with Instruction]]
-//    val p1 = wrapInstructions(Array(RtypeInstruction(2, 1, 0, ADD, RtypeMod.VV)))
-//    val b1 = Array(BtypeInstruction(EQUAL, 0, 1, -20)).asInstanceOf[Array[Bundle with Instruction]]
-//    val b2 = Array(BtypeInstruction(NEQ, 0, 1, 24)).asInstanceOf[Array[Bundle with Instruction]]
-//    val p2 = wrapInstructions(Array(RtypeInstruction(3, 2, 0, SUB, RtypeMod.XX)))
-//    val p3 = wrapInstructions(Array(RtypeInstruction(1, 2, 3, MUL, RtypeMod.SS)))
-//
-//    val instrs = Array.concat(b0, p1, b1, b2, p2, p3)
     val instrs = Assembler.assemble(program)
     Assembler.writeMemInitFile(memfile, instrs)
     //Execute

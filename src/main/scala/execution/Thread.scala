@@ -67,7 +67,7 @@ class Thread(id: Int) extends Module {
     xRegFile.initMemory()
   }
   /** Wrapper for KE-matrix, holding all KE-values */
-  val KE = Module(new KEWrapper(NUM_PROCELEM, sync=true, SIMULATION))
+  val KE = Module(new KEWrapper(NUM_PROCELEM, sync=true))
   /** Immediate generator */
   val immGen = Module(new ImmediateGenerator)
   /** Module handling all memory access related stuff */

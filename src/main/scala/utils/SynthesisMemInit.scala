@@ -12,8 +12,14 @@ import scala.collection.mutable.ListBuffer
  */
 object SynthesisMemInit {
 
-  def apply(): Unit = {
+  /**
+   * Creates memory init files for synthesis.
+   * @param memInitFileLocation The base location of the memory initialization files to be created. Should be a directory
+   * @return The number of words in each memory bank
+   */
+  def apply(memInitFileLocation: String): Int = {
 
+    //total number of memory words required
     val numWords = 8*NDOFSIZE+5*NELEMSIZE
     val wordsPerBank = numWords/8
 
@@ -42,10 +48,12 @@ object SynthesisMemInit {
 
     //Create memory initialization files
     for(i <- 0 until NUM_MEMORY_BANKS) {
-      val memFile = s"resources/membank_$i.txt"
+      val memFile = s"$memInitFileLocation/membank_$i.txt"
       val contents = mem(i).map(double2fixed).map(c => c & ((1L << FIXED_WIDTH)-1)) //Mask to preserve only FIXED_WIDTH lower bits
       writeMemInitFile(memFile, contents, 16)
     }
+
+    wordsPerBank
   }
 
 
