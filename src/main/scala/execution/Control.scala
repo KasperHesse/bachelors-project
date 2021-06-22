@@ -76,27 +76,6 @@ class Control extends Module {
     io.fe.iload := true.B
   }
 
-/*
-  //When we read the final instruction, stop loading after this one
-  when(isEnd && isPacket && isOtype && io.id.state === DecodeState.sLoad) {
-    io.id.iload := false.B
-    io.fe.iload := false.B
-    iload := false.B
-    //When we spot a pstart instruction, or we're currently loading a packet, keep processing
-  } .elsewhen((isStart && isPacket && isOtype && io.id.state === DecodeState.sIdle) || iload) {
-    io.id.iload := true.B
-    io.fe.iload := true.B
-    iload := true.B
-    //When not executing or processing a branch, toggle fetch iload
-  } .elsewhen(!(io.id.state === DecodeState.sExec || io.id.state === DecodeState.sBranch2)) {
-    io.fe.iload := true.B
-  }
-  */
-
-
-
-
-
   // --- THREAD CONTROL SIGNALS ---
   //Stall until read or write queue is empty once the final read/write operation has been issued
   when(memThread.state === ThreadState.sLoad && io.mem.rqCount =/= 0.U && memThread.fmt =/= InstructionFMT.STYPE) {
@@ -105,13 +84,14 @@ class Control extends Module {
     memThread.stall := true.B
   }
 
+  //When memthread performs nothing but at st.sel, we don't have time to fill the write queue before moving on
+  //Introducing a one-cycle delay to fix this
   when(memThread.state === ThreadState.sStore && memThread.fmt =/= InstructionFMT.STYPE && !hasWaited) {
     hasWaited := true.B
   } .elsewhen(memThread.state =/= ThreadState.sStore) {
     hasWaited := false.B
   }
-  //When memthread performs nothing but at st.sel, we don't have time to fill the write queue before moving on
-  //To fix this: either introduce a delay in control module, or wait one clock cycle if fmt =/= stype
+
 
 
   // --- EXECUTE STAGE STALLS ---
