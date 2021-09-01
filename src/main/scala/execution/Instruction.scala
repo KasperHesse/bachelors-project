@@ -326,6 +326,7 @@ object OtypeInstruction extends Bundle {
     val len = lenval match {
       case 0 => OtypeLen.NDOF
       case 2 => OtypeLen.SINGLE
+      case 3 => OtypeLen.DOUBLE
       case 4 => OtypeLen.NELEMVEC
       case 5 => OtypeLen.NELEMDOF
       case 6 => OtypeLen.NELEMSTEP
@@ -530,6 +531,7 @@ object OtypeSE extends ChiselEnum {
 object OtypeLen extends ChiselEnum {
   val NDOF = Value(0.U)
   val SINGLE = Value(2.U)
+  val DOUBLE = Value(3.U)
   val NELEMVEC = Value(4.U)
   val NELEMDOF = Value(5.U)
   val NELEMSTEP = Value(6.U)

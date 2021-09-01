@@ -20,18 +20,26 @@ class TimingModule(clkFreq: Int) extends Module {
     val s = Output(UInt(log2Ceil(60).W))
     /** Minutes value */
     val m = Output(UInt(log2Ceil(240).W))
+    /** Blinking LED to show that the accelerator has been transferred correctly */
+    val blink = Output(Bool())
   })
 
+  val blinkCntReg = RegInit(0.U(log2Ceil(clkFreq+1).W))
   val blinkReg = RegInit(false.B)
+  val blinkTick = blinkCntReg === clkFreq.U
+  blinkCntReg := Mux(blinkTick, 0.U, blinkCntReg + 1.U)
+  blinkReg := Mux(blinkTick, !blinkReg, blinkReg)
+
 
   val cntReg = RegInit(0.U(log2Ceil(clkFreq/1000+1).W))
   val msReg = RegInit(0.U(log2Ceil(1000).W))
   val sReg = RegInit(0.U(log2Ceil(60).W))
   val mReg = RegInit(0.U(8.W))
 
+
   val cntTick = cntReg === (clkFreq / 1000 - 1).U
-  val msTick =  if(SIMULATION) msReg === 5.U else msReg === 1000.U
-  val sTick =   if(SIMULATION) sReg === 4.U else sReg === 60.U
+  val msTick =  if(SIMULATION) msReg === 5.U else msReg === 999.U
+  val sTick =   if(SIMULATION) sReg === 4.U else sReg === 59.U
 
   when(io.en) {
     cntReg := Mux(cntTick, 0.U, cntReg + 1.U)
@@ -45,9 +53,12 @@ class TimingModule(clkFreq: Int) extends Module {
     sReg := 0.U
     mReg := 0.U
   }
+
+
   io.ms := msReg
   io.s := sReg
   io.m := mReg
+  io.blink := blinkReg
 }
 
 /**
@@ -62,6 +73,8 @@ class TimingOutput(val clkFreq: Int) extends Bundle {
   val s = Output(UInt(log2Ceil(60).W))
   /** Minutes value */
   val m = Output(UInt(8.W))
+  /** Blinking 'alive' led */
+//  val blink = Output(Bool())
   /** Ground signal for the millisecond values */
   val msGround = Output(UInt(log2Ceil(1000).W))
   /** Ground signal for the seconds values */
@@ -92,6 +105,8 @@ class TimingWrapper(clkFreq: Int) extends Module {
   io.out.ms := timing.io.ms
   io.out.s := timing.io.s
   io.out.m := timing.io.m
+//  io.out.blink := timing.io.blink
   io.out.sGround := 0.U
   io.out.msGround := 0.U
+
 }

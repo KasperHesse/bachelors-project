@@ -44,10 +44,9 @@ class Decode extends Module {
 
   // --- REGISTERS ---
   /** Pipeline stage register */
-//  val fe_instr = RegNext(io.fe.instr)
-//  val fe_instr = RegEnable(next=io.fe.instr, enable = !reset.asBool())
-  val fe_instr = RegInit(0.U(INSTRUCTION_WIDTH.W))
-  fe_instr := io.fe.instr
+//  val fe_instr = RegInit(0.U(INSTRUCTION_WIDTH.W))
+//  fe_instr := io.fe.instr
+  val fe_instr = io.fe.instr
   val fe_pc = RegNext(io.fe.pc)
   /** State register */
   val state = RegInit(DecodeState.sIdle)
@@ -74,12 +73,14 @@ class Decode extends Module {
   /** Length of the current instruction */ //iBuffer(0) always holds an O-type instruction indicating packet length
   val instrLen = iBuffer(0).asTypeOf(new OtypeInstruction).len
 
+  //When performing NDOF loads, we access VREG_DEPTH*VREG_SLOT_WIDTH elements per thread.
+  //When performing i,j,k-based loads, we only load VREG_SLOT_WIDTH elements per thread.
   /** LUT to decode instruction lengths given in pstart */
   val lenDecode = VecInit(Array(
     NDOFLENGTH.U, //len == NDOF
     1.U, //Len is invalid
     1.U, //len == SINGLE
-    1.U, //len is invalid
+    2.U, //len == DOUBLE
     leastMultiple(ELEMS_PER_VSLOT, NELEMSIZE).U, //len == NELEMVEC
     leastMultiple(XREG_DEPTH, NELEM).U, //len == NELEMDOF
     NELEM.U, //len == NELEMSTEP
@@ -96,8 +97,7 @@ class Decode extends Module {
     1.U, //len == NELEMSTEP
     1.U //len is invalid
   ))
-  //When performing NDOF loads, we access VREG_DEPTH*VREG_SLOT_WIDTH elements per thread.
-  //When performing i,j,k-based loads, we only load VREG_SLOT_WIDTH elements per thread.
+
   /** Current states of our threads */
   val threadStates = Wire(Vec(2, ThreadState()))
   /** Asserted to threads when the current instruction packet is finished */
@@ -198,11 +198,16 @@ class Decode extends Module {
     is(sIdle) {
       sRegFile.io.rs1 := Binst.rs1
       sRegFile.io.rs2 := Binst.rs2
-      when(io.ctrl.iload) {
+
+      when(io.ctrl.iload && !(Oinst.mod === OtypeMod.PACKET && Oinst.se === OtypeSE.START)) {
         iBuffer(0)(IP) := fe_instr
         iBuffer(1)(IP) := fe_instr
         IP := IP + 1.U
         state := sLoad
+      } .otherwise { //Sometimes, pstart is held for 2 clock cycles. This mux avoids double buffering the instruction
+        iBuffer(0)(0) := fe_instr
+        iBuffer(1)(0) := fe_instr
+        IP := 1.U
       }
       when(Binst.fmt === InstructionFMT.BTYPE) {
         state := sBranch

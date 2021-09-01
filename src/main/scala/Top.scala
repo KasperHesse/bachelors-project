@@ -11,18 +11,19 @@ import scala.io.Source
 
 object Top extends App {
   //Assemble program
-  val source = Source.fromFile("src/resources/programs/applystateoperator.txt")
-  Assembler.writeMemInitFile("src/resources/programs/applystateoperator.hex", Assembler.assemble(source).map(_.toLong))
+//  val source = Source.fromFile("src/resources/programs/asowithtiming.txt")
+//  Assembler.writeMemInitFile("src/resources/programs/asowithtiming.hex.txt", Assembler.assemble(source))
+//  source.close()
+
+  val source = Source.fromFile("src/main/c/topopt/top2.asm")
+  Assembler.writeMemInitFile("src/main/c/topopt/top2.hex.txt", Assembler.assemble(source))
   source.close()
 
   //Initialize starting values in memory for synthesis
-//  SynthesisMemInit()
+  val wordsPerBank = SynthesisMemInit("src/resources/meminit")
 
   (new chisel3.stage.ChiselStage).execute(
     Array("-X", "verilog", "-td", "target/gen"),
-    Seq(ChiselGeneratorAnnotation(() => new DecodeTiming(50e6.toInt, ""))))
-//  (new chisel3.stage.ChiselStage).execute(
-//    Array("-X", "verilog", "-td", "target/gen"),
-//    Seq(ChiselGeneratorAnnotation(() => new TopLevel(IMsize=1024, IMinitFileLocation = "src/resources/programs/applystateoperator.hex", wordsPerBank=1671, memInitFileLocation="src/resources/memInit"))))
+    Seq(ChiselGeneratorAnnotation(() => new TopLevel(IMsize=1024, IMinitFileLocation = "meminit/top2.hex.txt", wordsPerBank, memInitFileLocation="meminit", clkFreq = 50e6.toInt))))
 //  -X verilog outputs verilog, -td target/gen sets target directory
 }

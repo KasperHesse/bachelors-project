@@ -2,6 +2,7 @@
 import chisel3._
 import memory.{MemWbIO, MemoryStage}
 import execution._
+import utils.{TimingOutput, TimingWrapper}
 
 /**
  * The top level module for the topological optimizer
@@ -11,9 +12,10 @@ import execution._
  * @param memInitFileLocation Location of memory initialization files. This is the relative path. Each memory bank initialization file must be named
  *                            'membank_x.txt', where x is in the range [0;NUM_MEMORY_BANKS[. If eg 'resources/meminit' is given as parameter, the first file should be named 'resources/meminit/membank_0.txt'
  */
-class TopLevel(IMsize: Int, IMinitFileLocation: String, wordsPerBank: Int, memInitFileLocation: String) extends Module {
+class TopLevel(IMsize: Int, IMinitFileLocation: String, wordsPerBank: Int, memInitFileLocation: String, clkFreq: Int = 100e6.toInt) extends Module {
   val io = IO(new Bundle {
     val exout = new ExWbIO
+    val timing = new TimingOutput(clkFreq)
   })
 
   val fetch = Module(new Fetch(IMsize, IMinitFileLocation))
@@ -23,6 +25,7 @@ class TopLevel(IMsize: Int, IMinitFileLocation: String, wordsPerBank: Int, memIn
   val forward = Module(new Forwarding)
   val mem = Module(new MemoryStage(wordsPerBank, memInitFileLocation))
   val control = Module(new Control)
+  val timing = Module(new TimingWrapper(clkFreq))
 
   fetch.io.id <> decode.io.fe
   decode.io.ex <> execute.io.id
@@ -32,6 +35,7 @@ class TopLevel(IMsize: Int, IMinitFileLocation: String, wordsPerBank: Int, memIn
   forward.io.ex <> execute.io.fwd
   decode.io.mem <> mem.io.id
   decode.io.memWb <> mem.io.wb
+  timing.io.id <> decode.io.time
 
   control.io.fe <> fetch.io.ctrl
   control.io.id <> decode.io.ctrl
@@ -39,4 +43,5 @@ class TopLevel(IMsize: Int, IMinitFileLocation: String, wordsPerBank: Int, memIn
   control.io.mem <> mem.io.ctrl
 
   io.exout <> execute.io.wb
+  io.timing := timing.io.out
 }

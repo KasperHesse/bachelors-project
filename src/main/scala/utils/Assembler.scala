@@ -255,6 +255,7 @@ object Assembler {
 
     def length(str: String): Int = {
       val map = Map("single" -> SINGLE,
+      "double" -> DOUBLE,
       "ndof" -> NDOF,
       "nelemvec" -> NELEMVEC,
       "nelemdof" -> NELEMDOF,
@@ -361,11 +362,12 @@ object Assembler {
     val fmt = STYPE
     //Generate instruction
     var instr: Int = 0
-    instr |= ls << LS_OFFSET
-    instr |= mod << MOD_OFFSET
-    instr |= fmt << FMT_OFFSET
-    instr |= rsrd << RSRD_OFFSET
     instr |= baseAddr << BASEADDR_OFFSET
+    instr |= fmt << FMT_OFFSET
+    instr |= mod << MOD_OFFSET
+    instr |= ls << LS_OFFSET
+    instr |= rsrd << RSRD_OFFSET
+
     instr
   }
 
@@ -661,7 +663,7 @@ object LitVals {
 
   //S-type load/store flag
   val LOAD = 0x0
-  val STORE = 0x3
+  val STORE = 0x1
 
   //S-type modifier
   val ELEM = 0x2
@@ -700,6 +702,7 @@ object LitVals {
   //O-type instruction length
   val NDOF = 0x0
   val SINGLE = 0x2
+  val DOUBLE = 0x3
   val NELEMVEC = 0x4
   val NELEMDOF = 0x5
   val NELEMSTEP = 0x6

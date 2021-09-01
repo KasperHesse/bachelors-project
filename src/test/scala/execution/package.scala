@@ -109,12 +109,7 @@ package object execution {
   def calculateRes(instr: RtypeInstruction, a: SInt, b: SInt): SInt = {
     val ol = instr.op.litValue
 
-    //If instruction is immediate, replace b-value with immediate value
-//    val b = if(instr.immflag.litToBoolean) {
-//      getImmediate(instr)
-//    } else {
-//      b
-//    }
+    //If instruction is immediate, replace a-value with immediate value
     val A = if(instr.immflag.litToBoolean) {
       getImmediate(instr)
     } else {
@@ -356,6 +351,24 @@ package object execution {
     }
   }
 
+  /**
+   * Calculates the result of a red.xx instruction
+   * @param instr The instruction
+   * @param results The results registers
+   */
+  def calculateRedXXresult(instr: RtypeInstruction, results: Array[SInt], xReg: Array[Array[SInt]]): Unit = {
+    val rs1 = instr.rs1.litValue.toInt
+    val rs2 = instr.rs2.litValue.toInt
+    for(i <- results.indices) {
+      results(i) = 0.S(FIXED_WIDTH.W)
+    }
+    for(i <- 0 until XREG_DEPTH) {
+      val a = xReg(rs1)(i)
+      val b = xReg(rs2)(i)
+      results(0) = fixedAdd(results(0), fixedMul(a,b))
+    }
+  }
+
 
   /**
    * Updates the simulation vector register file with the values calculated in the instruction
@@ -404,10 +417,10 @@ package object execution {
   }
 
   /**
-   * Computes and prints the random seed to be used for this tester.
+   * Generates and prints the random seed to be used for this tester.
    * A specific seed may also be passed as a parameter in the option
    * @param name The name of the test
-   * @param seed a specific seed to be used instead of a randomly generated seed. If
+   * @param seed a specific seed to be used instead of a randomly generated seed.
    */
   def seed(name: String, seed: Option[Long] = None): Unit = {
     val x = seed match {

@@ -135,21 +135,6 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   /**
-   * Calculates the result of a red.xx instruction
-   * @param instr The instruction
-   * @param results The results registers
-   */
-  def calculateRedXXresult(instr: RtypeInstruction, results: Array[SInt]): Unit = {
-    val rs1 = instr.rs1.litValue.toInt
-    val rs2 = instr.rs2.litValue.toInt
-    for(i <- 0 until XREG_DEPTH) {
-      val a = xReg(rs1)(i)
-      val b = xReg(rs2)(i)
-      results(0) = fixedAdd(results(0), fixedMul(a,b))
-    }
-  }
-
-  /**
    * Expects the output of an instruction going into vector register file
    * @param dut The DUT
    * @param results Result buffer
@@ -219,7 +204,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     } else if(mod == RtypeMod.SV.litValue) {
       calculateSUMresult(instr, results)
     } else if(mod == RtypeMod.XX.litValue) {
-      calculateRedXXresult(instr, results)
+      calculateRedXXresult(instr, results, xReg)
     } else {
       throw new IllegalArgumentException("R-type mod not recognized")
     }

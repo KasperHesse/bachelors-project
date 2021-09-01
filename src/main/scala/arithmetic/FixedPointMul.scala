@@ -73,7 +73,7 @@ class FixedMulMultiCycle extends FixedPointMul {
   val lastBitReg = RegNext(lastBit)
 
   io.out.res := tmp + lastBitReg
-  io.out.q := false.B //TODO set this correctly
+  io.out.q := false.B //TODO implement overflow checking. Not relevant as of yet
   io.out.valid := validReg
 }
 

@@ -129,6 +129,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     } else {
       throw new IllegalArgumentException("Cannot decode modtype with result being xreg")
     }
+
     dut.io.wbout.rd.rf.expect(RegisterFileType.XREG)
     dut.io.wbout.rd.subvec.expect(0.U)
     assertEquals(dut.io.wbout.wrData(0).peek, results(0))
@@ -136,6 +137,31 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       results(i) = dut.io.wbout.wrData(i).peek
     }
     dut.io.wbout.wrData(NUM_PROCELEM).expect(0.S)
+  }
+
+  /**
+   * Expects the output of an instruction going into x-vector register file
+   * @param wb The writeback port of the module
+   * @param results Result buffer
+   * @param instr The instrution to check against
+   */
+  def expectXREG(wb: WbIdIO, instr: RtypeInstruction, results: Array[SInt]): Unit = {
+    if(instr.mod.litValue == RtypeMod.SX.litValue) {
+      calculateSXresult(instr, results, sReg, xReg(execThread))
+    } else if (instr.mod.litValue == RtypeMod.XX.litValue) {
+      calculateXXresult(instr, results, xReg(execThread))
+    } else if (instr.mod.litValue == RtypeMod.VV.litValue) {
+      calculateVVresult(instr, results, 0.U, vReg(execThread)) //Setting rd == 0 since we know all of the expected output data
+    } else {
+      throw new IllegalArgumentException("Cannot decode modtype with result being xreg")
+    }
+    wb.rd.rf.expect(RegisterFileType.XREG)
+    wb.rd.subvec.expect(0.U)
+    assertEquals(wb.wrData(0).peek, results(0))
+    for (i <- 0 until NUM_PROCELEM) {
+      results(i) = wb.wrData(i).peek
+    }
+    wb.wrData(NUM_PROCELEM).expect(0.S)
   }
 
   /**
@@ -152,10 +178,13 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       calculateReducedResult(results, MACresults)
     } else if(mod == RtypeMod.SV.litValue) {
       calculateReducedResult(results, MACresults)
+    } else if(mod == RtypeMod.XX.litValue) {
+      calculateRedXXresult(instr, results, xReg(execThread))
     } else {
       throw new IllegalArgumentException("R-type mod not recognized")
     }
     dut.io.wbout.rd.rf.expect(RegisterFileType.SREG)
+    dut.io.wbout.rd.reg.expect(instr.rd)
     dut.io.wbout.rd.subvec.expect(0.U)
     assertEquals(dut.io.wbout.wrData(0).peek, results(0))
     for(i <- 0 until NUM_PROCELEM) {
@@ -256,6 +285,10 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       maxProgress = NELEMLENGTH
       progressIncr = ELEMS_PER_VSLOT
       MAClength = NELEMLENGTH
+    } else if (iBuffer.pstart.len.litValue == NELEMSTEP.litValue) {
+      maxProgress = NELEMLENGTH
+      progressIncr = 1
+      MAClength = 1
     }
 
     //We need a special check to ensure correct functionality if only instruction is of type mac.vv/mac.sv
@@ -314,7 +347,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       } else if (fmt.litValue == InstructionFMT.RTYPE.litValue()) {
         iBuffer.exec += RtypeInstruction(instr)
       } else if (fmt.litValue == InstructionFMT.STYPE.litValue()) {
-        iBuffer.store += new StypeInstruction //TODO implement apply(v: UInt): StypeInstruction
+        iBuffer.store += StypeInstruction(instr)
       } else {
         throw new IllegalArgumentException("Unable to decode format")
       }
@@ -412,7 +445,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     val program = "" +
     "pstart single\n" + //0
       "estart\n" + //4
-      "add.is s1, s0, 5\n" + //8
+      "add.is s3, s0, 5\n" + //8
       "add.ss s2, s0, s0\n" + //12
       "eend\n" + //16
       "pend\n" + //20
@@ -422,10 +455,11 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       "add.is s2, s2, 1\n" + //32
       "eend\n" + //36
       "pend\n" + //40
-      "bne s2, s1, L1 " //44
+      "bne s2, s3, L1 " //44
     val instrs = Assembler.assemble(program)
     Assembler.writeMemInitFile(memfile, instrs)
-    test(new ExecutePipeline(memfile=memfile)) {dut =>
+    test(new ExecutePipeline(memfile=memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      dut.clock.setTimeout(150)
       testFun(dut)
     }
   }
@@ -473,6 +507,39 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     test(new ExecutePipeline(memfile)) {dut =>
       testFun(dut)
     }
+  }
+
+  it should "perform density filtering" in {
+    simulationConfig()
+    seed("Execute pipeline density filter", Some(6620151348395930099L))
+    val memfile = "src/resources/meminit/densityfilter.txt"
+
+    val program = "pstart nelemstep \n" + //Must use nelemstep as packet length as we're executing red.xx instructions
+      "estart\n" +
+      "div.xx x2, x2, x2\n" +
+      "div.xx x3, x3, x3\n" +
+      "div.xx x4, x4, x4\n" +
+      "mul.ix x2, x2, 0.5\n" +
+      "mul.ix x3, x3, 0.08578\n" +
+      "mul.ix x4, x4, 0.08578\n" +
+      "red.xx s1, x0, x2\n" +
+      "red.xx s2, x0, x3\n" +
+      "red.xx s3, x0, x4\n" +
+      "add.ss s1, s1, s2\n" +
+      "add.ss s1, s1, s3\n" +
+      "add.is s1, s1, 1.5\n" +
+      "div.is s1, s1, 1\n" +
+      "mul.sx x1, s1, x1\n" +
+      "eend\n" +
+      "pend"
+
+    val instrs = Assembler.assemble(program)
+    Assembler.writeMemInitFile(memfile, instrs)
+    test(new ExecutePipeline(memfile)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      dut.clock.setTimeout(200)
+      testFun(dut)
+    }
+
   }
 }
 

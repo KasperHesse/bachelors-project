@@ -97,19 +97,27 @@ class Control extends Module {
   // --- EXECUTE STAGE STALLS ---
   //These stall signals are active if the upcoming instruction relies on data that is currently being computed but not yet finished (data hazards)
   val dataHazardStall = WireDefault(false.B)
-  val dataHazardVec =  for(eha <- io.ex.queueHead) yield {
-    eha.valid && eha.dest.subvec === execThread.rs1.subvec && ((eha.dest.rf === execThread.rs1.rf && eha.dest.reg === execThread.rs1.reg) || (eha.dest.rf === execThread.rs2.rf && eha.dest.reg === execThread.rs2.reg))
+  val dataHazardVec =  for(dhv <- io.ex.queueHead) yield {
+    dhv.valid && //If that entry in destination queue is currently in use
+      dhv.dest.subvec === execThread.rs1.subvec && //Destination subvector matches source subvector (rs1.subvec === rs2.subvec, no need to check these two values)
+      (
+        (dhv.dest.rf === execThread.rs1.rf && dhv.dest.reg === execThread.rs1.reg) || //destination register + regfile matches rs1 input source register + regfile
+        (dhv.dest.rf === execThread.rs2.rf && dhv.dest.reg === execThread.rs2.reg)    //destination register + regfile matches rs2 input source register + regfile
+      )
   }
+  val dataHazardVecReduced = dataHazardVec.reduce((a,b) => a | b) //OR-reduction
   when(dataHazardVec.reduce((a, b) => a|b) && execThread.state === ThreadState.sExec) {
     dataHazardStall := true.B
   }
 
   //When decoded instruction is not the same opcode as instruction in execute stage, stall execution decode until destination queue is empty
+  //If macDestQueue is non-empty and current opcode is RED, we should also stall.
   val destQueueStall = WireDefault(false.B)
   val validHead = {for(head <- io.ex.queueHead) yield { //We don't need to stall if queue is non-empty but no entries in dQueue are invalid (this happens when the final value in dQueue is being output)
     head.valid
   }}.reduce((a,b) => a|b)
-  when(execThread.state === ThreadState.sExec && execThread.op =/= io.ex.op && !io.ex.empty && validHead) {
+  when(execThread.state === ThreadState.sExec && execThread.op =/= io.ex.op //When executing and incoming opcode does not match current opcode
+       && ((!io.ex.empty && validHead) || (!io.ex.macEmpty && io.ex.op === Opcode.RED))) { //And either the ordinary destQueue is non-empty or the macDestQueue is non-empty with RED instructions
     destQueueStall := true.B
   }
 

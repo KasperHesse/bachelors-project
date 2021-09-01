@@ -22,11 +22,17 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
 
   val PC: UInt = RegInit(0.U(32.W))
   val PCnext: UInt = WireDefault(0.U(32.W))
-  val imem: Mem[UInt] = Mem(memsize, UInt(INSTRUCTION_WIDTH.W))
+//  val imem: Mem[UInt] = Mem(memsize, UInt(INSTRUCTION_WIDTH.W))
+  val imem = SyncReadMem(memsize, UInt(INSTRUCTION_WIDTH.W))
+
+  val notFirstCycle = RegInit(false.B)
+  notFirstCycle := true.B //Should always just go to 1 after first cc
+  //firstCycle is a hackish solution to bad simulation results. The reset signals in chisel testers don't work the way I want them to, causing the simulation to read the instruction at [4]
+  //Almost immediately. Using firstCycle solves this. Has to start low, since registers have this value for the 1ns in chisel testers before the clock ticks
 
   when(io.id.branch) {
     PCnext := io.id.branchTarget
-  } .elsewhen(io.ctrl.iload) {
+  } .elsewhen(io.ctrl.iload && notFirstCycle) {
     PCnext := PC + 4.U
   } .otherwise {
     PCnext := PC
@@ -42,11 +48,8 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
     src.close()
     loadMemoryFromFile(imem, memfile)
   } else if (memfile.nonEmpty) {
-    val src = Source.fromFile(memfile)
-    require(src.getLines().length <= memsize, s"Memory file (${src.getLines.length}) too large for memory size ($memsize)")
-    src.close()
     loadMemoryFromFileInline(imem, memfile)
-//    loadMemoryFromFile(imem, memfile)
+    // loadMemoryFromFile(imem, memfile)
   }
 
   io.id.instr := instr

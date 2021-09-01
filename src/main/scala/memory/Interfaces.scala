@@ -28,7 +28,7 @@ class IJKgeneratorConsumerIO extends Bundle {
 class NeighbourGenIndexGenIO extends Bundle {
   val NUM_PORTS = 3
   /** Vector of ijk-values for which the global indices should be generated */
-  val ijk = Output(Vec(NUM_PORTS, new IJKBundle)) //TODO just 3 outputs
+  val ijk = Output(Vec(NUM_PORTS, new IJKBundle))
   /** Valid flags indicating whether these indices should be operated on */
   val validIjk = Output(Vec(NUM_PORTS, Bool()))
   /** Encoded base address to be read/written to */

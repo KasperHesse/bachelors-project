@@ -14,11 +14,28 @@ class TopLevelSpec extends FlatSpec with ChiselScalatestTester with Matchers{
 
   it should "perform setup and an elementwise operation" in {
     val source = Source.fromFile("resources/setupandelementwise.txt")
-    Assembler.writeMemInitFile("resources/setupandelementwise.hex.txt", Assembler.assemble(source).map(_.toLong))
+    Assembler.writeMemInitFile("resources/setupandelementwise.hex.txt", Assembler.assemble(source))
     source.close()
     SynthesisMemInit("src/resources/meminit")
+    FIXED_WIDTH = 26
+    INT_WIDTH = 10
+    FRAC_WIDTH = 15
     test(new TopLevel(IMsize=128, IMinitFileLocation = "resources/setupandelementwise.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      dut.clock.step(500)
+      dut.clock.step(600)
+    }
+  }
+
+  it should "perform setup and the second half of density filter gradient" in {
+    val source = Source.fromFile("resources/density_filter_gradient_second_half.txt")
+    Assembler.writeMemInitFile("resources/density_filter_gradient_second_half.hex.txt", Assembler.assemble(source))
+    source.close()
+    SynthesisMemInit("src/resources/meminit")
+    FIXED_WIDTH = 26
+    INT_WIDTH = 10
+    FRAC_WIDTH = 15
+    test(new TopLevel(IMsize=128, IMinitFileLocation = "resources/density_filter_gradient_second_half.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      dut.clock.setTimeout(1200)
+      dut.clock.step(1200)
     }
   }
 
@@ -61,19 +78,5 @@ class TopLevelSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/applydensityfilter.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       dut.clock.step(300)
     }
-  }
-
-  it should "test a value decode" in {
-    val point2 = 0x00000D00000000L
-    val value =  0x00003FFFFFFFD9L
-    val value3 = 0x00002000000000L
-    val value4 = 0x00000580000000L
-    println(fixed2double(value4))
-    println(double2fixed(0.2).toHexString)
-    println(fixed2double(point2))
-    println(fixed2double(value))
-    println(value)
-    println(imm2fixed(0.2).toBinaryString)
-    println(point2*math.pow(2,-38))
   }
 }

@@ -101,9 +101,9 @@ class Thread(id: Int) extends Module {
     (NDOFLENGTH/NUM_PROCELEM).U, //len == NDOF. MAC instructions
     1.U, //len is invalid
     (ELEMS_PER_VSLOT/NUM_PROCELEM).U, //len == SINGLE. Is this correct?
-    1.U, //len is invalid
+    1.U, //len == DOUBLE
     (NELEMLENGTH/NUM_PROCELEM).U, //len == NELEMVEC. MAC instructions
-    (VREG_DEPTH/NUM_PROCELEM).U, //len == NELEMDOF. RED.VV instructions
+    (VREG_DEPTH/NUM_PROCELEM).U, //len == NELEMDOF. RED.VV and MAC.KV instructions
     1.U, //len == NELEMSTEP. RED.XX instructions
     1.U //len is invalid
   ))
@@ -115,7 +115,7 @@ class Thread(id: Int) extends Module {
     NDOFSIZE.U, //len == NDOF.
     1.U, //len is invalid
     ELEMS_PER_VSLOT.U, //len == SINGLE
-    1.U, //len is invalid
+    (2*ELEMS_PER_VSLOT).U, //len == DOUBLE
     NELEMSIZE.U, //len == NELEM
     0.U,
     0.U,

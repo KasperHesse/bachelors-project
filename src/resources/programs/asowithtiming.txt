@@ -1,0 +1,62 @@
+//Set up loop variables
+pstart single
+estart
+add.is s10, s0, 5 //s10 = 5
+mul.is s10, s10, 4 //s10 = 20
+mul.is s10, s10, 5 //s10 = 100
+mul.ss s11, s0, s0 //s11 = 0
+eend
+pend
+
+//Start timing
+tstart clear
+L1:
+tstart run
+//Apply state operator with xphys as densities, U as input values and R as output
+//Setup constant values
+pstart single
+estart
+add.is s1, s0, 0.0078125
+mul.ss s1, s1, s1 // s2 =6.1e-5
+add.is s2, s0, 0.015625
+mul.ss s2, s1, s2 //s2 =9.5e-7 ~= 1e-6 = emin
+add.is s1, s0, 1 //s1=1=E0
+sub.ss s1, s1, s2 // s1 = e0-emin
+mul.sv v0, s0, v0 //Clear v0
+eend
+pend
+
+//Clear output vector
+pstart ndof
+estart
+eend
+st.vec v0, R
+pend
+
+pstart nelemdof //Loop over elements and perform applystateoperator
+ld.dof v0, U
+ld.dof v1, R
+ld.elem x0, XPHYS
+estart
+mul.xx x1, x0, x0 //x0 = pow(x,2)
+mul.xx x1, x1, x0 //x1 = pow(x,3)
+mul.sx x1, s1, x1 //x1 = pow(x,3)*(e0-emin)
+add.sx x1, s2, x1 //x1 = emin+pow(x,3)*(e0-emin)
+mul.xv v2, x1, v0 //v2 = u_local*elementScale
+mac.kv v2, v2 //ke*(u_local*elementScale)
+add.vv v2, v2, v1 //out[edof[i]] += out_local[i]
+eend
+st.dof v2, R
+st.fdof v0, R //Storing fixed DOFs with input values from U
+pend
+//End of apply state operator
+tend
+
+//Increment loop variable
+pstart single
+estart
+add.is s11, s11, 1
+eend
+pend
+ //branch if s10 != s11
+bne s10, s11, L1

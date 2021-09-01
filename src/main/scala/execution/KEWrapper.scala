@@ -49,32 +49,6 @@ class KEWrapper(val nelem: Int, val sync: Boolean = false) extends Module {
   } else {
     io.keVals := keMem(readLocation)
   }
-//  if(SIMULATION) {
-//    val keMem = Wire(Vec(numSlices, Vec(nelem, SInt(FIXED_WIDTH.W))))
-//    for(i <- 0 until numSlices) {
-//      for(j <- 0 until nelem) {
-//        keMem(i)(j) := double2fixed(KE(i)(j)).S(FIXED_WIDTH.W)
-//      }
-//    }
-//    if(sync) {
-//      io.keVals := RegNext(keMem(readLocation))
-//    } else {
-//      io.keVals := keMem(readLocation)
-//    }
-//  } else {
-//    //TODO SHould load actual KE values
-//    val keMem = Wire(Vec(numSlices, Vec(nelem, SInt(FIXED_WIDTH.W))))
-//    for(i <- 0 until numSlices) {
-//      for(j <- 0 until nelem) {
-//        keMem(i)(j) := double2fixed(KE(i)(j)).S(FIXED_WIDTH.W)
-//      }
-//    }
-//    if(sync) {
-//      io.keVals := RegNext(keMem(readLocation))
-//    } else {
-//      io.keVals := keMem(readLocation)
-//    }
-//  }
 }
 
 /**

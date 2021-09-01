@@ -28,18 +28,18 @@ class Execute extends Module {
 
   // --- MODULES ---
   val MPU = Module(new MatrixProcessingUnit(NUM_PROCELEM))
-  val macDestQueue = Module(new util.Queue(new RegisterBundle(),2))
+  val macDestQueue = Module(new util.Queue(new RegisterBundle(),4))
   val destinationQueue = Module(new DestinationQueue())
 
   // --- REGISTERS ---
   val in = RegNext(io.id)
+  //Must delay stall signal by one cc, since valid + op from decode stage are also delayed by 1 due to
+  //the SyncReadMem implementation of the register file
   val op = RegInit(Opcode.NOP)
   val valid = RegInit(false.B)
 
 
   // --- LOGIC ---
-  //Must delay stall signal by one cc, since valid + op from decode stage are also delayed by 1 due to
-  //the SyncReadMem implementation of the register file
   val validSignal =  !io.ctrl.stall && io.id.op =/= Opcode.NOP && io.id.valid
   valid := validSignal
 
@@ -64,9 +64,9 @@ class Execute extends Module {
   //We need a SEPARATE destination for MAC instructions, to allow other instructions to be processed at the same time
   destinationQueue.io.destIn := io.id.dest
   destinationQueue.io.enq := validSignal && !(opSignal === MAC || opSignal === RED)
-//  destinationQueue.io.enq := validSignal && (opSignal =/= MAC)
   macDestQueue.io.enq.bits := io.id.dest
-  macDestQueue.io.enq.valid := validSignal && (opSignal === MAC || opSignal === RED) && (macDestQueue.io.count === 0.U)
+  macDestQueue.io.enq.valid := validSignal && (opSignal === RED || (opSignal === MAC && macDestQueue.io.count === 0.U))
+
   //Output signals
   destinationQueue.io.deq := MPU.io.out.valid && !MPU.io.out.macResult
   macDestQueue.io.deq.ready := MPU.io.out.valid && MPU.io.out.macResult
