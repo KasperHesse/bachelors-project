@@ -1,47 +1,57 @@
- //Load scalar values for later computation
-    pstart single
-    estart
-    mul.sx x7, s0, x7 //Reset x7
-    add.ix x7, x7, 1 //x7=1
-    eend
-    pend
+//Load scalar values + populate design space (only for testing purposes)
+pstart double
+estart
+mul.sx x0, s0, x0 //Reset x0
+add.ix x0, x0, 1 //x0=1
+mul.sv v0, s0, v0 //Clear v0 //Not to be included in real program
+add.iv v0, v0, 1 //v1 = 1 //Not to be included in real program
+eend
+pend
 
-    //perform computation
-    //All neighbours are loaded down. Each neighbour is multiplied with its filterweight,
-    //and the sum of these values is stored in out[e1].
-    //Unityscale is calculated as the sum of filterweights, and out[e1] is scaled by this value
-    pstart nelemstep
-    ld.fcn x1, X  //x1 = face neighbour values
-    ld.edn1 x2, X //x2 = edge neighbour values
-    ld.edn2 x3, X //x3 = edge neighbour values
-    ld.sel x4, X	//x1 = central element value
-    estart
-        mul.ix x1, x1, 0.5 //multiply face-neighbours with filterweights
-        mul.ix x2, x2, 0.08578 //multiply edge-neighbours with filterweights
-        mul.ix x3, x3, 0.08578 //multiply more edge-neighbours with filterweights
-        mul.ix x4, x4, 1.5 //multiply central element with filterweight
-        red.xx s2, x1, x7 //sum/reduce all face neighbours
-        red.xx s3, x2, x7 //sum/reduce all edge neighbours
-        red.xx s4, x3, x7 //sum/reduce more edge neighbours
-        red.xx s5, x4, x7 //Sum/reduce central element
-        add.ss s3, s2, s3 //sum face and some edge neighbours
-        add.ss s3, s3, s4 //add remaining edge neighbours
-        add.ss s3, s3, s5 //add central element, s3=out[e1]
-        div.xx x1, x1, x1 //Divide x1 by itself to get 1's in all positions that are non-zero
-        div.xx x2, x2, x2 //Divide x2 by itself --||--
-        div.xx x3, x3, x3 //Divide x3 by itself --||--
-        mul.ix x1, x1, 0.5 //Multiply number of face neighbours with filterweight
-        mul.ix x2, x2, 0.08575 //Multiple number of edge neighbours with fw
-        mul.ix x3, x3, 0.08578 //Multiply numbef of edge neighbours with fw.
-        red.xx s2, x1, x7 //Sum all face neighbour fw's
-        red.xx s4, x2, x7 //Sum some edge neighbours fw's
-        red.xx s5, x3, x7 //Sum remaining edge neighbours fw's
-        add.ss s2, s2, s4 //Sum face and some edges
-        add.ss s2, s2, s5 //Sum remaining edges
-        add.is s2, s2, 1.5 //Add central element FW to obtain unityscale
-        div.ss s3, s3, s2 //s3 = out[e1] / unityscale
-        mul.sx x1, s0, x1 //Zero out x1
-        add.sx x1, s2, x1 //Copy s-value into x1 for storage
-    eend
-    st.sel x1, XPHYS
-    pend
+//Not to be included in real program
+pstart nelemvec
+estart
+eend
+st.vec v1, X
+pend
+
+//perform computation
+//All neighbours are loaded down. Each neighbour is multiplied with its filterweight,
+//and the sum of these values is stored in out[e1].
+//Unityscale is calculated as the sum of filterweights, and out[e1] is scaled by this value
+pstart nelemstep
+ld.fcn x1,  X //x1 = face neighbour values
+ld.edn1 x2, X //x2 = edge neighbour values
+ld.edn2 x3, X //x3 = edge neighbour values
+ld.sel x4,  X //x4 = central element value
+estart
+    //mul.ix instructions perform filterWeight * rho[e2]
+    mul.ix x1, x1, 0.5 //multiply face-neighbours with filterweights
+    mul.ix x2, x2, 0.08578 //multiply edge-neighbours with filterweights
+    mul.ix x3, x3, 0.08578 //multiply more edge-neighbours with filterweights
+    mul.ix x4, x4, 1.5 //multiply central element with filterweight
+    red.xx s2, x1, x0 //sum/reduce all face neighbours
+    red.xx s3, x2, x0 //sum/reduce all edge neighbours
+    red.xx s4, x3, x0 //sum/reduce more edge neighbours
+    red.xx s5, x4, x0 //Sum/reduce central element
+    add.ss s3, s2, s3 //sum face and some edge neighbours
+    add.ss s3, s3, s4 //add remaining edge neighbours
+    add.ss s3, s3, s5 //add central element, s3=out[e1] = sum(filterWeight_i*rho[e2_i])
+    div.xx x1, x1, x1 //Divide x1 by itself to get 1's in all positions that are non-zero
+    div.xx x2, x2, x2 //Divide x2 by itself --||--
+    div.xx x3, x3, x3 //Divide x3 by itself --||--
+    mul.ix x1, x1, 0.5 //Multiply number of face neighbours with filterweight
+    mul.ix x2, x2, 0.08575 //Multiple number of edge neighbours with fw
+    mul.ix x3, x3, 0.08578 //Multiply number of edge neighbours with fw.
+    red.xx s2, x1, x0 //Sum all face neighbour fw's
+    red.xx s4, x2, x0 //Sum some edge neighbours fw's
+    red.xx s5, x3, x0 //Sum remaining edge neighbours fw's
+    add.ss s2, s2, s4 //Sum face and some edges
+    add.ss s2, s2, s5 //Sum remaining edges
+    add.is s2, s2, 1.5 //s2 = unityScaleAdd central element FW to obtain unityscale
+    div.ss s3, s3, s2 //s3 = out[e1] / unityCcale
+    mul.sx x1, s0, x1 //Zero out x1
+    add.sx x1, s2, x1 //Copy s-value into x1 for storage
+eend
+st.sel x1, XPHYS
+pend

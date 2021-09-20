@@ -3,7 +3,7 @@ package execution
 import arithmetic._
 import chisel3._
 import chisel3.util.log2Ceil
-import utils.Config.{NDOFLENGTH, NUM_PROCELEM}
+import utils.Config.{MULTYPE, NDOFLENGTH, NUM_PROCELEM}
 import utils.Fixed._
 //import ProcElemOpcode._
 import chisel3.util.RegEnable
@@ -30,8 +30,8 @@ class ProcessingElement extends Module {
 
   val in = RegNext(io.in)
   //Modules in use
-  val mul = Module(FixedPointMul(utils.MulTypes.MULTICYCLE))
-  val div = Module(FixedPointDiv(utils.DivTypes.NEWTONRAPHSON))
+  val mul = Module(FixedPointMul(utils.Config.MULTYPE))
+  val div = Module(FixedPointDiv(utils.Config.DIVTYPE))
   val alu = Module(new FixedPointALU)
 
   // --- STAGE 1, MULTIPLIER AND DIVISION ---
@@ -49,7 +49,7 @@ class ProcessingElement extends Module {
   val mulDivValid = Mux(in.op === DIV, div.io.out.valid, mul.io.out.valid)
   val mulDivResultReg = RegNext(mulDivRes)
   val mulDivValidReg = RegNext(mulDivValid)
-  val tmp = RegNext(RegNext(in)) //Double regnext since multi-cycle multipliers have 1 register stage inside
+  val tmp = if(utils.Config.MULTYPE == utils.MulTypes.MULTICYCLE) RegNext(RegNext(in)) else RegNext(in) //Double regnext since multi-cycle multipliers have 1 register stage inside
 
 
   // --- ARITHMETIC AND MAC RESULT REGISTER ---

@@ -48,8 +48,8 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
     src.close()
     loadMemoryFromFile(imem, memfile)
   } else if (memfile.nonEmpty) {
-    loadMemoryFromFileInline(imem, memfile)
-    // loadMemoryFromFile(imem, memfile)
+//    loadMemoryFromFileInline(imem, memfile)
+     loadMemoryFromFile(imem, memfile)
   }
 
   io.id.instr := instr

@@ -1,3 +1,13 @@
+pstart ndof //Set up values to calculate inner product of
+estart
+mul.sv v0, s0, v0 //Clear v0
+add.iv v1, v0, 2
+add.iv v2, v0, 3
+eend
+st.vec v1, U
+st.vec v2, R
+pend
+
 pstart ndof
 ld.vec v0, U
 ld.vec v1, R

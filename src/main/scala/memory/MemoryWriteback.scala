@@ -97,6 +97,8 @@ class MemoryWriteback extends Module {
       }
       when(we && mod =/= SEL) { //SEL requires no building, must keep we high
         we := false.B
+      } .elsewhen(!valid) { //Once valid is deasserted, untoggle we
+        we := false.B
       }
     }
     is(sVec) {

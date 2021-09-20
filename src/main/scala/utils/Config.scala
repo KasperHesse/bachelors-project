@@ -11,7 +11,7 @@ object Config {
   /** What type of divisor to use if nothing is explicitly stated */
   val DIVTYPE = DivTypes.NEWTONRAPHSON
   /** What type of multiplier to use if nothing is explicitly stated when instantiating */
-  val MULTYPE = MulTypes.SINGLECYCLE
+  val MULTYPE = MulTypes.MULTICYCLE
   /** How many stages to use in Newton-Raphson divisors stage 3 */
   var NRDIV_STAGE3_REPS = 3
 

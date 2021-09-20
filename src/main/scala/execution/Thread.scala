@@ -78,35 +78,37 @@ class Thread(id: Int) extends Module {
   val IP = RegInit(0.U(log2Ceil(INSTRUCTION_BUFFER_SIZE+1).W))
   /** Current index into subvectors. Also gives the x-coordinate of the submatrix in the KE matrix */
   val X = RegInit(0.U(log2Ceil(VREG_DEPTH+1).W))
-//    val X = RegInit(0.U)
   /** Current y-coordinate used to index into KE matrix */
   val Y = RegInit(0.U(log2Ceil(KE_SIZE/NUM_PROCELEM+1).W))
-//    val Y = RegInit(0.U)
   /** Current column of submatrix (x,y) in the KE matrix */
   val col = RegInit(0.U(log2Ceil(NUM_PROCELEM+1).W))
-//    val col = RegInit(0.U)
   /** Used to select which vector from a vector slot is output */
   val slotSelect = RegInit(0.U(log2Ceil(VREG_SLOT_WIDTH+1).W))
-//    val slotSelect = RegInit(0.U)
   /** State register */
   val state = RegInit(sIdle)
+  /** Number of multiply-accumulate cycles to perform before a result is generated in MAC and RED instructions */
+//  val macLimit = RegInit(0.U(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W))
+  val macLimit = WireDefault(0.U(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W))
+  /** Maximum memory index that should be accessed when performing ld.vec and st.vec */
+  val maxIndex = RegInit(0.U(log2Ceil(NDOFSIZE+1).W))
+  /** O-type length of currently executing instruction packet */
+  val instrLen = RegInit(OtypeLen.SINGLE)
 
   // --- WIRES AND SIGNALS ---
   /** Handle to the current instruction */
   val currentInstr: UInt = io.instr
 
-
-  /** Lut to determince MAC limit to set into processing elements */
-  val macLimitDecode = VecInit(Array( //MAClimit into each PE should be the total number of elements processed / NUM_PROCELEM
-    (NDOFLENGTH/NUM_PROCELEM).U, //len == NDOF. MAC instructions
-    1.U, //len is invalid
-    (ELEMS_PER_VSLOT/NUM_PROCELEM).U, //len == SINGLE. Is this correct?
-    1.U, //len == DOUBLE
-    (NELEMLENGTH/NUM_PROCELEM).U, //len == NELEMVEC. MAC instructions
-    (VREG_DEPTH/NUM_PROCELEM).U, //len == NELEMDOF. RED.VV and MAC.KV instructions
-    1.U, //len == NELEMSTEP. RED.XX instructions
-    1.U //len is invalid
-  ))
+//  /** Lut to determince MAC limit to set into processing elements */
+//  val macLimitDecode = VecInit(Array( //MAClimit into each PE should be the total number of elements processed / NUM_PROCELEM
+//    (NDOFLENGTH/NUM_PROCELEM).U, //len == NDOF. MAC instructions
+//    1.U, //len is invalid
+//    (ELEMS_PER_VSLOT/NUM_PROCELEM).U, //len == SINGLE. Is this correct?
+//    1.U, //len == DOUBLE
+//    (NELEMLENGTH/NUM_PROCELEM).U, //len == NELEMVEC. MAC instructions
+//    (VREG_DEPTH/NUM_PROCELEM).U, //len == NELEMDOF. RED.VV and MAC.KV instructions
+//    1.U, //len == NELEMSTEP. RED.XX instructions
+//    1.U //len is invalid
+//  ))
 
   /** LUT to determine maximum index to access for ld.vec and st.vec operations */
    //If eg. NDOFSIZE != NDOFLENGTH, the system will start loading/storing values from the next vector in memory.
@@ -148,10 +150,6 @@ class Thread(id: Int) extends Module {
   val op = Mux(Rinst.fmt === InstructionFMT.RTYPE, Rinst.op, NOP)
   /** Destination register for current operation */
   val dest = WireDefault((new RegisterBundle).Lit(_.reg -> 0.U, _.subvec -> 0.U, _.rf -> VREG))
-  /** Limit for MAC operations */
-  val macLimit = RegInit(0.U(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W))
-  /** Maximum index that should be accessed when performing ld.vec and st.vec */
-  val maxIndex = RegInit(0.U(log2Ceil(NDOFSIZE+1).W))
   /** Signals that the outgoing operation should be added to the destination queue */
   val valid = WireDefault(false.B)
 
@@ -264,7 +262,6 @@ class Thread(id: Int) extends Module {
   io.threadOut.ijk := memAccess.io.ijkOut
 
   //Decode
-
   io.ip := IP
 
   /** Debug values */
@@ -285,8 +282,9 @@ class Thread(id: Int) extends Module {
       IP := 0.U
       when(Oinst.mod === OtypeMod.PACKET && Oinst.se === OtypeSE.START && Oinst.fmt === InstructionFMT.OTYPE && io.start) {
         IP := 1.U
-        macLimit := macLimitDecode(Oinst.len.asUInt())
+//        macLimit := macLimitDecode(Oinst.len.asUInt())
         maxIndex := maxIndexDecode(Oinst.len.asUInt())
+        instrLen := Oinst.len
         if(id == 0) {
           state := sLoad
         } else {
@@ -481,6 +479,9 @@ class Thread(id: Int) extends Module {
       is(RtypeMod.VV) {
         a := a_subvec(RegNext(X))
         b := b_subvec(RegNext(X))
+        when(op === RED) {
+          macLimit := (VREG_DEPTH/NUM_PROCELEM).U
+        }
       }
       is(RtypeMod.XV) {
         for (i <- 0 until NUM_PROCELEM) {
@@ -497,6 +498,9 @@ class Thread(id: Int) extends Module {
       is(RtypeMod.XX) {
         a := xRegRdData1
         b := xRegRdData2
+        when(op === RED) {
+          macLimit := 1.U
+        }
       }
       is(RtypeMod.SX) {
         for(i <- 0 until NUM_PROCELEM) {
@@ -519,6 +523,24 @@ class Thread(id: Int) extends Module {
     }
   }
 
+  //MAC limit selection
+  when(Rinst.op === RED && Rinst.mod === RtypeMod.VV) {
+    macLimit := (VREG_DEPTH/NUM_PROCELEM).U
+  } .elsewhen(Rinst.op === RED && Rinst.mod === RtypeMod.XX) {
+    macLimit := 1.U
+  } .elsewhen(Rinst.op === MAC && Rinst.mod === RtypeMod.KV) {
+    macLimit := (KE_SIZE).U
+  } .elsewhen(Rinst.op === MAC && (Rinst.mod === RtypeMod.VV || Rinst.mod === RtypeMod.SV)) {
+    //Performing MAC.VV/MAC.SV/MAC.IV instructions should only take place in lengths NDOF and NELEMVEC
+    when(instrLen === OtypeLen.NDOF) {
+      macLimit := (NDOFLENGTH/NUM_PROCELEM).U
+    } .otherwise {
+      macLimit := (NELEMLENGTH/NUM_PROCELEM).U
+    }
+  }
+
+
+  //Write data selection when storing
   when(state === sStore && RegNext(Rinst.fmt) === InstructionFMT.STYPE) {
     switch(RegNext(Sinst.mod)) {
       is(StypeMod.VEC) {
@@ -537,7 +559,6 @@ class Thread(id: Int) extends Module {
         wrData := wrData_subvec(RegNext(memAccess.io.subvec))
       }
     }
-
   }
 
   //Stall management

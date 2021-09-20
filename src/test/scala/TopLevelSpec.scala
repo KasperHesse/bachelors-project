@@ -12,71 +12,63 @@ import scala.io.Source
 class TopLevelSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   behavior of "Top Level Module"
 
-  it should "perform setup and an elementwise operation" in {
-    val source = Source.fromFile("resources/setupandelementwise.txt")
-    Assembler.writeMemInitFile("resources/setupandelementwise.hex.txt", Assembler.assemble(source))
+  def testFun(filename: String, cycles: Int = 999): Unit = {
+    val source = Source.fromFile(f"resources/$filename.txt")
+    Assembler.writeMemInitFile(f"resources/$filename.hex.txt", Assembler.assemble(source))
     source.close()
-    SynthesisMemInit("src/resources/meminit")
     FIXED_WIDTH = 26
     INT_WIDTH = 10
     FRAC_WIDTH = 15
-    test(new TopLevel(IMsize=128, IMinitFileLocation = "resources/setupandelementwise.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      dut.clock.step(600)
+    SynthesisMemInit("src/resources/meminit")
+    test(new TopLevel(IMsize=128, IMinitFileLocation = f"resources/$filename.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      dut.clock.setTimeout(cycles+1)
+      dut.clock.step(cycles)
     }
   }
 
-  it should "perform setup and the second half of density filter gradient" in {
-    val source = Source.fromFile("resources/density_filter_gradient_second_half.txt")
-    Assembler.writeMemInitFile("resources/density_filter_gradient_second_half.hex.txt", Assembler.assemble(source))
-    source.close()
-    SynthesisMemInit("src/resources/meminit")
-    FIXED_WIDTH = 26
-    INT_WIDTH = 10
-    FRAC_WIDTH = 15
-    test(new TopLevel(IMsize=128, IMinitFileLocation = "resources/density_filter_gradient_second_half.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      dut.clock.setTimeout(1200)
-      dut.clock.step(1200)
-    }
+  it should "perform the first half of applyDensityFilterGradient" in {
+    testFun("density_filter_gradient_1", 600)
   }
 
-  it should "perform a matrix-vector product" in {
-    val source = Source.fromFile("resources/mvp.txt")
-    Assembler.writeMemInitFile("resources/mvp.hex.txt", Assembler.assemble(source).map(_.toLong))
-    source.close()
-    SynthesisMemInit("src/resources/meminit")
-    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/mvp.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      dut.clock.setTimeout(2000)
-      dut.clock.step(1500)
-    }
-  }
-
-  it should "perform the setup before applyStateOperator" in {
-    val source = Source.fromFile("resources/asosetup.txt")
-    Assembler.writeMemInitFile("resources/asosetup.hex.txt", Assembler.assemble(source).map(_.toLong))
-    source.close()
-    SynthesisMemInit("src/resources/meminit")
-    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/asosetup.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      dut.clock.step(500)
-    }
-  }
-
-  it should "perform an inner product" in {
-    val source = Source.fromFile("resources/innerproduct.txt")
-    Assembler.writeMemInitFile("resources/innerproduct.hex.txt", Assembler.assemble(source).map(_.toLong))
-    source.close()
-    SynthesisMemInit("src/resources/meminit")
-    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/innerproduct.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      dut.clock.step(200)
-    }
+  it should "perform the second half of applyDensityFilterGradient" in {
+    testFun("density_filter_gradient_2", 1200)
   }
 
   it should "perform apply density filter" in {
-    val source = Source.fromFile("resources/applydensityfilter.txt")
-    Assembler.writeMemInitFile("resources/applydensityfilter.hex.txt", Assembler.assemble(source).map(_.toLong))
-    source.close()
-    SynthesisMemInit("src/resources/meminit")
-    test(new TopLevel(IMsize = 128, IMinitFileLocation = "resources/applydensityfilter.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      dut.clock.step(300)
-    }
+    testFun("applydensityfilter", 500)
   }
+
+  it should "perform applyStateOperator" in {
+    testFun("applyStateOperator", 1400)
+  }
+
+  it should "perform an inner product" in {
+    testFun("innerproduct", 1000)
+  }
+
+  it should "perform a vector norm" in {
+    testFun("norm", 700)
+  }
+
+  it should "perform generateMatrixDiagonal" in {
+    testFun("generateMatrixDiagonal", 800)
+  }
+
+  it should "perform preconditionDampedJacobi" in { //NOTE: This should be run with pstart nelemvec instead of pstart nelemdof to reduce runtime. Aint nobody got time for dat
+    testFun("preconditionDampedJacobi", 700)
+  }
+
+  it should "perform getComplianceAndSensitivity" in {
+    testFun("getComplianceAndSensitivity", 1200)
+  }
+
+  it should "perform lagrangian update" in {
+    testFun("lagrange", 1000)
+  }
+
+  it should "perform the second half of lagrangian update" in {
+    testFun("lagrange2", 1000)
+  }
+
+
 }

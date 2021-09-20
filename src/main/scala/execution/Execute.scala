@@ -28,7 +28,7 @@ class Execute extends Module {
 
   // --- MODULES ---
   val MPU = Module(new MatrixProcessingUnit(NUM_PROCELEM))
-  val macDestQueue = Module(new util.Queue(new RegisterBundle(),4))
+  val macDestQueue = Module(new util.Queue(new RegisterBundle(),8))
   val destinationQueue = Module(new DestinationQueue())
 
   // --- REGISTERS ---
@@ -37,6 +37,7 @@ class Execute extends Module {
   //the SyncReadMem implementation of the register file
   val op = RegInit(Opcode.NOP)
   val valid = RegInit(false.B)
+  val redVVcounter = RegInit(0.U((SUBVECTORS_PER_VREG+1).W))
 
 
   // --- LOGIC ---
@@ -65,7 +66,15 @@ class Execute extends Module {
   destinationQueue.io.destIn := io.id.dest
   destinationQueue.io.enq := validSignal && !(opSignal === MAC || opSignal === RED)
   macDestQueue.io.enq.bits := io.id.dest
-  macDestQueue.io.enq.valid := validSignal && (opSignal === RED || (opSignal === MAC && macDestQueue.io.count === 0.U))
+
+  //When inserting RED.XX instructions, every input is valid
+  //When inserting RED.VV instructions, only every SUBVECTORS_PER_VREG'th input is valid (as all VREG_DEPTH elements go into one slot in the dest. X-register)
+  //When inserting MAC.KV/MAC.VV/MAC.SV instructions, inputs are only valid if the dest. queue is empty
+  redVVcounter := Mux(opSignal === RED && io.id.dest.rf === RegisterFileType.XREG, //If op===RED and rf === XREG, instruction is RED.VV
+    Mux(redVVcounter === (SUBVECTORS_PER_VREG-1).U, 0.U, redVVcounter + 1.U),
+    redVVcounter)
+  macDestQueue.io.enq.valid := validSignal && ((opSignal === RED && redVVcounter === 0.U) || (opSignal === MAC && macDestQueue.io.count === 0.U))
+
 
   //Output signals
   destinationQueue.io.deq := MPU.io.out.valid && !MPU.io.out.macResult

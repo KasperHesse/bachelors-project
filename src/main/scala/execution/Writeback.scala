@@ -36,7 +36,7 @@ class Writeback extends Module {
   /** State register for output FSM */
   val state = RegInit(sOutput)
   /** Pointer to writeable location in writeBuffer */
-  val cnt = RegInit(0.U(log2Ceil(SUBVECTORS_PER_VREG+1).W))
+  val cnt = RegInit(0.U(log2Ceil(XREG_DEPTH+1).W))
   /** Result being output */
   val res = VecInit(Seq.fill(VREG_DEPTH)(0.S(FIXED_WIDTH.W)))
   /** Write enable flag */

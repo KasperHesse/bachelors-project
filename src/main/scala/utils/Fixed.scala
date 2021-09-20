@@ -321,7 +321,7 @@ object Fixed {
    * @return
    */
   def imm2fixed(imm: Double): Long = {
-    val immRounded = math.round(imm.toDouble*math.pow(2,IMM_FRAC_WIDTH))*math.pow(2,-IMM_FRAC_WIDTH)
+    val immRounded = math.round(imm*math.pow(2,IMM_FRAC_WIDTH))*math.pow(2,-IMM_FRAC_WIDTH)
     require(immRounded >= -math.pow(2,IMM_INT_WIDTH) && immRounded < math.pow(2, IMM_INT_WIDTH), s"Immediate value must be between ${-math.pow(2,IMM_INT_WIDTH)} and ${math.pow(2,IMM_INT_WIDTH)-math.pow(2,-IMM_FRAC_WIDTH)}")
     val immfixed = math.round(imm*math.pow(2,IMM_FRAC_WIDTH))
     immfixed
