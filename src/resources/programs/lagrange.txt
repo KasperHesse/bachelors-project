@@ -1,0 +1,158 @@
+//Simulation setup
+pstart double
+estart
+add.is s1, s0, 0.2 //x, xnew = 0.2
+add.is s2, s0, 5
+mul.is s2, s2, 5 //25
+mul.is s2, s2, 5 //125
+mul.is s2, s2, -5 //-625
+
+add.sv v0, s1, v0 //v0 = s1 = 0.2
+add.sv v1, s2, v1 //v1 = s2 = -625
+add.iv v2, v2, 0.95 //v2 = 0.95
+eend
+pend
+
+pstart nelemvec
+estart
+eend
+st.vec v0, XPHYS //all xphys = 0.2
+st.vec v0, X //all x = 0.2
+st.vec v1, DC //All dc = -625
+st.vec v2, DV //All dv = 0.95
+pend
+//End of simulation setup
+
+//Lagrange update start
+    pstart nelemvec
+    ld.vec v0, XPHYS
+    estart
+    mac.iv s1, v0, 1 //s1 = sum(xphys)
+    eend
+    pend
+
+    pstart single
+    estart
+    add.is s3, s0, 6 //s3 = 6
+    mul.is s3, s3, 6 //s3 = 36
+    mul.is s3, s3, 6 //s3 = 216 = nelem
+    //NOTE: NELEM must be changed here if grid size changes
+    div.ss s2, s1, s3 //s2 = vol = sum(xphys)/nelem
+    add.is s8, s2, -0.2 //s8 = g = sum(xphys)/nelem - volfrac
+
+    //Set up constants l1, l2, move and tolerance
+    add.ss s13, s0, s0 //s13 = l1 = 0
+    add.is s12, s0, 7.9 // s12 = 7.9
+    mul.is s12, s12, 7.9 //s12 = 62.4
+    mul.is s12, s12, 7.9 //s12 = 493 = lmid. Must be no greater than half of the largest possible value
+    //NOTE: l2 has been changed here: Should be as high as possible (approx 30k, 7.9^5)
+    add.is s11, s0, 0.2 //s11 = move = 0.2
+    add.is s1, s0, 0.0078125
+    mul.is s10, s1, 0.125 // s10 =9.7e-4 = tolerance
+    //NOTE: Tolerance has been changed here: Would be lower, but has been set to 9.7e-4 because we're simulating in Qs10.15 and not Qs15.38
+    eend
+    pend
+
+    LANGRANGE_START:
+    pstart single
+    estart
+    sub.ss s1, s12, s13 //s1 = l2-l1
+    add.ss s2, s12, s13 //s2 = l2+l1
+    div.ss s1, s1, s2 //s1 = (l2-l1)/(l2+l1)
+    eend
+    pend
+    blt s1, s10, LAGRANGE_END //if (l2-l1)/(l2+l1)<tolerance, we're finished
+
+    pstart single
+    estart
+    mul.is s9, s2, 0.5 //s9 = (l1+l2)/2 = lmid
+    eend
+    pend
+
+    pstart nelemvec
+    ld.vec v0, DV
+    ld.vec v1, DC
+    ld.vec v2, X
+    //v3 =  xnew
+    estart
+    mul.sv v3, s9, v0 //v3 = dv[i]*lmid
+    div.vv v3, v1, v3 //v3 = dc[i]/dv[i]*lmid
+    mul.iv v3, v3, -1 //v3 = -dc[i]/(dv[i]*lmid)
+
+    //Calculate square root of value in v3
+    mul.iv v0, v3, 0.5 //v0 = xn = S/2
+    //Start looping. v3 = S, v0 = xn, v1=tmp
+    div.vv v1, v3, v0 //v1 = S/xn
+    add.vv v1, v1, v0 //v1 = xn+S/xn
+    mul.iv v0, v1, 0.5 //v0 = xn = 1/2*(xn+S/xn) //First loop
+    div.vv v1, v3, v0 //v1 = S/xn
+    add.vv v1, v1, v0 //v1 = xn+S/xn
+    mul.iv v0, v1, 0.5 //v0 = xn = 1/2*(xn+S/xn) //Second loop
+    div.vv v1, v3, v0 //v1 = S/xn
+    add.vv v1, v1, v0 //v1 = xn+S/xn
+    mul.iv v0, v1, 0.5 //v0 = xn = 1/2*(xn+S/xn) //Third loop
+    div.vv v1, v3, v0 //v1 = S/xn
+    add.vv v1, v1, v0 //v1 = xn+S/xn
+    mul.iv v0, v1, 0.5 //v0 = xn = 1/2*(xn+S/xn) //Fourth loop
+    div.vv v1, v3, v0 //v1 = S/xn
+    add.vv v1, v1, v0 //v1 = xn+S/xn
+    mul.iv v0, v1, 0.5 //v0 = sqrt(-dc[i]/dv[i]*lmid) //Fifth loop, sqrt done
+    mul.vv v3, v2, v0 //v3 = x[i]*sqrt(-dc[i]/(dv[i]*lmid))
+    add.iv v0, v2, 0.2 //v0 = x[i] + move
+    min.vv v3, v0, v3 //v3 = min(x[i]+move, x[i]*sqrt(...))
+    min.iv v3, v3, 1 //v3 = min(1, min(x[i]...))
+    add.iv v0, v2, -0.2 //v0 = x[i]-move
+    max.vv v3, v0, v3 //v3 = max(x[i]-move, min(..))
+    max.iv v3, v3, 0 //v3 = xnew = max(0, max(x[i] ...)
+    eend
+    st.vec v3, XNEW
+    pend
+    //End of process: xnew[i] = 0.23017099 for all i
+
+    pstart nelemvec //Calculate value of gt
+    ld.vec v0, X
+    ld.vec v1, XNEW
+    ld.vec v2, DV
+    estart
+    sub.vv v3, v1, v0 //v3 = xnew[i]-x[i]
+    mac.vv s1, v2, v3 //v3 = s1 = sum(dv[i]*(xnew[i]-x[i]))
+    eend
+    pend
+
+    pstart single //Update value of gt
+    estart
+    add.ss s1, s1, s8 //s1 = gt += g
+    eend
+    pend
+
+    //Update l1 or l2
+    bge s1, s0 GT_POSITIVE //if gt >= 0, l1 = lmid
+    pstart single //gt < 0, l2 = lmid
+    estart
+    add.ss s12, s0, s9 //s12 = l2 = lmid
+    eend
+    pend
+    beq s0, s0 GT_UPDATE_END //unconditional branch
+
+    GT_POSITIVE:
+    pstart single
+    estart
+    add.ss s13, s0, s9 //s13 = l1 = lmid
+    eend
+    pend
+
+    GT_UPDATE_END:
+    beq s0, s0, LANGRANGE_START //Checks comparison up there
+    //Cbeck if lagrange update is finished
+
+    LAGRANGE_END:
+    pstart single
+    estart
+    mul.sv v2, s0, v0 //clear v2
+    mul.sv v3, s0, v0 //clear v3
+    add.iv v3, v3, 1 //v3 = 1
+    mul.sx x0, s0, x0 //clear x0
+    add.ix x0, x0, 1 //x0 = 1
+    add.ss s14, s0, s0 //clear s14 = change
+    eend
+    pend

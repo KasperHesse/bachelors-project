@@ -1,0 +1,20 @@
+    //Apply state operator with xphys as densities, U as input values and R as output
+    //Setup constant values
+    pstart single
+    estart
+    add.is s1, s0, 0.0078125
+    mul.ss s1, s1, s1 // s2 =6.1e-5
+    add.is s2, s0, 0.015625
+    mul.ss s2, s1, s2 //s2 =9.5e-7 ~= 1e-6 = emin
+    add.is s1, s0, 1 //s1=1=E0
+    sub.ss s1, s1, s2 // s1 = e0-emin
+	 mul.sv v0, s0, v0 //Clear v0
+    eend
+    pend
+
+     //Clear output vector
+     pstart ndof
+     estart
+     eend
+     st.vec v0, R
+     pend

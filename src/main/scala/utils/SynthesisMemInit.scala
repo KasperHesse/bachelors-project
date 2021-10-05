@@ -23,7 +23,7 @@ object SynthesisMemInit {
     val numWords = 8*NDOFSIZE+5*NELEMSIZE
     val wordsPerBank = numWords/8
 
-    val fOffset = mapping(F.litValue.toInt)
+    val fOffset = mapping(F.litValue.toInt) //F is the only vector to have values initialized at compile time
     val indexList = ListBuffer.empty[Int]
 
     //For each value of ny with i=nelx-1 and k=0, calculate the bank indices.
@@ -52,7 +52,6 @@ object SynthesisMemInit {
       val contents = mem(i).map(double2fixed).map(c => c & ((1L << FIXED_WIDTH)-1)) //Mask to preserve only FIXED_WIDTH lower bits
       writeMemInitFile(memFile, contents, 16)
     }
-
     wordsPerBank
   }
 

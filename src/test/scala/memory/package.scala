@@ -11,12 +11,15 @@ package object memory {
   /**
    * Compute the indices of the of the 24 degrees of freedom associated with the 8 corners of the element at (i,j,k) in the grid.
    *
-   * @param i Current iteration/coordinate in the x-direction
-   * @param j Current iteration/coordinate in the y-direction
-   * @param k Current iteration/coordinate in the z-direction
+   * @param i Current coordinate in the x-direction
+   * @param j Current coordinate in the y-direction
+   * @param k Current coordinate in the z-direction
    * @return An array of 24 integers holding the 24 DOF's of the specified element
    */
   def getEdof(i: Int, j: Int, k: Int): Array[Int] = {
+    if(i == -1 && j == -1 && k == -1) { //Shorthand for elements outside of grid
+      return Array.fill(24)(-1)
+    }
     require(0 <= i && i < NELX, "i must be in the range [0;NELX[")
     require(0 <= j && j < NELY, "j must be in the range [0;NELY[")
     require(0 <= k && k < NELZ, "k must be in the range [0;NELZ[")
@@ -51,6 +54,26 @@ package object memory {
       }
     }
     edof
+  }
+
+  /**
+   * Compute the indices of the of the 24 degrees of freedom associated with the 8 corners of the element at (i,j,k) in the grid.
+   * If an index does not correspond to a fixed DOF, returns -1 for that index instead
+   *
+   * @param i Current coordinate in the x-direction
+   * @param j Current coordinate in the y-direction
+   * @param k Current coordinate in the z-direction
+   * @return An array of 24 integers holding the 24 DOF's of the specified element
+   */
+  def getFdof(i: Int, j: Int, k: Int): Array[Int] = {
+    val edof = getEdof(i,j,k)
+    //We always know that 4-7, 12-15 and 21-24 are 0
+    val r = if(i == 0) { //There are some fixed dofs
+      edof.grouped(4).zipWithIndex.flatMap[Int](e => if(e._2 % 2 == 0) e._1 else Seq(-1,-1,-1,-1)).toArray
+    } else {
+      Array.fill[Int](24)(-1)
+    }
+    r
   }
 
   /**
@@ -195,12 +218,14 @@ package object memory {
       case 5 => Array(1,1,0)
       case 6 => Array(1,0,1)
       case 7 => Array(1,1,1)
-      case _ => throw new IllegalArgumentException("No start mapping for iterations outside interval [0;7]")
+      case 8 => Array(-1,-1,-1)
+      case _ => throw new IllegalArgumentException("No start mapping for iterations outside interval [0;8]")
     }
   }
 
   /**
    * Generates multiple IJK pairs which are sure to be in the order that the IJK generation module would traverse the grid
+   * If IJK coordinates outside of the grid would be generated, returns (-1,-1,-1) instead
    * @param start An Option holding the i,j,k coordinates to start at, at positions (0), (1) and (2) respectively. If (3) is set, this is used as the iteration number.
    *              If None is given, generates a random i,j,k-coordinate pair to start at
    * @param elems The number of coordinate pairs to generate. Defaults to XREG_DEPTH
@@ -234,6 +259,9 @@ package object memory {
     val j = ijkIter(1)
     val k = ijkIter(2)
     val iter = ijkIter(3)
+    if(i == -1 && j == -1 && k == -1) {
+      return Array(-1,-1,-1,8)
+    }
 
     val jUpdate = j + 2 >= NELY
     val kUpdate = k + 2 >= NELZ
@@ -275,7 +303,7 @@ package object memory {
     val k = ijk(2)
     // (i/2*NELYH*NELZH + k/2*NELYH + j/2) << 3 | iteration
     val e = (i/2*((NELY+1)/2)*((NELZ+1)/2) + k/2*((NELY+1)/2) + j/2)*NUM_MEMORY_BANKS + iterationFromIJK(Array(i,j,k))
-    if(i < 0 || i >= NELX || j < 0 || j >= NELY || k < 0 || k >= NELZ) return (e % 8) - 8 else e
+    if(i < 0 || i >= NELX || j < 0 || j >= NELY || k < 0 || k >= NELZ) {(e % 8) - 8} else e
   }
 
   /**

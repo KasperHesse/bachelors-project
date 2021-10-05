@@ -14,7 +14,12 @@ import utils.{TimingOutput, TimingWrapper}
  */
 class TopLevel(IMsize: Int, IMinitFileLocation: String, wordsPerBank: Int, memInitFileLocation: String, clkFreq: Int = 100e6.toInt) extends Module {
   val io = IO(new Bundle {
-    val exout = new ExWbIO
+    val exout = Output(new ExWbIO)
+    val idex = Output(new IdExIO)
+    val idctrl = Output(new IdControlIO)
+    val wbid = Output(new WbIdIO)
+    val idmem = Output(new IdMemIO)
+    val memid = Output(new WbIdIO)
     val timing = new TimingOutput(clkFreq)
   })
 
@@ -44,4 +49,10 @@ class TopLevel(IMsize: Int, IMinitFileLocation: String, wordsPerBank: Int, memIn
 
   io.exout <> execute.io.wb
   io.timing := timing.io.out
+
+  io.idex := decode.io.ex
+  io.idctrl := decode.io.ctrl
+  io.idmem := decode.io.mem
+  io.wbid := writeback.io.id
+  io.memid := mem.io.wb
 }

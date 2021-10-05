@@ -200,11 +200,12 @@ object StypeInstruction {
 
   /** Converts a UInt to the corresponding Stype instruction */
   def apply(v: UInt): StypeInstruction = {
-    val baseAddrVal = v(6,0).litValue.toInt
+    val baseAddrVal = v(5,0).litValue.toInt
+    val fmt = v(7,6).litValue.toInt
     val modVal = v(11,8).litValue.toInt
     val lsVal = v(12).litToBoolean
     val rsrd = v(16,13)
-    val fmt = v(7,6).litValue.toInt
+
 
     if(fmt != InstructionFMT.STYPE.litValue.toInt) {
       throw new IllegalArgumentException(s"Instruction format ($fmt) did not match S-type format")
@@ -228,13 +229,14 @@ object StypeInstruction {
     }
 
     val mod = modVal match {
-      case 0x0 => VEC
-      case 0x1 => DOF
       case 0x2 => ELEM
       case 0x4 => EDN1
       case 0x5 => EDN2
       case 0x6 => FCN
       case 0x7 => SEL
+      case 0x8 => DOF
+      case 0x9 => FDOF
+      case 0xC => VEC
       case _ => throw new IllegalArgumentException(s"Unable to decode S-type modifier (got $modVal)")
     }
 

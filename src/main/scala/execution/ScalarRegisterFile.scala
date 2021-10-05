@@ -2,7 +2,7 @@ package execution
 
 import chisel3._
 import chisel3.util._
-import chisel3.util.experimental.loadMemoryFromFile
+import chisel3.util.experimental.{loadMemoryFromFile, loadMemoryFromFileInline}
 import utils.Config._
 import utils.Fixed.FIXED_WIDTH
 import utils.Fixed.double2fixed
@@ -15,24 +15,14 @@ import java.io.{BufferedWriter, FileWriter}
 class ScalarRegisterFile(memInitFileLocation: String) extends Module {
   val io = IO(new ScalarRegFileIO)
 
-  val arr: Array[SInt] = Array.ofDim[SInt](NUM_SREG)
-  for(i <- 0 until NUM_SREG) {
-    arr(i) = double2fixed(i).S(FIXED_WIDTH.W)
-  }
-  /*
-  val regFile: Vec[SInt] = if(SIMULATION) {
-    RegInit(VecInit(arr))
-  } else {
-    RegInit(VecInit(Seq.fill(NUM_SREG)(0.S(FIXED_WIDTH.W))))
+  val arr: Array[SInt] = Array.fill[SInt](NUM_SREG)(0.S(FIXED_WIDTH.W))
+  if(SIMULATION) {
+    for(i <- 0 until NUM_SREG) {
+      arr(i) = double2fixed(i).S(FIXED_WIDTH.W)
+    }
   }
 
-  when(io.we && io.rd =/= 0.U) {
-    regFile(io.rd) := io.wrData
-  }
-  io.rdData1 := regFile(io.rs1)
-  io.rdData2 := regFile(io.rs2) */
-
-  //Trying to map it down to syncreadmem instead
+  //Trying to map it down to syncreadmem
   val mem = SyncReadMem(NUM_SREG, SInt(FIXED_WIDTH.W))
   when(io.we && io.rd =/= 0.U) {
     mem.write(io.rd, io.wrData)
@@ -40,14 +30,17 @@ class ScalarRegisterFile(memInitFileLocation: String) extends Module {
   io.rdData1 := mem.read(io.rs1)
   io.rdData2 := mem.read(io.rs2)
 
-  if(SIMULATION) {
-    //Write mem init file
-    val writer = new BufferedWriter(new FileWriter(memInitFileLocation))
-    for(v <- arr) {
-      v.litValue.toByteArray.foreach(b => writer.write(f"$b%02x"))
-      writer.write("\n")
-    }
-    writer.close()
+  //Create meminit file
+  val writer = new BufferedWriter(new FileWriter(memInitFileLocation))
+  for(v <- arr) {
+    v.litValue.toByteArray.foreach(b => writer.write(f"$b%02x"))
+    writer.write("\n")
+  }
+  writer.close()
+
+  if(INLINE) {
+    loadMemoryFromFileInline(mem, memInitFileLocation)
+  } else {
     loadMemoryFromFile(mem, memInitFileLocation)
   }
 }

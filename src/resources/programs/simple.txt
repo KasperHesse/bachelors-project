@@ -1,0 +1,12 @@
+//A very simple program to test basic load/execute/store functionality
+pstart single
+estart
+add.iv v0, v0, 3
+eend
+st.dof v0, U
+pend
+pstart single
+ld.dof v1, U
+estart
+eend
+pend

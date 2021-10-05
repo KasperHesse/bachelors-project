@@ -1,17 +1,8 @@
-pstart ndof //Set up values to calculate inner product of
+pstart ndof //Set up values to calculate inner product
 estart
 mul.sv v0, s0, v0 //Clear v0
 add.iv v1, v0, 2
 add.iv v2, v0, 3
+mac.vv s1, v1, v2
 eend
-st.vec v1, U
-st.vec v2, R
-pend
-
-pstart ndof
-ld.vec v0, U
-ld.vec v1, R
-estart
-mac.vv s1, v0, v1
-eend //No store is required, value is put into s-register
 pend

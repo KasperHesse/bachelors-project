@@ -1,0 +1,43 @@
+pstart nelemvec //Set up values
+estart
+mul.sv v0, s0, v0 //Clear v0
+add.iv v1, v0, 0.375
+add.iv v2, v0, 0.75
+eend
+st.vec v1, U
+st.vec v2, R
+pend
+
+pstart nelemvec //Calculate inner product
+ld.vec v1, U
+ld.vec v2, R
+estart
+mac.vv s1, v1, v2
+eend
+pend
+
+//Calculate square root
+pstart single
+estart
+//s1 holds S value
+mul.is s2, s1, 0.5 //s2 = xn = S/2
+add.is s3, s0, 0.5 //s3 = constant 1/2
+//Start looping
+div.ss s4, s1, s2 //s4 = S/xn
+add.ss s4, s4, s2 //s4 = xn + S/xn
+mul.ss s2, s3, s4 //s2 = xnew = 1/2*(xn+S/xn) //First loop
+div.ss s4, s1, s2 //s4 = S/xn
+add.ss s4, s4, s2 //s4 = xn + S/xn
+mul.ss s2, s3, s4 //s2 = xnew = 1/2*(xn+S/xn) //Second loop
+div.ss s4, s1, s2 //s4 = S/xn
+add.ss s4, s4, s2 //s4 = xn + S/xn
+mul.ss s2, s3, s4 //s2 = xnew = 1/2*(xn+S/xn) //Third iteration
+div.ss s4, s1, s2 //s4 = S/xn
+add.ss s4, s4, s2 //s4 = xn + S/xn
+mul.ss s2, s3, s4 //s2 = xnew = 1/2*(xn+S/xn) //Fourth iteration
+div.ss s4, s1, s2 //s4 = S/xn
+add.ss s4, s4, s2 //s4 = xn + S/xn
+mul.ss s13, s3, s4 //s13 = sqrt(S) = bnorm  //Fifth iteration
+//s2 = sqrt(x1)
+eend
+pend

@@ -60,7 +60,7 @@ object Assembler {
    * Initializes a memory file
    * @param memfile Relative path to the memory file to initialize. Existing contents are overwritten, a new file is created if none exists
    * @param instrs Encoded instruction to write into that file
-   * @param len The number of figures to print out for each line (if eg value=8 and len=4, it will print 0004)
+   * @param len The number of figures to print out for each line (if eg value=8 and len=4, it will print 0008)
    */
   def writeMemInitFile(memfile: String, instrs: Array[Long], len: Int = 8): Unit = {
     val dir = new File(new File(memfile).getParent)
@@ -617,7 +617,8 @@ object Assembler {
         }
         packetSize = 0
       }
-      case "//" => return
+      case x if x.startsWith("//") => return
+      case "{" | "}" => throw new IllegalArgumentException("Floating curly brace. Curly braces should only be used in function definitions")
       case x: String =>
         if(mutable.Seq("add","sub", "mul", "div", "max", "min", "mac").contains(x.substring(0,3)) && (!estart || eend)) {
           throw new IllegalArgumentException("R-type instructions only allowed between estart and eend")

@@ -1,0 +1,40 @@
+   //Setup values in U for simulation purposes
+   pstart double
+   estart
+   mul.sv v0, s0, v0 //Clear v0
+   add.iv v0, v0, 2.5 //Set values in v0
+   add.ix x0, x0, -1.25 //Set values in x0/XPHYS
+   eend
+   st.vec v0, U
+   st.elem x0, XPHYS
+   pend
+
+   //Compliance and sensitvity check
+    //Working on xphys, U and dc
+    //Setup constant values
+    {
+        pstart single
+        estart
+        add.is s1, s0, 0.0078125
+        mul.ss s1, s1, s1 // s2 =6.1e-5
+        add.is s2, s0, 0.015625
+        mul.ss s2, s1, s2 //s2 =9.5e-7 ~= 1e-6 = emin
+        add.is s1, s0, 1 //s1=1=E0
+        sub.ss s1, s1, s2 // s1 = e0-emin
+        eend
+        pend
+
+        pstart nelemdof
+        ld.dof v0, U
+        ld.elem x0, XPHYS
+        estart
+        mac.kv v1, v0 //ke * u_local
+        red.vv x1, v0, v1 //s3 = c_local = u_local^T *(Ke * u_local)
+        mul.xx x0, x0, x0 //x0 = pow(x,2)
+        mul.sx x0, s1, x0 //x0 = (e0-emin)*pow(x,2)
+        mul.ix x0, x0, -3 //x0 = -penal*(e0-emin)*pow(x,2)
+        mul.xx x0, x1, x0 //x0 = clocal*(-penal)*(e0-emin)*pow(x,2)
+        eend
+        st.elem x0, DC
+        pend
+    }

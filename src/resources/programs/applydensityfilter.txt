@@ -4,7 +4,7 @@ estart
 mul.sx x0, s0, x0 //Reset x0
 add.ix x0, x0, 1 //x0=1
 mul.sv v0, s0, v0 //Clear v0 //Not to be included in real program
-add.iv v0, v0, 1 //v1 = 1 //Not to be included in real program
+add.iv v0, v0, 0.75 //v1 = 1 //Not to be included in real program
 eend
 pend
 
@@ -12,7 +12,7 @@ pend
 pstart nelemvec
 estart
 eend
-st.vec v1, X
+st.vec v0, X
 pend
 
 //perform computation
@@ -51,7 +51,7 @@ estart
     add.is s2, s2, 1.5 //s2 = unityScaleAdd central element FW to obtain unityscale
     div.ss s3, s3, s2 //s3 = out[e1] / unityCcale
     mul.sx x1, s0, x1 //Zero out x1
-    add.sx x1, s2, x1 //Copy s-value into x1 for storage
+    add.sx x1, s3, x1 //Copy s-value into x1 for storage
 eend
 st.sel x1, XPHYS
 pend

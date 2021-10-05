@@ -11,7 +11,6 @@ class ExecutePipeline(memfile: String = "") extends Module {
   val io = IO(new Bundle {
     val wbout = new WbIdIO
     val idctrl = new IdControlIO
-    val fectrl = new IfControlIO
     val idout = new IdExIO
   })
 
@@ -24,7 +23,6 @@ class ExecutePipeline(memfile: String = "") extends Module {
 
   io.wbout <> writeback.io.id
   io.idctrl <> decode.io.ctrl
-  io.fectrl <> fetch.io.ctrl
   io.idout <> decode.io.ex
 
   fetch.io.id <> decode.io.fe

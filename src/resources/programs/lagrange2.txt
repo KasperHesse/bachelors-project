@@ -1,0 +1,85 @@
+//The contents of lagrange.txt, up to and including calculating sqrt(-dc[i] / dv[i]*lmid) has proven to be correct
+//Now, we check whether the updating scheme of l1/l2/lmid works as expected
+
+//Dv = 0.95
+//DC = -625
+//Simulation setup
+pstart double
+estart
+add.iv v1, v1, 0.2 //
+add.iv v2, v2, 0.95 //v2 = 0.95
+add.iv v3, v3, 0.23017 //xnew values
+add.is s8, s0, 0 //s8 = g = 0, from previous calculations
+add.is s9, s0, 7.9 //s9 = 7.9
+mul.is s9, s9, 7.9 //s9 = 62.41
+mul.is s9, s9, 7.9 //s9 = 493 = lmid
+add.ss s13, s0, s0 //s13 = l1 = 0
+mul.is s12, s9, 2 //s12 = l2 ~=1000
+eend
+pend
+
+pstart nelemvec
+estart
+eend
+st.vec v1, X //All x = 0.2
+st.vec v2, DV //All dv = 0.95
+st.vec v3, XNEW //All xnew = 0.23
+pend
+//End of simulation setup
+
+pstart nelemvec //Calculate value of gt
+ld.vec v0, X
+ld.vec v1, XNEW
+ld.vec v2, DV
+estart
+sub.vv v3, v1, v0 //v3 = xnew[i]-x[i]
+mac.vv s1, v2, v3 //v3 = s1 = sum(dv[i]*(xnew[i]-x[i]))
+eend
+pend
+
+pstart single //Update value of gt
+estart
+add.ss s1, s1, s8 //s1 = gt += g
+eend
+pend
+
+//Update l1 or l2
+bge s1, s0 GT_POSITIVE //if gt >= 0, l1 = lmid
+pstart single //gt < 0, l2 = lmid
+estart
+add.ss s12, s0, s9 //s12 = l2 = lmid
+eend
+pend
+beq s0, s0 LAGRANGE_START //unconditional branch
+
+GT_POSITIVE:
+pstart single
+estart
+add.ss s13, s0, s9 //s13 = l1 = lmid
+eend
+pend
+
+beq s0, s0, LANGRANGE_START //Checks comparison up there
+//Cbeck if lagrange update is finished
+
+LAGRANGE_END:
+pstart single
+estart
+mul.sv v2, s0, v0 //clear v2
+mul.sv v3, s0, v0 //clear v3
+add.iv v3, v3, 1 //v3 = 1
+mul.sx x0, s0, x0 //clear x0
+add.ix x0, x0, 1 //x0 = 1
+add.ss s14, s0, s0 //clear s14 = change
+eend
+pend
+
+LANGRANGE_START:
+pstart single
+estart
+sub.ss s1, s12, s13 //s1 = l2-l1
+add.ss s2, s12, s13 //s2 = l2+l1
+div.ss s1, s1, s2 //s1 = (l2-l1)/(l2+l1)
+eend
+pend
+blt s1, s10, LAGRANGE_END //if (l2-l1)/(l2+l1)<tolerance, we're finished

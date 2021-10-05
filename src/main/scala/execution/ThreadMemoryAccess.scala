@@ -44,7 +44,8 @@ class ThreadMemoryAccessIO extends Bundle {
 
 /**
  * This is the main module used for interfacing between a thread and the memory stage.
- * Contains the submodules for generating IJK values and indices for VEC lookups
+ * Contains the submodules for generating IJK values and indices for VEC lookups.
+ * This module primarily controls ready/valid signalling with the memory module
  *
  * @param sim Flag that must be enabled when this module is tested by itself. When tested/instantiated inside of threads,
  *            this parameter must be set false

@@ -1,7 +1,6 @@
 package execution
 
 import chisel3._
-import execution.RegisterBundle
 
 class ControlIO extends Bundle {
   val id = Flipped(new IdControlIO)

@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util.experimental.loadMemoryFromFile
 import chisel3.util.experimental.loadMemoryFromFileInline
 import chisel3.util._
-import utils.Assembler.writeMemInitFile
+import utils.Assembler
 import utils.Fixed._
 import utils.Config._
 
@@ -55,7 +55,6 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
   // -- LOGIC ---
   //Addresses are right-shifted by log2Ceil(NUM_MEMORY_BANKS) such that address x000, x001, x010 ... x111
   // are all represented as address 'x' in their respective banks. The lower 3 bits are thus used to select the relevant banks
-  //TODO When performing st.sel, we should move the incoming value at wrData(0) to the correct index, based on ijk iteration value
   for(i <- membank.indices) {
     //Set up read accessors. If address it not valid, we replace the read data with 0's
     rdData(i) := membank(i).read((io.addrGen.bits.addr(i) >> log2Ceil(NUM_MEMORY_BANKS)).asUInt(), validOp)
@@ -116,7 +115,7 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
       val values = for(index <- 0 until wordsPerBank) yield {
         double2fixed(index*NUM_MEMORY_BANKS+bank)
       }
-      writeMemInitFile(file, values.toArray)
+      Assembler.writeMemInitFile(file, values.toArray)
     }
   }
 }

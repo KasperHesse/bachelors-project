@@ -1,0 +1,47 @@
+//Performs the second half of densityFilterGradient, setting v[e1] = 0 and then
+//performing v[e1] += filterWeight*tmp[e2] over all neighbouring elements
+//Performs the summation of filterWeights and tmp[]-values first, and then stores this into v
+
+
+//populate design space
+//Volfrac = 0.2
+pstart nelemvec
+estart
+add.iv v1, v1, 1 //Set all elements in v1=1
+eend
+st.vec v1, TMP //Store v1 in TMP, all TMP-values=1
+pend
+
+pstart double //Initial setup
+estart
+mul.sx x0, s0, x0 //clear x0
+add.ix x0, x0, 1 //Set x0=1
+eend
+pend
+
+
+//For each element in DV, clear its value. Then loop through neighbourhood, setting new element
+//value to be a scaled version of all input values in tmp
+pstart nelemstep //Through all elements
+ld.sel x1, TMP
+ld.fcn x2, TMP
+ld.edn1 x3, TMP
+ld.edn2 x4, TMP
+estart //We need both the original values AND count of values
+mul.ix x1, x1, 1.5 //Scale central element
+mul.ix x2, x2, 0.5 //scale face neighbours
+mul.ix x3, x3, 0.08578 //Scale edge neighbours
+mul.ix x4, x4, 0.08578 //Scale edge neighbours
+add.ss s1, s0, s0 //Clear s1
+red.xx s1, x1, x0 //Sum values in x1
+red.xx s2, x2, x0 //Sum values in x2
+red.xx s3, x3, x0 //Sum values in x3
+red.xx s4, x4, x0 //Sum values in x4
+add.ss s1, s1, s2
+add.ss s1, s1, s3
+add.ss s1, s1, s4 //s1 = v[e1] += filterWeight*tmp[e2] for all neighbours
+div.xx x1, x1, x1 //Reset value in x1 to a single 1
+mul.sx x1, s1, x1 //Set first value in x1 to new element value
+eend
+st.sel x1, DV
+pend

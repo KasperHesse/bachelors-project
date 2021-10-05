@@ -24,7 +24,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
 
   /**
    * (Re)initializes the variable [[mem]] to a clean version that matches the memory contents at startup
-   * when simulating.
+   * when simulating. All memory locations are initialized to their address in memory
    */
   def initMemory(): Unit = {
     for(bank <- 0 until NUM_MEMORY_BANKS) {
@@ -50,12 +50,12 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
 
 
   /**
-   * Calculates the expected data for a given memory load operation
-   * @param indices The memory indices that the load operation accessed / The IJK-values used for the load operation
+   * Determines the expected data for a given memory load operation
+   * @param indices The memory indices that the load operation accessed. If an index i<0, that memory read is not valid and returns 0
    * @param baseAddr The S-type base address of the load operation
    * @return
    */
-  def calculateExpectedData(indices: Seq[Int], baseAddr: StypeBaseAddress.Type): Seq[Long] = {
+  def determineExpectedLoadData(indices: Seq[Int], baseAddr: StypeBaseAddress.Type): Seq[Long] = {
     //Decode base address to literal offset.
     val baseAddrDec = AddressDecode.mapping(baseAddr.litValue.toInt)
     val addresses = indices.map(_ + baseAddrDec)
@@ -73,16 +73,16 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
   }
 
   /**
-   * Expects the output of a load instruction
+   * Expects the output of a FULL load-data operation. Primarily used for ld.vec / ld.dof operations, but works for all kinds of operations
    * @param expected A 2D container holding the expected data. expected(0) holds the data expected the first time we goes high, expected(1) the data expected the second time, etc.
    *                 expected(x)(0) should hold the data expected at wrData(0), expected(x)(1) the data at wrData(1), etc.
    * @param rd The base register where the load operation is supposed to happen. If expected.length > 0, it is assumed that a VEC or DOF load has been started, at which point the expected destination
    *           register will increment for each time we is enabled. If eg. rd=8 and VREG_SLOT_WIDTH=8, the expected registers will be 8,9,...,15.
    * @param wb The writeback port of the DUT
    * @param clock The clock of the DUT
-   * @note If expected(x).length > XREG_DEPTH, it is assumed that the destination register is the vector register file. If expected(x).length <= XREG_DEPTH, it is assumed that the destination register if the x register file.
+   * @note If expected(x).length > XREG_DEPTH, it is assumed that the destination register is the vector register file. If expected(x).length <= XREG_DEPTH, it is assumed that the destination register is the x register file.
    */
-  def expectLoad(expected: Seq[Seq[Long]], rd: Int, wb: WbIdIO, clock: Clock): Unit = {
+  def performExpectLoad(expected: Seq[Seq[Long]], rd: Int, wb: WbIdIO, clock: Clock): Unit = {
     for(i <- expected.indices) {
       while(!wb.we.peek.litToBoolean) { //Step up to next result
         clock.step()
@@ -99,7 +99,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
     }
   }
 
-  private val annos = Seq(WriteVcdAnnotation)
+  private val annos = Seq()
   it should "perform a ld.sel" in {
     /*
     pstart
@@ -115,14 +115,12 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       dut.clock.setTimeout(30)
       val instr = StypeInstruction(rsrd=0, mod=SEL, baseAddr=X, ls=LOAD)
       val ijk = Array(0,0,0)
-      val expData = calculateExpectedData(Seq(elementIndex(ijk)), baseAddr=X)
+      val expData = determineExpectedLoadData(Seq(elementIndex(ijk)), baseAddr=X)
       val instrs = wrapLoadStoreInstructions(Array(instr))
 
       loadInstructions(dut.io.in, dut.clock, instrs)
-      var x = 0
       while(!dut.io.memWb.we.peek.litToBoolean) {
         dut.clock.step()
-        x += 1
       }
       dut.io.memWb.wrData(0).expect(expData(0).S)
       dut.io.memWb.rd.reg.expect(0.U)
@@ -158,8 +156,8 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       val ijk = Array(0,0,0,0)
       val ldInstr = Array(StypeInstruction(rsrd=0, mod=SEL, baseAddr=X, ls=LOAD), StypeInstruction(rsrd=1, mod=SEL, baseAddr=XPHYS, ls=LOAD))
       val stInstr = Array(StypeInstruction(rsrd=0, mod=SEL, baseAddr=XPHYS, ls=STORE), StypeInstruction(rsrd=1, mod=SEL, baseAddr = X, ls=STORE))
-      val expX = calculateExpectedData(Seq(elementIndex(ijk)), baseAddr=X)
-      val expXphys = calculateExpectedData(Seq(elementIndex(ijk)), baseAddr=XPHYS)
+      val expX = determineExpectedLoadData(Seq(elementIndex(ijk)), baseAddr=X)
+      val expXphys = determineExpectedLoadData(Seq(elementIndex(ijk)), baseAddr=XPHYS)
       val p1 = wrapLoadStoreInstructions(ldInstr, Some(stInstr))
       val p2 = wrapLoadStoreInstructions(ldInstr)
 
@@ -214,8 +212,8 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       val ijk = genIJKmultiple(start=Some(Array(0,0,0,0)))
       val ldInstr = Array(StypeInstruction(rsrd=0, mod=ELEM, baseAddr=X, ls=LOAD), StypeInstruction(rsrd=1, mod=ELEM, baseAddr=XPHYS, ls=LOAD))
       val stInstr = Array(StypeInstruction(rsrd=0, mod=ELEM, baseAddr=XPHYS, ls=STORE), StypeInstruction(rsrd=1, mod=ELEM, baseAddr = X, ls=STORE))
-      val expX = calculateExpectedData(ijk.map(elementIndex), X)
-      val expXphys = calculateExpectedData(ijk.map(elementIndex), XPHYS)
+      val expX = determineExpectedLoadData(ijk.map(elementIndex), X)
+      val expXphys = determineExpectedLoadData(ijk.map(elementIndex), XPHYS)
       val p1 = wrapLoadStoreInstructions(ldInstr, Some(stInstr))
       val p2 = wrapLoadStoreInstructions(ldInstr)
 
@@ -264,7 +262,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       dut.clock.setTimeout(30)
       val rd = scala.util.Random.nextInt(NUM_XREG)
       val ijk = genIJKmultiple(start=Some(Array(0,0,0,0)))
-      val expData = calculateExpectedData(ijk.map(elementIndex), baseAddr=Q)
+      val expData = determineExpectedLoadData(ijk.map(elementIndex), baseAddr=Q)
 
       val instr = StypeInstruction(rd, mod=ELEM, baseAddr=Q, ls=LOAD)
       val instrs = wrapLoadStoreInstructions(Array(instr))
@@ -305,12 +303,12 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
 
       val ijk = genIJKmultiple(start=Some(Array(0,0,0,0)))
       val edof = ijk.map(e => getEdof(e(0), e(1), e(2)))
-      val expDof = edof.map(e => calculateExpectedData(e, baseAddr))
-      val expElem = calculateExpectedData(ijk.map(elementIndex), baseAddr)
+      val expDof = edof.map(e => determineExpectedLoadData(e, baseAddr))
+      val expElem = determineExpectedLoadData(ijk.map(elementIndex), baseAddr)
 
       loadInstructions(dut.io.in, dut.clock, packet)
-      expectLoad(expDof, vrd, wb=dut.io.memWb, clock=dut.clock)
-      expectLoad(Seq(expElem), xrd, dut.io.memWb, dut.clock)
+      performExpectLoad(expDof, vrd, wb=dut.io.memWb, clock=dut.clock)
+      performExpectLoad(Seq(expElem), xrd, dut.io.memWb, dut.clock)
     }
   }
 
@@ -341,8 +339,8 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       val ldInstr = Array(StypeInstruction(rsrd = 0, mod = DOF, baseAddr = F, ls = LOAD), StypeInstruction(rsrd = 1, mod = DOF, baseAddr = U, ls = LOAD))
       val stInstr = Array(StypeInstruction(rsrd = 0, mod = DOF, baseAddr = U, ls = STORE), StypeInstruction(rsrd = 1, mod = DOF, baseAddr = F, ls = STORE))
 
-      val expF = edof.map(i => calculateExpectedData(i, F))
-      val expU = edof.map(i => calculateExpectedData(i, U))
+      val expF = edof.map(i => determineExpectedLoadData(i, F))
+      val expU = edof.map(i => determineExpectedLoadData(i, U))
 
       val p1 = wrapLoadStoreInstructions(ldInstr, Some(stInstr), len = OtypeLen.SINGLE)
       val p2 = wrapLoadStoreInstructions(ldInstr, len = OtypeLen.SINGLE)
@@ -409,10 +407,10 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       val ldInstr = Array(StypeInstruction(rsrd = 0, mod = DOF, baseAddr = F, ls = LOAD), StypeInstruction(rsrd = 1, mod = DOF, baseAddr = U, ls = LOAD))
       val stInstr = Array(StypeInstruction(rsrd = 0, mod = FDOF, baseAddr = U, ls = STORE), StypeInstruction(rsrd = 1, mod = FDOF, baseAddr = F, ls = STORE))
 
-      val readF = edof.map(i => calculateExpectedData(i, F))
-      val readU = edof.map(i => calculateExpectedData(i, U))
-      val expF = edof.map(i => calculateExpectedData(i, F).toArray)
-      val expU = edof.map(i => calculateExpectedData(i, U).toArray)
+      val readF = edof.map(i => determineExpectedLoadData(i, F))
+      val readU = edof.map(i => determineExpectedLoadData(i, U))
+      val expF = edof.map(i => determineExpectedLoadData(i, F).toArray)
+      val expU = edof.map(i => determineExpectedLoadData(i, U).toArray)
 
       //Expected data is not a copy of read data since we're performing fixed dof store
       //For each ijk pair, if i==0 (element is in bottom layer), the store operation will happen at indices 0-3, 8-11 and 16-19
@@ -454,7 +452,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
         }
         val e = expF(i)
         for (j <- e.indices) {
-          dut.io.memWb.wrData(j).expect(e(j).S) //io_memWb_wrData_0=73924608 (0x4680000) did not equal expected=40108032 (0x2640000) (lines in DecodeMemorySpec.scala: 455, 450, 404)
+          dut.io.memWb.wrData(j).expect(e(j).S)
         }
         dut.clock.step()
       }
@@ -496,17 +494,17 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       val packet = wrapLoadStoreInstructions(instrs)
 
       val ijk = Array(0,0,0,0)
-      val expFcn = calculateExpectedData(getFcnIndices(ijk), baseAddr)
-      val edn1Fcn = calculateExpectedData(getEdn1Indices(ijk), baseAddr)
-      val expEdn2 = calculateExpectedData(getEdn2Indices(ijk), baseAddr)
-      val expSel = Seq(calculateExpectedData(Seq(elementIndex(ijk)), baseAddr), Seq.fill(XREG_DEPTH-1)(0L)).flatten //Must also receive 0's on the remaining positions
+      val expFcn = determineExpectedLoadData(getFcnIndices(ijk), baseAddr)
+      val edn1Fcn = determineExpectedLoadData(getEdn1Indices(ijk), baseAddr)
+      val expEdn2 = determineExpectedLoadData(getEdn2Indices(ijk), baseAddr)
+      val expSel = Seq(determineExpectedLoadData(Seq(elementIndex(ijk)), baseAddr), Seq.fill(XREG_DEPTH-1)(0L)).flatten //Must also receive 0's on the remaining positions
 
       //Execution
       loadInstructions(dut.io.in, dut.clock, packet)
-      expectLoad(expected=Seq(expFcn), rd=0, wb=dut.io.memWb, clock=dut.clock)
-      expectLoad(Seq(edn1Fcn), 1, dut.io.memWb, dut.clock)
-      expectLoad(Seq(expEdn2), 2, dut.io.memWb, dut.clock)
-      expectLoad(Seq(expSel), 3, dut.io.memWb, dut.clock)
+      performExpectLoad(expected=Seq(expFcn), rd=0, wb=dut.io.memWb, clock=dut.clock)
+      performExpectLoad(Seq(edn1Fcn), 1, dut.io.memWb, dut.clock)
+      performExpectLoad(Seq(expEdn2), 2, dut.io.memWb, dut.clock)
+      performExpectLoad(Seq(expSel), 3, dut.io.memWb, dut.clock)
     }
   }
 
@@ -533,13 +531,13 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       val packet = wrapLoadStoreInstructions(instrs)
 
       val indices = Seq.tabulate(VREG_SLOT_WIDTH)(n => Seq.range(n*VREG_DEPTH, (n+1)*VREG_DEPTH))
-      val expVec1 = indices.map(i => calculateExpectedData(i, vec1.baseAddr))
-      val expVec2 = indices.map(i => calculateExpectedData(i, vec2.baseAddr))
+      val expVec1 = indices.map(i => determineExpectedLoadData(i, vec1.baseAddr))
+      val expVec2 = indices.map(i => determineExpectedLoadData(i, vec2.baseAddr))
 
       //Execution
       loadInstructions(dut.io.in, dut.clock, packet)
-      expectLoad(expected=expVec1, rd=rd1, wb=dut.io.memWb, clock=dut.clock)
-      expectLoad(expVec2, rd2*VREG_SLOT_WIDTH, dut.io.memWb, dut.clock)
+      performExpectLoad(expected=expVec1, rd=rd1, wb=dut.io.memWb, clock=dut.clock)
+      performExpectLoad(expVec2, rd2*VREG_SLOT_WIDTH, dut.io.memWb, dut.clock)
     }
   }
 
@@ -569,8 +567,8 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       val ldInstr = Array(StypeInstruction(rsrd=0, mod=VEC, baseAddr=P, ls=LOAD), StypeInstruction(rsrd=1, mod=VEC, baseAddr=Q, ls=LOAD))
       val stInstr = Array(StypeInstruction(rsrd=0, mod=VEC, baseAddr=Q, ls=STORE), StypeInstruction(rsrd=1, mod=VEC, baseAddr = P, ls=STORE))
 
-      val expP = indices.map(i => calculateExpectedData(i, P))
-      val expQ = indices.map(i => calculateExpectedData(i, Q))
+      val expP = indices.map(i => determineExpectedLoadData(i, P))
+      val expQ = indices.map(i => determineExpectedLoadData(i, Q))
 
       val p1 = wrapLoadStoreInstructions(ldInstr, Some(stInstr), len=OtypeLen.SINGLE)
       val p2 = wrapLoadStoreInstructions(ldInstr, len=OtypeLen.SINGLE)

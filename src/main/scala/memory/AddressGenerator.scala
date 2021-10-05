@@ -165,7 +165,7 @@ object AddressDecode {
   mapping += (3 -> (mapping(2) + NELEMSIZE)) //base address for DC
   mapping += (4 -> (mapping(3) + NELEMSIZE)) //base address for DV
   mapping += (5 -> (mapping(4) + NELEMSIZE)) //Base address for F
-  mapping += (6 -> (mapping(5) + NELEMSIZE)) //Base address for U
+  mapping += (6 -> (mapping(5) + NDOFSIZE)) //Base address for U
   mapping += (7 -> (mapping(6) + NDOFSIZE)) //Base address for R
   mapping += (8 -> (mapping(7) + NDOFSIZE)) //Base address for Z
   mapping += (9 -> (mapping(8) + NDOFSIZE)) //Base address for P

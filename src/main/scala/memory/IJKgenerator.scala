@@ -53,6 +53,8 @@ class IJKgenerator extends Module {
   /** Iteration / colouring value */
   val iteration = RegInit(0.U(4.W))
 
+  val iterationNext = WireDefault(0.U(4.W))
+  /** Saved iteration value, used when restarting */
   val iterationSaved = RegInit(0.U(4.W))
   /** Whether the output is valid or not. When asserted, all i,j,k-values have been iterated through */
   val invalidFlag = WireDefault(false.B)
@@ -81,6 +83,7 @@ class IJKgenerator extends Module {
   iNext := i
   kNext := k
   jNext := Mux(invalidFlag, j, j + 2.U) //Once iter = 8, don't update j and other values
+  iterationNext := iteration
 
   when(jUpdate) {
     jNext := startVec(iteration)(1)
@@ -94,7 +97,7 @@ class IJKgenerator extends Module {
     iNext := startVec(iteration + 1.U)(0)
     jNext := startVec(iteration + 1.U)(1)
     kNext := startVec(iteration + 1.U)(2)
-    iteration := iteration + 1.U
+    iterationNext := iteration + 1.U
   }
   invalidFlag := iteration >= 8.U
 
@@ -117,6 +120,7 @@ class IJKgenerator extends Module {
     i := iNext
     j := jNext
     k := kNext
+    iteration := iterationNext
   }
 
   // --- OUTPUTS ---

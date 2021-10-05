@@ -22,8 +22,7 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
 
   val PC: UInt = RegInit(0.U(32.W))
   val PCnext: UInt = WireDefault(0.U(32.W))
-//  val imem: Mem[UInt] = Mem(memsize, UInt(INSTRUCTION_WIDTH.W))
-  val imem = SyncReadMem(memsize, UInt(INSTRUCTION_WIDTH.W))
+  val imem: SyncReadMem[UInt] = SyncReadMem(memsize, UInt(INSTRUCTION_WIDTH.W))
 
   val notFirstCycle = RegInit(false.B)
   notFirstCycle := true.B //Should always just go to 1 after first cc
@@ -44,13 +43,11 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
   if(SIMULATION) {
     require(memfile.nonEmpty, "Cannot simulate with empty memory init file")
     val src = Source.fromFile(memfile)
-    require(src.getLines().length <= memsize, s"Memory file (${src.getLines.length}) too large for memory size ($memsize)")
+    require(src.getLines.length <= memsize, s"Memory file (${src.getLines.length}) too large for memory size ($memsize)")
     src.close()
     loadMemoryFromFile(imem, memfile)
-  } else if (memfile.nonEmpty) {
-//    loadMemoryFromFileInline(imem, memfile)
-     loadMemoryFromFile(imem, memfile)
   }
+  if(INLINE) loadMemoryFromFileInline(imem, memfile) else loadMemoryFromFile(imem, memfile)
 
   io.id.instr := instr
   io.id.pc := PCnext

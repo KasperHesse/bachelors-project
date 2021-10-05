@@ -73,7 +73,7 @@ class VecMemoryFSM extends Module {
       when(io.threadState === sStore) {
         state := sOutput
         index := indexSaved
-        indexNext := index + (ELEMS_PER_VSLOT).U
+        indexNext := index + ELEMS_PER_VSLOT.U
       }.elsewhen(io.threadState === sLoad) {
         state := sOutput
         index := indexNext

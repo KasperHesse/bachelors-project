@@ -7,7 +7,7 @@ import utils.Fixed.{FIXED_WIDTH, FRAC_WIDTH, INT_WIDTH}
  * A general placeholder class, used for defining all constants used throughout the workflow
  */
 object Config {
-  //Configuration values
+  //Configuration values for arithmetic circuits
   /** What type of divisor to use if nothing is explicitly stated */
   val DIVTYPE = DivTypes.NEWTONRAPHSON
   /** What type of multiplier to use if nothing is explicitly stated when instantiating */
@@ -15,7 +15,7 @@ object Config {
   /** How many stages to use in Newton-Raphson divisors stage 3 */
   var NRDIV_STAGE3_REPS = 3
 
-  //Compile-time constant definitions
+  //Compile-time constants for the grid being operated upon
   /** Number of element in the x-direction */
   var NELX = 6
   /** Number of elements in the y-direction */
@@ -37,6 +37,7 @@ object Config {
   /** Total number of element DOF in the design domain */
   var NDOF = 3 * NX * NY * NZ
 
+  //Processing element and decode/execution logic configurations parameters
   /** Maximum number of instructions that may be in one instruction packet (including pstart, estart, eend and pend) */
   val INSTRUCTION_BUFFER_SIZE = 40
   /** The number of elements in the vector register file */
@@ -80,9 +81,15 @@ object Config {
   var MEM_ADDR_WIDTH = 32 //TODO set this based on x*NELEMSIZE + Y*NDOFSIZE and log2Ceil
   /** The number of different memory locations addressible from Stype instructions */
   val NUM_MEMORY_LOCS = 13
+  /** Number of data words stored in each memory bank */
+  val WORDS_PER_BANK: Int = (8*NDOFSIZE+5*NELEMSIZE)/8
 
   /** Simulation flag. Assert inside of a tester to use simulation-specific functionality */
   var SIMULATION = false
+
+  /** Controls whether the memories should be initialized using an inline statement (true, for synthesis)
+   * or out-of-line using a 'binds' statement (false, for simulation) */
+  var INLINE = false
 
   checkRequirements()
 
@@ -103,6 +110,7 @@ object Config {
     require(XREG_DEPTH >= 6, s"XREG_DEPTH must be greater than or equal to 6. Got $XREG_DEPTH")
     require(VREG_DEPTH % NUM_MEMORY_BANKS == 0, s"VREG_DEPTH($VREG_DEPTH) must be an integer multiple of NUM_MEMORY_BANKS($NUM_MEMORY_BANKS)")
     require(VREG_DEPTH == 24, s"VREG_DEPTH($VREG_DEPTH) must be exactly 24 to correctly perform DOF loads")
+    require(WORDS_PER_BANK == (8*NDOFSIZE+5*NELEMSIZE)/8, s"WORDS_PER_BANK must be exactly (8*NDOFDIZE+5*NELEMSIZE)/8 (${(8*NDOFSIZE+5*NELEMSIZE)/8}), was $WORDS_PER_BANK")
 
     require(NELX % 2 == 0, s"NELX($NELX) must be even")
     require(NELY % 2 == 0, s"NELY($NELY) must be even")

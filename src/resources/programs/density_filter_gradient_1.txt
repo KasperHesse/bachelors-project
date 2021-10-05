@@ -1,0 +1,53 @@
+//This performs the first of the densityFilterGradient function call
+//By first populating the design space and then calculating the value tmp[e1] = v[e1]/unityScale
+//populate design space
+//Volfrac = 0.2
+pstart nelemvec
+estart
+mul.sv v0, s0, v0 //Clear v0
+mul.sv v1, s0, v1 //Clear v1
+add.iv v0, v0, 0.2 //Set all elements in v0=0.2
+add.iv v1, v1, 1 //Set all elements in v1=1
+eend
+st.vec v0, X //Store v0 in X, all X-values=0.2
+st.vec v0, XPHYS //Store v0 in XPHYS, all XPHYS-values=0.2
+st.vec v1, DV //Store v1 in DV, all DV-values=1
+pend
+
+//Apply density filter gradient on DV
+//{
+    //For each element, calculate unityscale and scale the central element by this value. Store that value in tmp
+    //Unityscale is obtained by getting all neighbours, dividing by themselves to get 1, and then multiplying
+    //neighbours with their known, constant filterweight. Summing all filterweights gives unityscale
+    pstart double //Initial setup
+    estart
+    mul.sx x0, s0, x0 //clear x0
+    add.ix x0, x0, 1 //Set x0=1
+    eend
+    pend
+
+    pstart nelemstep //Step through all elements
+    ld.sel x1, DV //x1 = v[e1]
+    ld.fcn x2, DV //x2 = fcn[e1]
+    ld.edn1 x3, DV //x3 = edn1[e1]
+    ld.edn2 x4, DV //x4 = edn2[e1]
+    estart
+    add.ss s1, s0, s0 //Clear s1
+    div.xx x2, x2, x2 //x2 = x2/x2 (all non-zero elements become 1)
+    div.xx x3, x3, x3 //x3 = x3/x3
+    div.xx x4, x4, x4 //x4 = ones
+    mul.ix x2, x2, 0.5 //face neighbour weight = 0.5
+    mul.ix x3, x3, 0.08578 //Edge neighbour weight = 0.08578
+    mul.ix x4, x4, 0.08578 //edge neighbour weight = 0.08578
+    red.xx s1, x0, x2 //Sum all face neighbour weightings
+    red.xx s2, x0, x3 //Sum some edge neigbour weights
+    red.xx s3, x0, x4 //Sum remaining edge neighbour weights
+    add.ss s1, s1, s2 //Add partial sum
+    add.ss s1, s1, s3 //Add remaining edge neighbours
+    add.is s1, s1, 1.5 //Add central element weighting. s1 = unityscale
+    div.is s1, s1, 1   //s1 = 1/unityScale
+    mul.sx x1, s1, x1  //x1 = v[e1]/unityscale
+    eend
+    st.sel x1, TMP
+    pend
+//}

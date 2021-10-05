@@ -13,14 +13,14 @@ class TopLevelSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   behavior of "Top Level Module"
 
   def testFun(filename: String, cycles: Int = 999): Unit = {
-    val source = Source.fromFile(f"resources/$filename.txt")
-    Assembler.writeMemInitFile(f"resources/$filename.hex.txt", Assembler.assemble(source))
+    val source = Source.fromFile(f"src/resources/$filename.txt")
+    Assembler.writeMemInitFile(f"src/resources/$filename.hex.txt", Assembler.assemble(source))
     source.close()
     FIXED_WIDTH = 26
     INT_WIDTH = 10
     FRAC_WIDTH = 15
     SynthesisMemInit("src/resources/meminit")
-    test(new TopLevel(IMsize=128, IMinitFileLocation = f"resources/$filename.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+    test(new TopLevel(IMsize=128, IMinitFileLocation = f"resources/$filename.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")) {dut =>
       dut.clock.setTimeout(cycles+1)
       dut.clock.step(cycles)
     }

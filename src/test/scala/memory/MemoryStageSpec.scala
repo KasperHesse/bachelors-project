@@ -790,29 +790,4 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       (expDof, takeNth(rdDof, 3)).zipped.foreach((e, r) => waitAndExpect(dut, e, r.rd))
     }
   }
-
-
-  //Tests removed since this never should be the case, that we perform ld.vec and ld.dof in the same instruction
-//
-//  it should "perform ld.dof followed by ld.vec" in {
-//    simulationConfig(true)
-//    initMemory()
-//    seed("Memory stage ld.dof and ld.vec")
-//    test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
-//      dut.clock.setTimeout(20)
-//      performLdDof(dut, pad=false)
-//      performLdVec(dut)
-//    }
-//  }
-//
-//  it should "perform ld.vec followed by ld.dof" in {
-//    simulationConfig(true)
-//    initMemory()
-//    seed("Memory stage ld.dof and ld.vec")
-//    test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
-//      dut.clock.setTimeout(20)
-//      performLdVec(dut)
-//      performLdDof(dut, pad=false)
-//    }
-//  }
 }

@@ -1,0 +1,37 @@
+//Only one iteration of preconditionDampedJacobi is used here
+//The first half of preconditionDampedJacobi is just a call to applYStateOperator, which has been verified to work
+//Thus, we are only checking the final loop where the values of u (actually Z) are updated
+
+pstart double
+estart
+mul.sv v3, s0, v3 //v3 = 0
+add.iv v0, v3, 2 //v0 = 2
+add.iv v1, v3, 2.5 //v1 = 2.5
+add.iv v2, v3, 5.2 //v2 = 5.2
+eend
+pend
+
+//Store those values
+pstart nelemvec
+estart
+eend
+st.vec v0, R
+st.vec v1, TMP
+st.vec v2, INVD
+st.vec v3, Z
+pend
+
+//Update values of u
+pstart nelemvec
+ld.vec v0, R
+ld.vec v1, TMP
+ld.vec v2, INVD
+ld.vec v3, Z
+estart
+sub.vv v0, v0, v1 //v0 = b(R)[i]- tmp[i]
+mul.vv v0, v0, v2 //v0 = invD[i]*(b[i]-tmp[i])
+mul.iv v0, v0, 0.6 //v0 = omega*invD[i]*(b[i]-tmp[i])
+add.vv v0, v0, v3 //v0 = u(Z)[i] += omega*invD[i]*(F[i]-tmp[i])
+eend
+st.vec v0, Z
+pend

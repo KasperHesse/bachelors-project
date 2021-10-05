@@ -4,6 +4,7 @@ import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
+import common.{InstructionBuffer, fillInstructionBuffer}
 import execution.BranchComp._
 import execution.Opcode.{ADD, MAC, MUL, SUB}
 import execution._
@@ -47,36 +48,36 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   }
 
   /**
-   * Sets all global variables.
+   * Sets all global variables in the simulation
    * This includes references to the testers's [[sReg]], [[xReg]] and [[vReg]] variables
-   * @param dut the DUT
+   * @param decode Decode stage of the DUT
    */
-  def setGlobals(dut: ExecutePipeline): Unit = {
-    sReg = dut.decode.sRegFile.arr
-    xReg = Array(dut.decode.threads(0).xRegFile.arr, dut.decode.threads(1).xRegFile.arr)
-    vReg = Array(dut.decode.threads(0).vRegFile.arr, dut.decode.threads(1).vRegFile.arr)
+  def setGlobals(decode: Decode): Unit = {
+    sReg = decode.sRegFile.arr
+    xReg = Array(decode.threads(0).xRegFile.arr, decode.threads(1).xRegFile.arr)
+    vReg = Array(decode.threads(0).vRegFile.arr, decode.threads(1).vRegFile.arr)
     execThread = 0
     memThread = 1
   }
 
-  /**
-   * Verifies that the branch outcome of the DUT matches the simulation's expected branch outcome
-   * @param dut The DUT
-   * @param instr The branch instruction being evaluated
-   */
-  def verifyBranchOutcome(dut: ExecutePipeline, instr: BtypeInstruction): Unit = {
-    val a = sReg(instr.rs1.litValue.toInt)
-    val b = sReg(instr.rs2.litValue.toInt)
-    val comp = instr.comp
-    val branch = branchOutcome(a, b, comp)
-    dut.clock.step() //Branch outcomes are evaluated on next clock cycle
-    dut.io.idctrl.branch.expect(branch.B)
-    dut.clock.step() //Another cc for next instruction be present
+    /**
+     * Verifies that the branch outcome of the DUT matches the simulation's expected branch outcome
+     * @param idctrl Interface between instruction decode and control stage
+     * @param clock DUT clock
+     * @param instr The branch instruction being evaluated
+     */
+    def verifyBranchOutcome(idctrl: IdControlIO, clock: Clock, instr: BtypeInstruction): Unit = {
+      val a = sReg(instr.rs1.litValue.toInt)
+      val b = sReg(instr.rs2.litValue.toInt)
+      val comp = instr.comp
+      val branch = branchOutcome(a, b, comp)
+      clock.step() //Branch outcomes are evaluated on next clock cycle
+      idctrl.branch.expect(branch.B)
+      clock.step() //Another cc for next instruction be present
+    }
 
-  }
-
   /**
-   * Finalizes the operation performed in the MAC-units of the pipeline by performing a sum-reduction
+   * Finalizes a sum-reduction operation by summing all values in MACresults, and storing the summed result in all elements of results
    */
   def calculateReducedResult(results: Array[SInt], MACresults: Array[SInt]): Unit = {
     var temp = 0.S(FIXED_WIDTH.W)
@@ -90,54 +91,31 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   }
 
   /**
-   * Expects the output of an instruction going into vector register file
-   * @param dut The DUT
+   * Expects the output of an instruction going into the vector register file
+   * @param wbout Interface between execute writeback and decode stage
    * @param results Result buffer
    * @param instr The instrution to check against
    */
-  def expectVREG(dut: ExecutePipeline, instr: RtypeInstruction, results: Array[SInt]): Unit = {
+  def expectVREG(wbout: WbIdIO, instr: RtypeInstruction, results: Array[SInt]): Unit = {
     val mod = instr.mod.litValue
     if(instr.op.litValue() == MAC.litValue && mod == RtypeMod.KV.litValue) {
-      calculateKVresult(instr, results, dut.io.wbout.rd.reg.peek, vReg(execThread))
+      calculateKVresult(instr, results, wbout.rd.reg.peek, vReg(execThread))
     } else if(mod == RtypeMod.VV.litValue) {
-      calculateVVresult(instr, results, dut.io.wbout.rd.reg.peek, vReg(execThread))
+      calculateVVresult(instr, results, wbout.rd.reg.peek, vReg(execThread))
     } else if (mod == RtypeMod.XV.litValue) {
-      calculateXVresult(instr, results, dut.io.wbout.rd.reg.peek, xReg(execThread), vReg(execThread))
+      calculateXVresult(instr, results, wbout.rd.reg.peek, xReg(execThread), vReg(execThread))
     } else if (mod == RtypeMod.SV.litValue) {
-      calculateSVresult(instr, results, dut.io.wbout.rd.reg.peek, sReg, vReg(execThread))
+      calculateSVresult(instr, results, wbout.rd.reg.peek, sReg, vReg(execThread))
     } else {
       throw new IllegalArgumentException("Unknown Rtype modifier")
     }
-    dut.io.wbout.rd.rf.expect(RegisterFileType.VREG)
-    assertEquals(dut.io.wbout.wrData(0).peek, results(0))
+    wbout.rd.rf.expect(RegisterFileType.VREG)
+    assertEquals(wbout.wrData(0).peek, results(0))
     for(i <- 0 until VREG_DEPTH) {
-      results(i) = dut.io.wbout.wrData(i).peek //to avoid any incremental changes
+      results(i) = wbout.wrData(i).peek //to avoid any incremental changes we store the calculated values
     }
   }
 
-  /**
-   * Expects the output of an instruction going into x-vector register file
-   * @param dut The DUT
-   * @param results Result buffer
-   * @param instr The instrution to check against
-   */
-  def expectXREG(dut: ExecutePipeline, instr: RtypeInstruction, results: Array[SInt]): Unit = {
-    if(instr.mod.litValue == RtypeMod.SX.litValue) {
-      calculateSXresult(instr, results, sReg, xReg(execThread))
-    } else if (instr.mod.litValue == RtypeMod.XX.litValue) {
-      calculateXXresult(instr, results, xReg(execThread))
-    } else {
-      throw new IllegalArgumentException("Cannot decode modtype with result being xreg")
-    }
-
-    dut.io.wbout.rd.rf.expect(RegisterFileType.XREG)
-    dut.io.wbout.rd.subvec.expect(0.U)
-    assertEquals(dut.io.wbout.wrData(0).peek, results(0))
-    for (i <- 0 until NUM_PROCELEM) {
-      results(i) = dut.io.wbout.wrData(i).peek
-    }
-    dut.io.wbout.wrData(NUM_PROCELEM).expect(0.S)
-  }
 
   /**
    * Expects the output of an instruction going into x-vector register file
@@ -166,11 +144,11 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
 
   /**
    * Expects the output of an instruction going into scalar register file
-   * @param dut The DUT
+   * @param wbout The Writeback-Instruction Decode port of the module
    * @param results Result buffer
    * @param instr The instrution to check against
    */
-  def expectSREG(dut: ExecutePipeline, instr: RtypeInstruction, results: Array[SInt], MACresults: Array[SInt]): Unit = {
+  def expectSREG(wbout: WbIdIO, instr: RtypeInstruction, results: Array[SInt], MACresults: Array[SInt]): Unit = {
     val mod = instr.mod.litValue
     if(mod == RtypeMod.SS.litValue) {
       calculateSSresult(instr, results, sReg)
@@ -183,47 +161,48 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     } else {
       throw new IllegalArgumentException("R-type mod not recognized")
     }
-    dut.io.wbout.rd.rf.expect(RegisterFileType.SREG)
-    dut.io.wbout.rd.reg.expect(instr.rd)
-    dut.io.wbout.rd.subvec.expect(0.U)
-    assertEquals(dut.io.wbout.wrData(0).peek, results(0))
+    wbout.rd.rf.expect(RegisterFileType.SREG)
+    wbout.rd.reg.expect(instr.rd)
+    wbout.rd.subvec.expect(0.U)
+    assertEquals(wbout.wrData(0).peek, results(0))
     for(i <- 0 until NUM_PROCELEM) {
-      results(i) = dut.io.wbout.wrData(i).peek
+      results(i) = wbout.wrData(i).peek
     }
-    dut.io.wbout.wrData(NUM_PROCELEM).expect(0.S)
+    wbout.wrData(NUM_PROCELEM).expect(0.S)
   }
 
   /**
    * Checks whether the result returned by the writeback module matches our expectations.
    * Updates the register files in the DUT with all new values
-   * @param dut The DUT
+   * @param wbout The output of the execute writeback stage
+   * @param idout Output of the instruction decode stage
    * @param results Result buffer
    * @param MACresults Result buffer for MAC instructions
    * @param instr Instruction to expect the output of
    */
-  def expectAndUpdate(dut: ExecutePipeline, results: Array[SInt], MACresults: Array[SInt], instr: RtypeInstruction): Unit = {
+  def expectAndUpdate(wbout: WbIdIO, idout: IdExIO, clock: Clock, results: Array[SInt], MACresults: Array[SInt], instr: RtypeInstruction): Unit = {
     import RegisterFileType._
     val rf = getResultRegisterType(instr).litValue
     if(rf == VREG.litValue) {
       //KV, VV, XV and SV-instructions generate multiple results. We need to observe all of those results
       for(i <- 0 until VREG_SLOT_WIDTH) {
-        while(!dut.io.wbout.we.peek.litToBoolean) {
+        while(!wbout.we.peek.litToBoolean) {
           //We still need to perform MAC instructions bookkeeping
-          dut.clock.step()
-          handleMACSVandMACVV(dut, MACresults)
+          clock.step()
+          handleMACSVandMACVV(idout, MACresults)
         }
-        expectVREG(dut, instr, results)
-        updateVREG(instr, results, dut.io.wbout.rd.reg.peek, vReg(execThread))
+        expectVREG(wbout, instr, results)
+        updateVREG(instr, results, wbout.rd.reg.peek, vReg(execThread))
         if (i < VREG_SLOT_WIDTH-1) {
-          dut.clock.step()
-          handleMACSVandMACVV(dut, MACresults)
+          clock.step()
+          handleMACSVandMACVV(idout, MACresults)
         } //Don't step after final result, this happens in testFun()
       }
     } else if (rf == XREG.litValue) {
-      expectXREG(dut, instr, results)
+      expectXREG(wbout, instr, results)
       updateXREG(instr, results, xReg(execThread))
     } else if (rf == SREG.litValue) {
-      expectSREG(dut, instr, results, MACresults)
+      expectSREG(wbout, instr, results, MACresults)
       updateSREG(instr, results, sReg)
     } else {
       throw new IllegalArgumentException("Unknown register file type")
@@ -233,13 +212,13 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   /**
    * Performs bookkeeping when operating MAC instructions by storing the intermediate MAC results in a buffer
    * until they are used
-   * @param dut The DUT
+   * @param idout Interface between Decode and Execute stages
    * @param MACresults The buffer storing MAC calculations until the result is presented
    */
-  def handleMACSVandMACVV(dut: ExecutePipeline, MACresults: Array[SInt]): Unit = {
-    val isMACinstruction = dut.io.idout.valid.peek().litToBoolean &&
-      dut.io.idout.opUInt.peek.litValue == Opcode.MAC.litValue() &&
-      dut.io.idout.dest.rfUint.peek.litValue == RegisterFileType.SREG.litValue
+  def handleMACSVandMACVV(idout: IdExIO, MACresults: Array[SInt]): Unit = {
+    val isMACinstruction = idout.valid.peek().litToBoolean &&
+      idout.opUInt.peek.litValue == Opcode.MAC.litValue() &&
+      idout.dest.rfUint.peek.litValue == RegisterFileType.SREG.litValue
     val macLimit = ELEMS_PER_VSLOT / NUM_PROCELEM //Number of elements added to each result register on each MAC iteration
     /*
       When a mac is noticed on the output, the actual values arrive one clock cycle later since the reg file is a syncreadmem
@@ -250,8 +229,8 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
      */
     if((isMACinstruction && !firstMAC) || (0 < macCnt && macCnt < macLimit)) {
       for(i <- 0 until NUM_PROCELEM) {
-        val a = dut.io.idout.a(i).peek
-        val b = if(dut.io.idout.useImm.peek.litToBoolean) dut.io.idout.imm.peek else dut.io.idout.b(i).peek
+        val a = idout.a(i).peek
+        val b = if(idout.useImm.peek.litToBoolean) idout.imm.peek else idout.b(i).peek
         MACresults(i) = fixedAdd(MACresults(i), fixedMul(a,b))
       }
       macCnt += 1
@@ -265,10 +244,12 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
 
   /**
    * Handles all execution logic, such as expecting outputs and updating register files in simulation
-   * @param dut the DUT
+   * @param wbout Interface between execute writeback and decode stage
+   * @param idout Interface between instruction decode and execute stages
+   * @param clock DUT clock
    * @param iBuffer The instruction buffer being operated on
    */
-  def performExecution(dut: ExecutePipeline, iBuffer: InstructionBuffer): Unit = {
+  def performExecution(wbout: WbIdIO, idout: IdExIO, clock: Clock, iBuffer: InstructionBuffer): Unit = {
     import OtypeLen._
 
     var maxProgress = 0   //How many elements total should be processed
@@ -294,8 +275,8 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     //We need a special check to ensure correct functionality if only instruction is of type mac.vv/mac.sv
     if(iBuffer.exec.length == 1 && iBuffer.exec(0).op.litValue == MAC.litValue &&
       (iBuffer.exec(0).mod.litValue == RtypeMod.SV.litValue || iBuffer.exec(0).mod.litValue() == RtypeMod.VV.litValue)) {
-        maxProgress = 1
-        progressIncr = 1
+      maxProgress = 1
+      progressIncr = 1
     }
 
     val results = Array.fill(VREG_DEPTH)(0.S(FIXED_WIDTH.W))
@@ -305,18 +286,18 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       while(instrCnt < iBuffer.exec.length) {
         //Wait until something is presented on decode stage output.
         //If that is a mac.vv or mac.sv instruction, add to temporary result buffer
-        handleMACSVandMACVV(dut, MACresults)
+        handleMACSVandMACVV(idout, MACresults)
 
         //When things are presented on writeback output, write back into register file
-        if(dut.io.wbout.we.peek().litToBoolean) {
+        if(wbout.we.peek().litToBoolean) {
           //MAC.VV, MAC.SV instructions only output on the final cycle of that packet. Skip them while working towards the final outputs
           if(iBuffer.exec(instrCnt).op.litValue == MAC.litValue && getResultRegisterType(iBuffer.exec(instrCnt)).litValue == RegisterFileType.SREG.litValue && progress != (maxProgress-progressIncr)) {
             instrCnt += 1
           }
-          expectAndUpdate(dut, results, MACresults, iBuffer.exec(instrCnt))
+          expectAndUpdate(wbout, idout, clock, results, MACresults, iBuffer.exec(instrCnt))
           instrCnt += 1
         }
-        dut.clock.step()
+        clock.step()
       }
       progress += progressIncr
       //Swap executable and memory threads
@@ -328,65 +309,66 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     execThread = 0
     memThread = 1
   }
-
-  /**
-   * Fills the instruction buffer with all instructions in the current instruction packet
-   * @param dut The DUT
-   * @param iBuffer The instruction buffer to be filled
-   */
-  def fillInstructionBuffer(dut: ExecutePipeline, iBuffer: InstructionBuffer): Unit = {
-    var i = 1
-    var instr: UInt = 0.U //Default value
-    var fmt: InstructionFMT.Type = InstructionFMT.RTYPE //Default value
-    do {
-      instr = dut.io.idctrl.instr.peek
-//      instr = dut.io.
-      fmt = InstructionFMT(instr(7, 6).litValue.toInt)
-      if (fmt.litValue == InstructionFMT.OTYPE.litValue) {
-        //Do nothing
-      } else if (fmt.litValue == InstructionFMT.RTYPE.litValue()) {
-        iBuffer.exec += RtypeInstruction(instr)
-      } else if (fmt.litValue == InstructionFMT.STYPE.litValue()) {
-        iBuffer.store += StypeInstruction(instr)
-      } else {
-        throw new IllegalArgumentException("Unable to decode format")
-      }
-      i += 1
-      dut.clock.step()
-      //Continue until we get iend instruction
-    } while(instr.litValue != OtypeInstruction(OtypeSE.END, OtypeMod.PACKET).toUInt().litValue())
-  }
+//
+//  /**
+//   * Fills the instruction buffer with all instructions in the current instruction packet
+//   * @param idctrl Interface between instruction decode and control stages
+//   * @param clock DUT clock
+//   * @param iBuffer The instruction buffer to be filled
+//   */
+//  def fillInstructionBuffer(idctrl: IdControlIO, clock: Clock, iBuffer: InstructionBuffer): Unit = {
+//    var i = 1
+//    var instr: UInt = 0.U //Default value
+//    var fmt: InstructionFMT.Type = InstructionFMT.RTYPE //Default value
+//
+//    iBuffer.load.clear()
+//    iBuffer.exec.clear()
+//    iBuffer.store.clear()
+//    do {
+//      instr = idctrl.instr.peek
+//      fmt = InstructionFMT(instr(7, 6).litValue.toInt)
+//      if (fmt.litValue == InstructionFMT.OTYPE.litValue) {
+//        //Do nothing
+//      } else if (fmt.litValue == InstructionFMT.RTYPE.litValue()) {
+//        iBuffer.exec += RtypeInstruction(instr)
+//      } else if (fmt.litValue == InstructionFMT.STYPE.litValue()) {
+//        iBuffer.store += StypeInstruction(instr)
+//      } else {
+//        throw new IllegalArgumentException("Unable to decode format")
+//      }
+//      i += 1
+//      clock.step()
+//      //Continue until we get iend instruction
+//    } while(instr.litValue != OtypeInstruction(OtypeSE.END, OtypeMod.PACKET).toUInt().litValue())
+//  }
 
   /**
    * Main testing function for the execute pipeline tester. Performs global variables setup
    * @param dut the DUT
    */
   def testFun(dut: ExecutePipeline): Unit = {
-    setGlobals(dut)
+    setGlobals(dut.decode)
     dut.clock.step() //1 cycle to get instruction into decode stage
     assert(dut.io.idctrl.instr.peek.litValue != 0, "Peeked instruction with value 0, did not init memory correctly")
-    while(dut.io.idctrl.instr.peek().litValue != 0) {
+    while (dut.io.idctrl.instr.peek().litValue != 0) {
       //Always snoop on instruction at decode stage
       val instr = dut.io.idctrl.instr.peek()
-      val fmt = InstructionFMT(instr(7,6).litValue.toInt)
+      val fmt = InstructionFMT(instr(7, 6).litValue.toInt)
 
       if (fmt.litValue == InstructionFMT.BTYPE.litValue) {
-        verifyBranchOutcome(dut, BtypeInstruction(instr))
+        verifyBranchOutcome(dut.io.idctrl, dut.clock, BtypeInstruction(instr))
       } else if (fmt.litValue == InstructionFMT.OTYPE.litValue) { //Executable packet
         val iBuffer = new InstructionBuffer
         iBuffer.pstart = OtypeInstruction(instr)
-        fillInstructionBuffer(dut, iBuffer)
-        performExecution(dut, iBuffer)
+        fillInstructionBuffer(dut.io.idctrl, dut.clock, iBuffer)
+        performExecution(dut.io.wbout, dut.io.idout, dut.clock, iBuffer)
         //Wait until all threads are idle
-        while(dut.io.idctrl.stateUint.peek.litValue != DecodeState.sIdle.litValue()) {
+        while (dut.io.idctrl.stateUint.peek.litValue != DecodeState.sIdle.litValue()) {
           dut.clock.step()
         }
-
       }
     }
   }
-
-
 
   it should "execute simple instructions and branch" in {
     simulationConfig()
@@ -539,13 +521,6 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
       dut.clock.setTimeout(200)
       testFun(dut)
     }
-
   }
 }
 
-class InstructionBuffer {
-  var pstart: OtypeInstruction = new OtypeInstruction
-  val load = ListBuffer.empty[StypeInstruction]
-  val exec = ListBuffer.empty[RtypeInstruction]
-  val store = ListBuffer.empty[StypeInstruction]
-}

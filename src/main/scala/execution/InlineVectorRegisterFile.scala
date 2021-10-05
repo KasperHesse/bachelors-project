@@ -13,13 +13,13 @@ import java.io.{BufferedWriter, FileWriter}
 /**
  * A module representing a vector register file. This module generates the hardware "inline" (ie. not inside of an explicit module), to avoid some weird compilation issues in Quartus,
  * that arose when the [[VectorRegisterFile]] was used.
- * @param width The number of entries in the vector register file. If eg. width=32, then mem.length == 32
- * @param depth The number of values in each entry. If eg depth=16, then mem(0).length == 16
+ * @param width The number of entries in the vector register file.
+ * @param depth The number of values in each entry.
  * @param memInitFileLocation Location of a memory initialization file, if any. If this is given, the loadMemoryFromFile / loadMemoryFromFileInline annotation is used to generate a verilog $readmemh statement.
  *                            If [[utils.Config.SIMULATION]] is true, the non-inline version is used. false, the inlined version if used.
  */
 class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: String) {
-  val arr: Array[Array[SInt]] = Array.ofDim[SInt](width,depth)
+  val arr: Array[Array[SInt]] = Array.fill[SInt](width, depth)(0.S(FIXED_WIDTH.W))
 
   //Creating 'depth' arrays, each of which holds 'width' SInts. When performing a read/write to an address,
   //the n'th value of each of the 'depth' memories is output. This removes the need for any switching logic
@@ -81,8 +81,12 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
     }
   }
 
-  if(SIMULATION) {
+  if(INLINE) {
     for (d <- 0 until depth) {
+      loadMemoryFromFileInline(mem(d), s"${memInitFileLocation}_$d.hex.txt")
+    }
+  } else {
+    for(d <- 0 until depth) {
       loadMemoryFromFile(mem(d), s"${memInitFileLocation}_$d.hex.txt")
     }
   }

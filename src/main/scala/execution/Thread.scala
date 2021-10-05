@@ -118,7 +118,7 @@ class Thread(id: Int) extends Module {
     1.U, //len is invalid
     ELEMS_PER_VSLOT.U, //len == SINGLE
     (2*ELEMS_PER_VSLOT).U, //len == DOUBLE
-    NELEMSIZE.U, //len == NELEM
+    NELEMSIZE.U, //len == NELEMVEC
     0.U,
     0.U,
     0.U
@@ -450,7 +450,7 @@ class Thread(id: Int) extends Module {
       }
 
       is(RtypeMod.KV) {
-        macLimit := KE_SIZE.U //These instructions must override macLimit
+//        macLimit := KE_SIZE.U //These instructions must override macLimit
         dest.reg := v_rd
         dest.subvec := Y
         dest.rf := VREG
@@ -479,9 +479,6 @@ class Thread(id: Int) extends Module {
       is(RtypeMod.VV) {
         a := a_subvec(RegNext(X))
         b := b_subvec(RegNext(X))
-        when(op === RED) {
-          macLimit := (VREG_DEPTH/NUM_PROCELEM).U
-        }
       }
       is(RtypeMod.XV) {
         for (i <- 0 until NUM_PROCELEM) {
@@ -498,9 +495,6 @@ class Thread(id: Int) extends Module {
       is(RtypeMod.XX) {
         a := xRegRdData1
         b := xRegRdData2
-        when(op === RED) {
-          macLimit := 1.U
-        }
       }
       is(RtypeMod.SX) {
         for(i <- 0 until NUM_PROCELEM) {
@@ -547,7 +541,7 @@ class Thread(id: Int) extends Module {
         wrData := wrData_subvec(RegNext(memAccess.io.subvec))
       }
       is(StypeMod.SEL) {
-        wrData(0) := xRegRdData1(0)
+        wrData := VecInit(Seq.fill(NUM_MEMORY_BANKS)(xRegRdData1(0)))
       }
       is(StypeMod.ELEM) {
         wrData(0) := xRegRdData1(RegNext(memAccess.io.subvec))

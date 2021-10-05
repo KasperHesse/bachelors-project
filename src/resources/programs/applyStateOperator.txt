@@ -1,6 +1,7 @@
 //Apply state operator with xphys as densities, U as input values and R as output
+
 //Setup constant values
-pstart single
+pstart double
 estart
 add.is s1, s0, 0.0078125
 mul.ss s1, s1, s1 // s2 =6.1e-5
@@ -19,6 +20,19 @@ eend
 st.vec v0, R
 pend
 
+//Load bogus values into U, R to verify simulation data
+pstart single
+estart
+mul.sx x0, s0, x0 //Clear x0
+add.ix x0, x0, 2 //xphys = 2
+add.iv v1, v0, 3 //u = 3
+add.iv v2, v0, 4 //r = 4
+eend
+st.elem x0, XPHYS
+st.dof v1, U
+st.dof v2, R
+pend
+
 pstart nelemdof //Loop over elements and perform applystateoperator
 ld.dof v0, U
 ld.dof v1, R
@@ -27,12 +41,12 @@ estart
 mul.xx x1, x0, x0 //x0 = pow(x,2)
 mul.xx x1, x1, x0 //x1 = pow(x,3)
 mul.sx x1, s1, x1 //x1 = pow(x,3)*(e0-emin)
-add.sx x1, s2, x1 //x1 = emin+pow(x,3)*(e0-emin)
+add.sx x1, s2, x1 //x1 = emin+pow(x,3)*(e0-emin) = elementScale
 mul.xv v2, x1, v0 //v2 = u_local*elementScale
 mac.kv v2, v2 //ke*(u_local*elementScale)
 add.vv v2, v2, v1 //out[edof[i]] += out_local[i]
 eend
 st.dof v2, R
-st.fdof v0, R //Storing fixed DOFs with input values from U
+st.fdof v0, R //Overwriting the fixed DOFs of R with input values from U
 pend
-//End of apply state
+//End of apply state 

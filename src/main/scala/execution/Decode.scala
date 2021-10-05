@@ -76,18 +76,18 @@ class Decode extends Module {
   //When performing NDOF loads, we access VREG_DEPTH*VREG_SLOT_WIDTH elements per thread.
   //When performing i,j,k-based loads, we only load VREG_SLOT_WIDTH elements per thread.
   /** LUT to decode instruction lengths given in pstart */
-  val lenDecode = VecInit(Array(
+  val lenDecode: Vec[UInt] = VecInit(Array(
     NDOFLENGTH.U, //len == NDOF
     1.U, //Len is invalid
     1.U, //len == SINGLE
     2.U, //len == DOUBLE
-    leastMultiple(ELEMS_PER_VSLOT, NELEMSIZE).U, //len == NELEMVEC
+    NELEMLENGTH.U, //len == NELEMVEC
     leastMultiple(XREG_DEPTH, NELEM).U, //len == NELEMDOF
     NELEM.U, //len == NELEMSTEP
     1.U //len is invalid
   ))
   /** LUT mapping instruction length to progress increment */
-  val incrDecode = VecInit(Array(
+  val incrDecode: Vec[UInt] = VecInit(Array(
     ELEMS_PER_VSLOT.U, //len == NDOF
     1.U, //len is invalid
     1.U, //len == SINGLE
@@ -227,7 +227,7 @@ class Decode extends Module {
         iCount := IP
         start := true.B
 
-        maxProgress := lenDecode(instrLen.asUInt()) //TODO ugly code, introduce some kind of error checking here?
+        maxProgress := lenDecode(instrLen.asUInt())
         progressIncr := incrDecode(instrLen.asUInt())
         progress := 0.U
       }

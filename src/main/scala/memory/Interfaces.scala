@@ -76,7 +76,7 @@ class ReadQueueBundle extends Bundle {
   val rd = new RegisterBundle
   /** IJK generator iteration value. Used to access correct indices when executing ELEM, SEL, FCN and EDN1/2 operations */
   val iter = UInt(3.W)
-  /** S-type modifier of the load operation being performed, for controlling the internal state machine */
+  /** S-type modifier of the load operation being performed, for controlling the internal state machine of [[MemoryWriteback]] */
   val mod = StypeMod()
 }
 

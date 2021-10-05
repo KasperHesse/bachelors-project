@@ -39,6 +39,17 @@ object Fixed {
   }
 
   /**
+   * Parses a string containing a hexadecimal value, returning the fixed-point value that this string represents
+   * @param value A string containing a hexadecimal value
+   * @return
+   */
+  def string2fixed(value: String): SInt = {
+    val x = java.lang.Long.parseUnsignedLong(value, 16) & ((1L << FIXED_WIDTH) -1L)
+    val y = if (x >= Math.pow(2, FIXED_WIDTH-1).toLong) x - Math.pow(2, FIXED_WIDTH).toLong else x
+    y.S(FIXED_WIDTH.W)
+  }
+
+  /**
    * Converts a given fixed-point number (stored as an SInt) into the double which it represents
    * @param value The number to convert
    * @return A double with the value that the fixed-point number represents
