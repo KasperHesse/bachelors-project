@@ -79,16 +79,18 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
       }
       writer.close()
     }
+
+    if(INLINE) {
+      for (d <- 0 until depth) {
+        loadMemoryFromFileInline(mem(d), s"${memInitFileLocation}_$d.hex.txt")
+      }
+    } else {
+      for(d <- 0 until depth) {
+        loadMemoryFromFile(mem(d), s"${memInitFileLocation}_$d.hex.txt")
+      }
+    }
   }
 
-  if(INLINE) {
-    for (d <- 0 until depth) {
-      loadMemoryFromFileInline(mem(d), s"${memInitFileLocation}_$d.hex.txt")
-    }
-  } else {
-    for(d <- 0 until depth) {
-      loadMemoryFromFile(mem(d), s"${memInitFileLocation}_$d.hex.txt")
-    }
-  }
+
 
 }

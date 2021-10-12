@@ -468,11 +468,13 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
   /**
    * Main function for testing the top-level component
+   *
    * @param filename The program to execute
    * @param timeout The clock timeout value to be used
    * @param annos Annotations to pass to the tester
+   * @param dumpMemory Whether to dump all memory contents to csv files after simulation is finished
    */
-  def testFun(filename: String, timeout: Int = 500, annos: AnnotationSeq = Seq()): Unit = {
+  def testFun(filename: String, timeout: Int = 500, annos: AnnotationSeq = Seq(), dumpMemory: Boolean = false): Unit = {
     val source = Source.fromFile(f"src/resources/programs/$filename.txt")
     Assembler.writeMemInitFile(f"src/resources/programs/$filename.hex.txt", Assembler.assemble(source))
     source.close()
@@ -504,16 +506,32 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
           while(dut.io.idctrl.stateUint.peek.litValue() != DecodeState.sIdle.litValue()) {
             dut.clock.step()
           }
+          //Get console input, ask if we should dump contents or run the next N packets?
         }
       }
+      print(f"\n\nSimulation finished")
+      if(dumpMemory) dumpMemoryContents(filename, sc)
+
     }
   }
 
   it should "execute a simple program" in {
-    testFun("simple")
+    testFun("simple", dumpMemory = true)
   }
 
   it should "perform applyStateOperator" in {
     testFun("applystateoperator", timeout=20000)
+  }
+
+  it should "perform applyDensityFilter" in {
+    testFun("applydensityfilter", timeout=30000)
+  }
+
+  it should "perform getComplianceAndSensitivity" in {
+    testFun("getComplianceAndSensitivity", 20000)
+  }
+
+  it should "perform generateMatrixDiagonal" in {
+    testFun("generateMatrixDiagonal")
   }
 }

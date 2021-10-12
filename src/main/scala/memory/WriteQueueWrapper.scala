@@ -13,7 +13,7 @@ class WriteQueueWrapperIO extends Bundle {
 /**
  * A wrapper / pre-stage before the write queue.
  * When performing st.sel and st.elem operations, the stored data should be moved to the correct output index,
- * based on the ijk iteration value that spawned them.
+ * based on the ijk iteration value that spawned them. This module reorders write data to the correct ijk iteration value
  */
 class WriteQueueWrapper extends Module {
   val io = IO(new WriteQueueWrapperIO)

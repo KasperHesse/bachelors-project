@@ -2,10 +2,12 @@ import chiseltest._
 import chisel3._
 import execution.Opcode.{MAC, RED}
 import execution._
+import memory.{AddressDecode, elementIndex, getEdof, iterationFromIJK}
 import utils.Config._
 import utils.Fixed._
 import org.scalatest.{FlatSpec, Matchers}
 
+import java.io.File
 import scala.collection.mutable.ListBuffer
 
 /**
@@ -67,10 +69,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       instr = idctrl.instr.peek
       fmt = InstructionFMT(instr(7, 6).litValue.toInt)
       if (fmt.litValue == InstructionFMT.OTYPE.litValue) {
-//        val o = OtypeInstruction(idctrl.instr.peek())
-//        if(o.mod.litValue() == OtypeMod.PACKET.litValue() && o.se.litValue() == OtypeSE.START.litValue()) {
-//          iBuffer.pstart = o
-//        }
+        //Do nothing
       } else if (fmt.litValue == InstructionFMT.RTYPE.litValue()) {
         iBuffer.exec += RtypeInstruction(instr)
       } else if (fmt.litValue == InstructionFMT.STYPE.litValue()) {
@@ -487,4 +486,262 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     if(rd != 0) { sReg(rd) = results(0) }
   }
 
+  /**
+   * Dumps the contents of all memory and registers to csv files for postprocessing
+   * @param testname The name of the test being run. Used to prepend an identifier to memory dumps
+   * @param sc The simulation container object used in the simulation being processed
+   */
+  def dumpMemoryContents(testname: String, sc: SimulationContainer): Unit = {
+    import java.io.{BufferedWriter, FileWriter}
+    import execution.StypeBaseAddress
+
+    def elementIndexCStyle(i: Int, j: Int, k: Int): Int = {
+      i * NELY * NELZ + k * NELY + j
+    }
+
+    def getEdofCStyle(i: Int, j: Int, k: Int): Array[Int] = {
+      val edof = Array.ofDim[Int](24)
+      val nx1 = i
+      val nx2 = i+1
+      val nz1 = k
+      val nz2 = k+1
+      val ny1 = j
+      val ny2 = j+1
+
+      val nIndex1 = nx1*NY*NZ + nz1*NY + ny2
+      val nIndex2 = nx2*NY*NZ + nz1*NY + ny2
+      val nIndex3 = nx2*NY*NZ + nz1*NY + ny1
+      val nIndex4 = nx1*NY*NZ + nz1*NY + ny1
+
+      val nIndex5 = nx1*NY*NZ + nz2*NY + ny2
+      val nIndex6 = nx2*NY*NZ + nz2*NY + ny2
+      val nIndex7 = nx2*NY*NZ + nz2*NY + ny1
+      val nIndex8 = nx1*NY*NZ + nz2*NY + ny1
+
+      //x,y+1,z
+      edof(0) = 3*nIndex1 + 0
+      edof(1) = 3*nIndex1 + 1
+      edof(2) = 3*nIndex1 + 2
+
+      //x+1,y+1,z
+      edof(3) = 3*nIndex2 + 0
+      edof(4) = 3*nIndex2 + 1
+      edof(5) = 3*nIndex2 + 2
+
+      //x+1,y,z
+      edof(6) = 3*nIndex3 + 0
+      edof(7) = 3*nIndex3 + 1
+      edof(8) = 3*nIndex3 + 2
+
+      //x,y,z
+      edof(9) = 3*nIndex4 + 0
+      edof(10) = 3*nIndex4 + 1
+      edof(11) = 3*nIndex4 + 2
+
+      //x,y+1,z+1
+      edof(12) = 3*nIndex5 + 0
+      edof(13) = 3*nIndex5 + 1
+      edof(14) = 3*nIndex5 + 2
+
+      //x+1,y+1,z+1
+      edof(15) = 3*nIndex6 + 0
+      edof(16) = 3*nIndex6 + 1
+      edof(17) = 3*nIndex6 + 2
+
+      //x+1,y,z+1
+      edof(18) = 3*nIndex7 + 0
+      edof(19) = 3*nIndex7 + 1
+      edof(20) = 3*nIndex7 + 2
+
+      //x,y,z+1
+      edof(21) = 3*nIndex8 + 0
+      edof(22) = 3*nIndex8 + 1
+      edof(23) = 3*nIndex8 + 2
+
+      edof
+    }
+
+    def openFile(name: String, prefix: String): BufferedWriter = {
+      new BufferedWriter(new FileWriter(f"memdump/${testname}_${prefix}_$name.csv"))
+    }
+
+    def writeElemHeader(bw: BufferedWriter): Unit = {
+      bw.write("i,j,k,elementIndex_scala,elementIndex_c,value\n")
+    }
+
+    def writeElemLine(i: Int, j: Int, k: Int, baseAddress: StypeBaseAddress.Type, bw: BufferedWriter): Unit = {
+      val baseAddr = AddressDecode.mapping(baseAddress.litValue.toInt)
+      val addr = baseAddr + elementIndex(Array(i,j,k))
+      val bank = addr % NUM_MEMORY_BANKS
+      val index = addr >> 3
+      bw.write(f"$i," +
+        f"$j," +
+        f"$k," +
+        f"${elementIndex(Array(i,j,k))}," +
+        f"${elementIndexCStyle(i,j,k)}," +
+        f"${fixed2double(sc.mem(bank)(index))}%.10f\n")
+    }
+
+    def writeEdofHeader(bw: BufferedWriter): Unit = {
+      bw.write("i,j,k,edof_scala,edof_c,value\n")
+    }
+
+    def writeEdofLine(i: Int, j: Int, k: Int, edofC: Array[Int], edofScala: Array[Int], baseAddress: StypeBaseAddress.Type, bw: BufferedWriter): Unit = {
+      //Find the base address of the vector being accessed, and get the DOF's of the element,
+      //both in the C-code's version and accelerators version
+      val baseAddr = AddressDecode.mapping(baseAddress.litValue.toInt)
+
+      //Can now write edofs to file
+      for (iter <- edofC.indices) {
+        val addr = edofScala(iter) + baseAddr
+        val bank = addr % 8
+        val index = addr >> 3
+        val value = sc.mem(bank)(index)
+        bw.write(s"$i," +
+          s"$j," +
+          s"$k," +
+          s"${edofScala(iter)}," +
+          s"${edofC(iter)}," +
+          f"${fixed2double(value)}%.10f\n")
+      }
+    }
+
+    def dumpNelem(): Unit = {
+      //Start by dumping all NELEM long vectors
+      val X = openFile("X", "mem")
+      val XPHYS = openFile("XPHYS", "mem")
+      val XNEW = openFile("XNEW", "mem")
+      val DC = openFile("DC", "mem")
+      val DV = openFile("DV", "mem")
+      Seq(X, XPHYS, XNEW, DC, DV).foreach(writeElemHeader)
+
+      for(i <- 0 until NELX) {
+        for(k <- 0 until NELZ) {
+          for(j <- 0 until NELY) {
+            writeElemLine(i, j, k, StypeBaseAddress.X, X)
+            writeElemLine(i, j, k, StypeBaseAddress.XPHYS, XPHYS)
+            writeElemLine(i, j, k, StypeBaseAddress.XNEW, XNEW)
+            writeElemLine(i, j, k, StypeBaseAddress.DC, DC)
+            writeElemLine(i, j, k, StypeBaseAddress.DV, DV)
+          }
+        }
+      }
+      Seq(X, XPHYS, XNEW, DC, DV).foreach(_.close())
+    }
+
+    def dumpNdof(): Unit = {
+      val F = openFile("F", "mem")
+      val U = openFile("U", "mem")
+      val R = openFile("R", "mem")
+      val Z = openFile("Z", "mem")
+      val P = openFile("P", "mem")
+      val Q = openFile("Q", "mem")
+      val INVD = openFile("invD", "mem")
+      val TMP = openFile("TMP", "mem")
+      Seq(F, U, R, Z, P, Q, INVD, TMP).foreach(writeEdofHeader)
+
+      for(i <- 0 until NELX ) {
+        for(k <- 0 until NELZ ) {
+          for(j <- 0 until NELY) {
+            val edofC = getEdofCStyle(i, j, k)
+            //Loop through all elements in steps of 1. This causes the logfile to be larger than necessary,
+            // but simplifies the remaining logic
+
+            //Reordering scala EDOFs to be grouped in sets of 3 to match C-style EDOF layout
+            val edofScala = getEdof(i, j, k)
+            val edof: Array[Array[Int]] = Array.ofDim[Int](8, 3)
+            for (i <- edofScala.indices) {
+              edof(i % 8)(i / 8) = edofScala(i)
+            } //now, elements 0:2 in both edof arrays correspond to the x,y,z edofs of the same node
+
+            //To correctly map these, we must reorder the groups of elements in scala edofs
+            val finalEdof: Array[Int] = (iterationFromIJK(Array(i, j, k)) match {
+              case 0 => Array(edof(1), edof(5), edof(4), edof(0), edof(3), edof(7), edof(6), edof(2))
+              case 1 => Array(edof(0), edof(4), edof(5), edof(1), edof(2), edof(6), edof(7), edof(3))
+              case 2 => Array(edof(3), edof(7), edof(6), edof(2), edof(1), edof(5), edof(4), edof(0))
+              case 3 => Array(edof(2), edof(6), edof(7), edof(3), edof(0), edof(4), edof(5), edof(1))
+              case 4 => Array(edof(5), edof(1), edof(0), edof(4), edof(7), edof(3), edof(2), edof(6))
+              case 5 => Array(edof(4), edof(0), edof(1), edof(5), edof(6), edof(2), edof(3), edof(7))
+              case 6 => Array(edof(7), edof(3), edof(2), edof(6), edof(5), edof(1), edof(0), edof(4))
+              case 7 => Array(edof(6), edof(2), edof(3), edof(7), edof(4), edof(0), edof(1), edof(5))
+              case x => throw new IllegalArgumentException(s"Unable to reorder DOFs with iteration value $x")
+            }).flatten
+
+            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.F, F)
+            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.U, U)
+            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.R, R)
+            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.Z, Z)
+            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.P, P)
+            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.Q, Q)
+            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.INVD, INVD)
+            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.TMP, TMP)
+          }
+        }
+      }
+      Seq(F, U, R, Z, P, Q, INVD, TMP).foreach(_.close())
+    }
+
+    def writeRegisterHeader(num: Int, bw: BufferedWriter): Unit = {
+      bw.write(s"reg")
+      for(i <- 0 until num) { bw.write(s",$i") }
+      bw.write("\n")
+    }
+
+    def dumpRegisters(): Unit = {
+      //Dump vregs
+      val vreg0 = openFile("vreg0", "reg")
+      val vreg1 = openFile("vreg1", "reg")
+      writeRegisterHeader(VREG_DEPTH, vreg0)
+      writeRegisterHeader(VREG_DEPTH, vreg1)
+      for(i <- 0 until NUM_VREG) {
+        vreg0.write(s"$i (${i/VREG_SLOT_WIDTH}:${i%VREG_SLOT_WIDTH})")
+        vreg1.write(s"$i (${i/VREG_SLOT_WIDTH}:${i%VREG_SLOT_WIDTH})")
+        for(j <- 0 until VREG_DEPTH) {
+          vreg0.write(s",${fixed2double(sc.vReg(0)(i)(j))}")
+          vreg1.write(s",${fixed2double(sc.vReg(1)(i)(j))}")
+        }
+        vreg0.write("\n")
+        vreg1.write("\n")
+      }
+      vreg0.close()
+      vreg1.close()
+
+      //Dump xregs
+      val xreg0 = openFile("xreg0", "reg")
+      val xreg1 = openFile("xreg1", "reg")
+      writeRegisterHeader(XREG_DEPTH, xreg0)
+      writeRegisterHeader(XREG_DEPTH, xreg1)
+      for(i <- 0 until NUM_XREG) {
+        xreg0.write(s"$i")
+        xreg1.write(s"$i")
+        for(j <- 0 until XREG_DEPTH) {
+          xreg0.write(s",${fixed2double(sc.xReg(0)(i)(j))}")
+          xreg1.write(s",${fixed2double(sc.xReg(1)(i)(j))}")
+        }
+        xreg0.write("\n")
+        xreg1.write("\n")
+      }
+      xreg0.close()
+      xreg1.close()
+
+      //Dump sreg
+      val sreg = openFile("sreg", "reg")
+      writeRegisterHeader(NUM_SREG, sreg)
+      sreg.write("0")
+      for(i <- 0 until NUM_SREG) {
+        sreg.write(s",${fixed2double(sc.sReg(i))}")
+      }
+      sreg.write("\n")
+      sreg.close()
+    }
+
+    // Actual dumping happens here
+    val dir = new File(new File(s"memdump/$testname.txt").getParent)
+    if(!dir.exists) {
+      dir.mkdirs()
+    }
+    dumpNelem()
+    dumpNdof()
+    dumpRegisters()
+  }
 }

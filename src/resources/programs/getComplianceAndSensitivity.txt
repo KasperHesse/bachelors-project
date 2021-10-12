@@ -2,17 +2,16 @@
    pstart double
    estart
    mul.sv v0, s0, v0 //Clear v0
+   add.iv v1, v0, -1.25
    add.iv v0, v0, 2.5 //Set values in v0
-   add.ix x0, x0, -1.25 //Set values in x0/XPHYS
    eend
    st.vec v0, U
-   st.elem x0, XPHYS
+   st.vec v1, XPHYS
    pend
 
    //Compliance and sensitvity check
     //Working on xphys, U and dc
     //Setup constant values
-    {
         pstart single
         estart
         add.is s1, s0, 0.0078125
@@ -37,4 +36,3 @@
         eend
         st.elem x0, DC
         pend
-    }

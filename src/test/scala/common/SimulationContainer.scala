@@ -36,8 +36,8 @@ class SimulationContainer {
   var MAClength: Int = 0
   /** Base index for each thread used when executing ld.vec or st.vec operations */
   var vecBaseIndex: Array[Int] = Array.ofDim[Int](2)
-  /** Base IJK-tuple used when performing memory load/store operations. (0) */
-  val ijkBase: Array[Array[Int]] = Array.ofDim[Int](2,3)
+  /** Base IJK-tuples used when performing memory load/store operations. */
+  val ijkBase: Array[Array[Int]] = Array.ofDim[Int](2,4)
   /** ID of current thread with access to execute stage */
   var execThread: Int = 1
   /** ID of current thread with access to memory stage */
@@ -99,7 +99,7 @@ class SimulationContainer {
       progressIncr = ELEMS_PER_VSLOT
       MAClength = NELEMLENGTH
     } else if (iBuffer.pstart.len.litValue() == NELEMSTEP.litValue()) {
-      maxProgress = NELEMLENGTH
+      maxProgress = NELEM
       progressIncr = 1
       MAClength = 1
     } else if (iBuffer.pstart.len.litValue() == NDOF.litValue()) {
@@ -128,8 +128,8 @@ class SimulationContainer {
     this.signalRelease(1) = false
     this.vecBaseIndex(0) = 0
     this.vecBaseIndex(1) = 0
-    this.ijkBase(0) = Array(0,0,0)
-    this.ijkBase(1) = Array(0,0,0)
+    this.ijkBase(0) = Array(0,0,0,0)
+    this.ijkBase(1) = Array(0,0,0,0)
     this.threadsFinished = 0
     this.results = Array.fill(VREG_DEPTH)(0.S(FIXED_WIDTH.W))
     this.MACresults = Array.fill(NUM_PROCELEM)(0.S(FIXED_WIDTH.W))

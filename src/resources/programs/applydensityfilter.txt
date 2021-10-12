@@ -4,7 +4,7 @@ estart
 mul.sx x0, s0, x0 //Reset x0
 add.ix x0, x0, 1 //x0=1
 mul.sv v0, s0, v0 //Clear v0 //Not to be included in real program
-add.iv v0, v0, 0.75 //v1 = 1 //Not to be included in real program
+add.iv v0, v0, 0.75 //v0 = 0.75 //Not to be included in real program
 eend
 pend
 

@@ -1,5 +1,5 @@
 //Only one iteration of preconditionDampedJacobi is used here
-//The first half of preconditionDampedJacobi is just a call to applYStateOperator, which has been verified to work
+//The first half of preconditionDampedJacobi is just a call to applyStateOperator, which has been verified to work
 //Thus, we are only checking the final loop where the values of u (actually Z) are updated
 
 pstart double
