@@ -143,7 +143,7 @@ class SimulationContainer {
    */
   def signalSectionFinished(id: Int): Unit = {
     this.signals(id) = true
-    println(f"$id signalling, now ${signals.mkString("Array(", ", ", ")")}")
+//    println(f"$id signalling, now ${signals.mkString("Array(", ", ", ")")}")
     if(this.signals.reduce((a,b) => a & b)) { //And-reduce
       val temp = this.memThread
       this.memThread = this.execThread

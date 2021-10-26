@@ -26,23 +26,33 @@ object SynthesisMemInit {
     val fOffset = mapping(F.litValue.toInt) //F is the only vector to have values initialized at compile time
     val indexList = ListBuffer.empty[Int]
 
-    //For each value of ny with i=nelx-1 and k=0, calculate the bank indices.
-    //We take the bank indices at (16) and (18) to calculate the indices for z-direction DOF's in bank 0 and 2 (banks at i=nelx-1 and k=0)
+    //Original C-snippet is as follows
+    /*
+    for (int j = 0; j < ny; j++) {
+      const int i = nx - 1;
+      const int k = 0;
+      const uint_fast32_t nidx = i * ny * nz + k * ny + j;
+      F[3 * nidx + 2] = -1.0;
+    }
+     */
+    //This means that the <ny> z-directed dofs in the topmost layer, with k=0, should all have value -1 (downwards force)
+    //Due to our new EDOF mapping, we're finding the DOF's of all elements in top layer at k=0
+    //Since these DOF's are at z=0, x=nelx-1 and the DOF's are z-directed, they must be in DOF banks 0 and 1, meaning indices 16 and 17 of the new DOFs, since grid sizes are ALWAYS even
     val i = NELX-1
     val k = 0
     for(j <- 0 until NELY) {
       val edof = getEdof(i,j,k)
-      //We're only interested in the DOF's in z-direction, entries 16 and 18
+      //We're only interested in the DOF's in z-direction for banks 0 and 1, entries 16 and 17
       indexList += edof(16)
-      if(j != NELY-1) indexList += edof(18) //On the final iteration, the index for bank 2 is outside of the grid since grid size is always even
+      if(j != NELY-1) indexList += edof(17) //On the final iteration, the index for bank 1 is outside of the grid since grid size is always even
     }
-    val indices = indexList.distinct
+    val indices = indexList.distinct //Some of the values were previously overlapping, remove those
     //Set these values in memory
     val mem = Array.ofDim[Double](8,wordsPerBank)
     val addresses = indices.map(_+fOffset)
     for(addr <- addresses) {
-      val bank = addr & 0x7
-      val offset = addr/8
+      val bank = addr % NUM_MEMORY_BANKS
+      val offset = addr / NUM_MEMORY_BANKS
       mem(bank)(offset) = -1
     }
 
@@ -55,17 +65,18 @@ object SynthesisMemInit {
     wordsPerBank
   }
 
-
-
   /**
    * Compute the indices of the of the 24 degrees of freedom associated with the 8 corners of the element at (i,j,k) in the grid.
    *
-   * @param i Current iteration/coordinate in the x-direction
-   * @param j Current iteration/coordinate in the y-direction
-   * @param k Current iteration/coordinate in the z-direction
+   * @param i Current coordinate in the x-direction
+   * @param j Current coordinate in the y-direction
+   * @param k Current coordinate in the z-direction
    * @return An array of 24 integers holding the 24 DOF's of the specified element
    */
   def getEdof(i: Int, j: Int, k: Int): Array[Int] = {
+    if(i == -1 && j == -1 && k == -1) { //Shorthand for elements outside of grid
+      return Array.fill(24)(-1)
+    }
     require(0 <= i && i < NELX, "i must be in the range [0;NELX[")
     require(0 <= j && j < NELY, "j must be in the range [0;NELY[")
     require(0 <= k && k < NELZ, "k must be in the range [0;NELZ[")

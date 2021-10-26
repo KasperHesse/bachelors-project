@@ -61,24 +61,24 @@ class InlineVectorRegisterFile(width: Int, depth: Int, memInitFileLocation: Stri
   def initMemory(): Unit = {
     //Create memory inits
     //2D array, width*depth
-    val memArray = Array.ofDim[BigInt](depth, width)
-    for(d <- 0 until depth) {
-      for(w <- 0 until width) {
-        val v = double2fixed(w*depth+d)
-        arr(w)(d) = v.S(FIXED_WIDTH.W)
-        memArray(d)(w) = BigInt(v)
-      }
-    }
-
-    for(i <- 0 until depth) {
-      val mif = s"${memInitFileLocation}_$i.hex.txt"
-      val writer = new BufferedWriter(new FileWriter(mif))
-      for(v <- memArray(i)) {
-        v.toByteArray.foreach(b => writer.write(f"$b%02x"))
-        writer.write("\n")
-      }
-      writer.close()
-    }
+//    val memArray = Array.ofDim[BigInt](depth, width)
+//    for(d <- 0 until depth) {
+//      for(w <- 0 until width) {
+//        val v = double2fixed(w*depth+d)
+//        arr(w)(d) = v.S(FIXED_WIDTH.W)
+//        memArray(d)(w) = BigInt(v)
+//      }
+//    }
+//
+//    for(i <- 0 until depth) {
+//      val mif = s"${memInitFileLocation}_$i.hex.txt"
+//      val writer = new BufferedWriter(new FileWriter(mif))
+//      for(v <- memArray(i)) {
+//        v.toByteArray.foreach(b => writer.write(f"$b%02x"))
+//        writer.write("\n")
+//      }
+//      writer.close()
+//    }
 
     if(INLINE) {
       for (d <- 0 until depth) {

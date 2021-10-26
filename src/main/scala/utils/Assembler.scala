@@ -33,7 +33,7 @@ object Assembler {
   var code: ListBuffer[Long] = ListBuffer.empty[Long]
 
   val symbolRegex: Regex = "([\\w]+:)".r//Any characters, followed by a :
-  val functionRegex: Regex = "func (\\w+) *\\(((?:\\w+)(?: *, *\\w+)*)\\) *= *\\{\\s+([\\w.,\\s]*)[\\n\\r]+\\s*\\}".r
+  val functionRegex: Regex = "func (\\w+) *\\(((?:\\w+)(?: *, *\\w+)*)\\) *= *\\{\\s+([^}]*)[\\n\\r]+\\s*\\}".r
 
   /**
    * Resets the state of the assembler, resetting all member variables

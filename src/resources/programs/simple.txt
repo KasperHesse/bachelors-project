@@ -2,6 +2,7 @@
 pstart single
 estart
 add.iv v0, v0, 3
+add.ix x0, x0, 1.5
 eend
 st.dof v0, U
 st.vec v0, X

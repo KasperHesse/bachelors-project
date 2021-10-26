@@ -8,7 +8,7 @@ import utils.Fixed._
 import org.scalatest.{FlatSpec, Matchers}
 
 import java.io.File
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
 /**
  * A helper class containing a number of commonly used functions shared across multiple simulations
@@ -488,12 +488,18 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
 
   /**
    * Dumps the contents of all memory and registers to csv files for postprocessing
-   * @param testname The name of the test being run. Used to prepend an identifier to memory dumps
+   * @param testName The name of the test being run. Used to prepend an identifier to memory dumps
    * @param sc The simulation container object used in the simulation being processed
    */
-  def dumpMemoryContents(testname: String, sc: SimulationContainer): Unit = {
+  def dumpMemoryContents(testName: String, sc: SimulationContainer): Unit = {
     import java.io.{BufferedWriter, FileWriter}
     import execution.StypeBaseAddress
+
+    case class edofLine(i: Int, j: Int, k: Int, scala: Int, c: Int, value: Double) {
+      override def toString: String = f"$i,$j,$k,$scala,$c,$value%.10f"
+    }
+
+    val currentTime = System.currentTimeMillis().toHexString.reverse.substring(0,6)
 
     def elementIndexCStyle(i: Int, j: Int, k: Int): Int = {
       i * NELY * NELZ + k * NELY + j
@@ -562,7 +568,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     }
 
     def openFile(name: String, prefix: String): BufferedWriter = {
-      new BufferedWriter(new FileWriter(f"memdump/${testname}_${prefix}_$name.csv"))
+      new BufferedWriter(new FileWriter(f"memdump/$testName/$currentTime/${prefix}_$name.csv"))
     }
 
     def writeElemHeader(bw: BufferedWriter): Unit = {
@@ -586,9 +592,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       bw.write("i,j,k,edof_scala,edof_c,value\n")
     }
 
-    def writeEdofLine(i: Int, j: Int, k: Int, edofC: Array[Int], edofScala: Array[Int], baseAddress: StypeBaseAddress.Type, bw: BufferedWriter): Unit = {
-      //Find the base address of the vector being accessed, and get the DOF's of the element,
-      //both in the C-code's version and accelerators version
+    def fillEdofBuffer(i: Int, j: Int, k: Int, edofC: Array[Int], edofScala: Array[Int], baseAddress: StypeBaseAddress.Type, buf: ArrayBuffer[edofLine]): Unit = {
       val baseAddr = AddressDecode.mapping(baseAddress.litValue.toInt)
 
       //Can now write edofs to file
@@ -597,17 +601,16 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
         val bank = addr % 8
         val index = addr >> 3
         val value = sc.mem(bank)(index)
-        bw.write(s"$i," +
-          s"$j," +
-          s"$k," +
-          s"${edofScala(iter)}," +
-          s"${edofC(iter)}," +
-          f"${fixed2double(value)}%.10f\n")
+        buf += edofLine(i, j, k, edofScala(iter), edofC(iter), fixed2double(value))
       }
     }
 
+    def writeEdofFile(buf: ArrayBuffer[edofLine], bw: BufferedWriter): Unit = {
+      buf.groupBy(_.c).map(_._2.head).toList.sortBy(_.c).foreach(x => bw.write(f"$x\n"))
+    }
+
+
     def dumpNelem(): Unit = {
-      //Start by dumping all NELEM long vectors
       val X = openFile("X", "mem")
       val XPHYS = openFile("XPHYS", "mem")
       val XNEW = openFile("XNEW", "mem")
@@ -640,6 +643,17 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       val TMP = openFile("TMP", "mem")
       Seq(F, U, R, Z, P, Q, INVD, TMP).foreach(writeEdofHeader)
 
+      //Each array has 24*NELEM entries
+      val Fbuf = ArrayBuffer.empty[edofLine]
+      val Ubuf = ArrayBuffer.empty[edofLine]
+      val Rbuf = ArrayBuffer.empty[edofLine]
+      val Zbuf = ArrayBuffer.empty[edofLine]
+      val Pbuf = ArrayBuffer.empty[edofLine]
+      val Qbuf = ArrayBuffer.empty[edofLine]
+      val INVDbuf = ArrayBuffer.empty[edofLine]
+      val TMPbuf = ArrayBuffer.empty[edofLine]
+
+
       for(i <- 0 until NELX ) {
         for(k <- 0 until NELZ ) {
           for(j <- 0 until NELY) {
@@ -655,7 +669,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
             } //now, elements 0:2 in both edof arrays correspond to the x,y,z edofs of the same node
 
             //To correctly map these, we must reorder the groups of elements in scala edofs
-            val finalEdof: Array[Int] = (iterationFromIJK(Array(i, j, k)) match {
+            val finalEdofScala: Array[Int] = (iterationFromIJK(Array(i, j, k)) match {
               case 0 => Array(edof(1), edof(5), edof(4), edof(0), edof(3), edof(7), edof(6), edof(2))
               case 1 => Array(edof(0), edof(4), edof(5), edof(1), edof(2), edof(6), edof(7), edof(3))
               case 2 => Array(edof(3), edof(7), edof(6), edof(2), edof(1), edof(5), edof(4), edof(0))
@@ -667,17 +681,27 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
               case x => throw new IllegalArgumentException(s"Unable to reorder DOFs with iteration value $x")
             }).flatten
 
-            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.F, F)
-            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.U, U)
-            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.R, R)
-            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.Z, Z)
-            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.P, P)
-            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.Q, Q)
-            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.INVD, INVD)
-            writeEdofLine(i, j, k, edofC, finalEdof, StypeBaseAddress.TMP, TMP)
+            fillEdofBuffer(i, j, k, edofC, finalEdofScala, StypeBaseAddress.F, Fbuf)
+            fillEdofBuffer(i, j, k, edofC, finalEdofScala, StypeBaseAddress.U, Ubuf)
+            fillEdofBuffer(i, j, k, edofC, finalEdofScala, StypeBaseAddress.R, Rbuf)
+            fillEdofBuffer(i, j, k, edofC, finalEdofScala, StypeBaseAddress.Z, Zbuf)
+            fillEdofBuffer(i, j, k, edofC, finalEdofScala, StypeBaseAddress.P, Pbuf)
+            fillEdofBuffer(i, j, k, edofC, finalEdofScala, StypeBaseAddress.Q, Qbuf)
+            fillEdofBuffer(i, j, k, edofC, finalEdofScala, StypeBaseAddress.INVD, INVDbuf)
+            fillEdofBuffer(i, j, k, edofC, finalEdofScala, StypeBaseAddress.TMP, TMPbuf)
           }
         }
       }
+
+      writeEdofFile(Fbuf, F)
+      writeEdofFile(Ubuf, U)
+      writeEdofFile(Rbuf, R)
+      writeEdofFile(Zbuf, Z)
+      writeEdofFile(Pbuf, P)
+      writeEdofFile(Qbuf, Q)
+      writeEdofFile(INVDbuf, INVD)
+      writeEdofFile(TMPbuf, TMP)
+
       Seq(F, U, R, Z, P, Q, INVD, TMP).foreach(_.close())
     }
 
@@ -689,8 +713,8 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
 
     def dumpRegisters(): Unit = {
       //Dump vregs
-      val vreg0 = openFile("vreg0", "reg")
-      val vreg1 = openFile("vreg1", "reg")
+      val vreg0 = openFile("0", "vreg")
+      val vreg1 = openFile("1", "vreg")
       writeRegisterHeader(VREG_DEPTH, vreg0)
       writeRegisterHeader(VREG_DEPTH, vreg1)
       for(i <- 0 until NUM_VREG) {
@@ -707,8 +731,8 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       vreg1.close()
 
       //Dump xregs
-      val xreg0 = openFile("xreg0", "reg")
-      val xreg1 = openFile("xreg1", "reg")
+      val xreg0 = openFile("0", "xreg")
+      val xreg1 = openFile("1", "xreg")
       writeRegisterHeader(XREG_DEPTH, xreg0)
       writeRegisterHeader(XREG_DEPTH, xreg1)
       for(i <- 0 until NUM_XREG) {
@@ -725,7 +749,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       xreg1.close()
 
       //Dump sreg
-      val sreg = openFile("sreg", "reg")
+      val sreg = openFile("0", "sreg")
       writeRegisterHeader(NUM_SREG, sreg)
       sreg.write("0")
       for(i <- 0 until NUM_SREG) {
@@ -735,8 +759,11 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       sreg.close()
     }
 
+
+
     // Actual dumping happens here
-    val dir = new File(new File(s"memdump/$testname.txt").getParent)
+    //Ensure memdump directory exists
+    val dir = new File(s"memdump/$testName/$currentTime")
     if(!dir.exists) {
       dir.mkdirs()
     }
