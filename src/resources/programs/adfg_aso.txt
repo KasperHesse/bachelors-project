@@ -1,0 +1,83 @@
+//Picks up where adfg.txt leaves off, setting up change, loop variables, entering solveStateCG and performing
+// first call to applyStateOperator
+
+//DENS: The vector containing densities. Either X or XPHYS
+//INPUT: The input vector being used: Either U, ??
+//OUTPUT: The output vector: Either R,
+func applyStateOperator(DENS, INPUT, OUTPUT) = {
+
+    pstart double //Setu up e0, emin constants. Being setup twice, but that's OK
+    estart
+    add.is s1, s0, 0.0078125
+    mul.ss s1, s1, s1 //s1 = 6.1e-5
+    add.is s2, s0, 0.015625
+    mul.ss s2, s1, s2 //s2 = 9.5e-7 ~= 1e-6 = emin
+    add.is s1, s0, 1 //s1 = 1 = e0
+    sub.ss s1, s1, s2 //s1 = e0-emin
+    mul.sv v0, s0, v0 //clear v0
+    eend
+    pend
+
+    //Clear output vector
+    pstart ndof
+    estart
+    eend
+    st.vec v0, OUTPUT
+    pend
+
+    pstart nelemdof //Loop over elements and perform applyStateOperator
+    ld.dof v0, INPUT
+    ld.dof v1, OUTPUT
+    ld.elem x0, DENS
+    estart
+    mul.xx x1, x0, x0 //x0 = pow(x,2)
+    mul.xx x1, x1, x0 //x1 = pow(x,3)
+    mul.sx x1, s1, x1 //x1 = pow(x,3)*(e0-emin)
+    add.sx x1, s2, x1 //x1 = emin+pow(x,3)*(e0-emin)
+    mul.xv v2, x1, v0 //v2 = u_local*elementScale
+    mac.kv v2, v2     //ke*(u_local*elementScale)
+    add.vv v2, v2, v1 //out[edof[i]] += out_local[i]
+    eend
+    st.dof v2, OUTPUT
+    st.fdof v0, OUTPUT //Store fixed DOFs from inp. values
+    pend
+}
+
+
+//Set up loop and change variables
+pstart single
+estart
+add.ss s15, s0, s0 //s15 =loop =0
+add.is s14, s0, 1  //s14=change=1
+eend
+pend
+
+//Main loop start
+TOP3DCG:
+pstart single
+estart
+add.is s15, s15, 1 //loop++
+eend
+pend
+
+//Solve state conjugate gradient
+
+//Set up and clear a lot of vectors
+pstart double
+estart
+mul.sv v0, s0, v0 //clear v0 of both threads
+eend
+pend
+
+pstart ndof //Clear all ndof long vectors except U,F
+estart
+eend
+st.vec v0, R
+st.vec v0, Z
+st.vec v0, P
+st.vec v0, Q
+st.vec v0, INVD
+st.vec v0, TMP
+pend
+
+applyStateOperator(XPHYS, U, R)

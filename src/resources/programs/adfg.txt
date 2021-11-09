@@ -1,4 +1,4 @@
-//Function definitions
+// Performs the initial setup of top.txt, up to and including the call to applyDensityFilterGradient
 
 // VEC: The NELEM long vector that ADFG should be applied to. Should be either DV or DC
 func applyDensityFilterGradient(VEC) = {
@@ -66,12 +66,34 @@ func applyDensityFilterGradient(VEC) = {
 //populate design space
 //Volfrac = 0.2
 //tstart clear
-pstart nelemvec
+
+pstart single // Setup value of volfrac = 0.2
 estart
-mul.sv v0, s0, v0 //clear v0
-mul.sv v1, s0, v1 //Clear v1
-add.iv v0, v0, 0.2 //v0 = 0.2
-add.iv v1, v1, 1 //v1 = 1
+add.is s1, s0, 0.203125 //Closest imm value to 0.2
+add.is s2, s0, 0.0546875 //Helper value to make 0.203125 more precise
+mul.ss s3, s2, s2 //s2 = 0.0029
+sub.ss s1, s1, s3 //s1 = 0.200134
+add.is s2, s0, 0.109375 //Helper value
+mul.ss s2, s2, s2 //s2 = 0.011962890625
+mul.ss s2, s2, s2 //s2 = 1.431e-4
+sub.ss s1, s1, s2 //s2 = 0.19999116, diff. from 0.20... is 8.83e-6
+add.is s2, s0, 0.0546875 //helper value
+mul.ss s2, s2, s2 //0.0029907
+mul.ss s2, s2, s2 //8.944e-6
+add.ss s1, s1, s2 //s1 = 0.2000001110. Diff from 0.20... is 1.11e-7
+eend
+pend
+
+pstart double //Init v0,v1 in both threads
+estart
+mul.sv v0, s0, v0 //Clear v0
+add.iv v1, v0, 1  //Set v1 = 1
+add.sv v0, s1, v0 //Set v0 = 0.2
+eend
+pend
+
+pstart nelemvec //Init X, XPHYS and DV vectors
+estart
 eend
 st.vec v0, X
 st.vec v0, XPHYS

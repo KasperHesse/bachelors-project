@@ -1,0 +1,138 @@
+//Picks up where adfg_aso leaves off, performing generateMatrixDiagonal
+
+//GenerateMatrixDiagonal ALWAYS uses XPHYS as input and INVD as output
+func generateMatrixDiagonal() = {
+    //Setup constants
+    pstart double
+    estart
+    add.is s1, s0, 0.0078125
+    mul.ss s1, s1, s1 //s1 = 6.1e-5
+    add.is s2, s0, 0.015625
+    mul.ss s2, s1, s2 //s2 = 9.5e-7 ~=1e-6 = emin
+    add.is s1, s0, 1 //s1 = 1 = e0
+    sub.ss s1, s1, s2 //s1 = e0-emin
+
+    add.is s3, s0, 0.235043 //ke diagonal value, gets imm-rounded to 0.234375
+    add.is s4, s0, 0.0258457 //helper value to increase precision
+    mul.ss s4, s4, s4 //helper value
+    add.ss s3, s3, s4 //s3 = 0.2349243
+    add.is s4, s0, 0.0491455 //helper value
+    mul.ss s5, s4, s4 //helper
+    mul.ss s5, s5, s4 //helper
+    add.ss s3, s3, s5 //s3 = ke[diag] = 0.2350273. Diff from actual value is 1.5e-5
+    add.is s4, s0, 0.0625 //helper
+    mul.ss s5, s4, s4 //helper = 0.00390625
+    mul.ss s5, s5, s5 //helper = 0.00001525878906
+    add.ss s3, s3, s5 //s3 = ke[diag] = 0.23504257, diff from actual value is 4.28e-7
+
+    mul.sv v0, s0, v0 //Clear v0
+    add.iv v1, v0, 1 //Fixed dof values for diag
+    add.sv v2, s3, v0 //ke diagonal value
+    eend
+    pend
+
+    //Clear invd vector
+    pstart ndof
+    estart
+    eend
+    st.vec v0, INVD
+    pend
+
+    pstart nelemdof //Main loop, generate diag values
+    ld.dof v0, INVD
+    ld.elem x0, XPHYS
+    estart
+    mul.xx x1, x0, x0 //x1 = pow(x,2)
+    mul.xx x1, x1, x0 //x1 = pow(x,3)
+    mul.sx x1, s1, x1 //x1 = pow(x,3)*(e0-emin)
+    add.sx x1, s2, x1 //x1 = emin + pow(x,3)*(e0-emin) = elementScale
+    mul.xv v3, x1, v2 //v3 = elementScale * ke[ii][ii] = elementScale * keDiag
+    add.vv v0, v0, v3 //diag[edof[ii]] += elementScale * ke[ii][ii]
+    eend
+    st.dof v0, INVD //Store dofs
+    st.fdof v1, INVD //Store fixed dofs with value = 1
+    pend
+
+    //Invert values
+   pstart ndof
+   ld.vec v0, INVD
+   estart
+   div.iv v0, v0, 1 //v0 = 1/invD
+   eend
+   st.vec v0, INVD
+   pend
+}
+
+//Scalar square root
+//REG1: Input value to take sqrt of, will also contain result when finished
+//REG2, REG3, REG4: Additional registers than can be used as temps
+func sqrt_S(REG1, REG2, REG3, REG4) = {
+    pstart single
+    estart
+    mul.is REG2, REG1, 0.5 //REG2 = xn = S/2
+    add.is REG3, s0, 0.5 //s3 = constant 1/2
+
+    //Unrolled loop
+    div.ss REG4, REG1, REG2 //REG4 = S/xn
+    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
+    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), first iteration
+    div.ss REG4, REG1, REG2 //REG4 = S/xn
+    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
+    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), second iteration
+    div.ss REG4, REG1, REG2 //REG4 = S/xn
+    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
+    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), third iteration
+    div.ss REG4, REG1, REG2 //REG4 = S/xn
+    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
+    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), fourth iteration
+    div.ss REG4, REG1, REG2 //REG4 = S/xn
+    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
+    mul.ss REG1, REG3, REG4 //REG1 = xnew = sqrt(S), fifth and final iteration
+    eend
+    pend
+}
+
+//Calculate value of r[i]=b[i]-r[i] where b=F
+pstart ndof
+ld.vec v0, R
+ld.vec v1, F
+estart
+sub.vv v0, v1, v0 //r[i] = b[i]-r[i]
+eend
+st.vec v0, R
+pend
+
+generateMatrixDiagonal()
+
+//Setup scalars for CG loop
+pstart ndof //Calculate sum(F[i]*F[i])
+ld.vec v0, F
+estart
+mac.vv s13, v0, v0
+eend
+pend
+
+//Calculate bnorm into s13, use s1,s2,s3 as temp registers
+sqrt_S(s13, s1, s2, s3)
+
+pstart single
+estart
+//s13 = bnorm, setup above
+add.ss s12, s0, s0 //rho
+add.ss s11, s0, s0 //rhoold
+add.ss s10, s0, s0 //dpr
+add.ss s9, s0, s0 //alpha
+add.ss s8, s0, s0 //cgIter
+add.is s7, s0, 5 //s7 = 5
+mul.is s7, s7, 5 //s7 = 25
+mul.is s7, s7, 5 //s7 = 125
+mul.is s7, s7, 5 //s7 = 625
+mul.is s7, s7, 4 //s7 = 2500
+mul.is s7, s7, 4 //s7 = 10000 = maxiter
+add.is s6, s0, 0.0078125
+mul.ss s6, s6, s6 //s6 = 6.1e-5
+mul.is s6, s6, 0.1640625 //s6 ~= 1e-5 = cgTol
+eend
+pend
+
+//Start CG loop
