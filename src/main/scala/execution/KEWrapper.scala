@@ -73,28 +73,22 @@ object KEWrapper {
    */
   def getKEMatrix(): Array[Array[Double]] = {
     val KE = Array.ofDim[Double](KE_SIZE, KE_SIZE)
-    if(!SIMULATION) {
-      val src = Source.fromFile("src/resources/ke.csv")
-      val lines = src.getLines().toArray
-      if(lines.length != KE_SIZE) {
-        throw new IllegalArgumentException("KE matrix CSV file must have exactly 24 lines")
+    val src = Source.fromFile("src/resources/ke.csv")
+    val lines = src.getLines().toArray
+
+    if(lines.length != KE_SIZE) {
+      throw new IllegalArgumentException("KE matrix CSV file must have exactly 24 lines")
+    }
+    for(i <- 0 until KE_SIZE) {
+      val tokens = lines(i).split(",")
+      if(tokens.length != KE_SIZE) {
+        throw new IllegalArgumentException("Each line of the KE matrix in the CSV file must have exactly 24 items")
       }
-      for(i <- 0 until KE_SIZE) {
-        val tokens = lines(i).split(",")
-        if(tokens.length != KE_SIZE) {
-          throw new IllegalArgumentException("Each line of the KE matrix in the CSV file must have exactly 24 items")
-        }
-        for(j <- 0 until KE_SIZE) {
-          KE(i)(j) = tokens(j).toDouble
-        }
-      }
-    } else {
-      for (i <- 0 until KE_SIZE) {
-        for (j <- 0 until KE_SIZE) {
-          KE(i)(j) = i * KE_SIZE + j
-        }
+      for(j <- 0 until KE_SIZE) {
+        KE(i)(j) = tokens(j).toDouble
       }
     }
+    src.close()
     KE
   }
 

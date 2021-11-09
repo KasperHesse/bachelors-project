@@ -99,7 +99,7 @@ class AssemblerSpec extends FlatSpec with Matchers {
       val rd = rand.nextInt(regMax)
 
       val imm = genImmediate()
-      val immparts = fixedImm2parts(imm2fixed(imm))
+      val immparts = fixedImm2parts(imm2long(imm))
 
       val line = s"$opString.$modString $prefix$rd, $prefix$rs2, $imm"
       val parsed = Assembler.parseRtype(Assembler.splitInstruction(line))

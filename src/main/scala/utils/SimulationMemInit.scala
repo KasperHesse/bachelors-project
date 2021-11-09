@@ -25,7 +25,7 @@ object SimulationMemInit extends App {
     def readMemFile(vec: String, baseAddrIndex: Int): Unit = {
       val file = Source.fromFile(s"memdump/$testName/$hash/mem_$vec.csv")
 
-      val lines = file.getLines().toList.tail
+      val lines = file.getLines().toList.tail //First row contains headers, using .tail removes that in O(1) time
       val baseAddress = AddressDecode.mapping(baseAddrIndex)
 
       for(line <- lines) {
@@ -54,6 +54,16 @@ object SimulationMemInit extends App {
       file.close()
     }
 
+    def writeVreg(id: Int): Unit = {
+      for(i <- 0 until VREG_DEPTH) {
+        val contents = Array.ofDim[Long](NUM_VREG)
+        for(j <- 0 until NUM_VREG) {
+          contents(j) = double2fixed(vreg(id)(j)(i)) & ((1L << FIXED_WIDTH)-1)
+        }
+        writeMemInitFile(s"$memInitFileLocation/vreg${id}_$i.hex.txt", contents, 16)
+      }
+    }
+
     def readXregFile(id: Int): Unit = {
       val file = Source.fromFile(s"memdump/$testName/$hash/xreg_$id.csv")
 
@@ -67,6 +77,16 @@ object SimulationMemInit extends App {
       file.close()
     }
 
+    def writeXreg(id: Int): Unit = {
+      for(i <- 0 until XREG_DEPTH) {
+        val contents = Array.ofDim[Long](NUM_XREG)
+        for(j <- 0 until NUM_XREG) {
+          contents(j) = double2fixed(xreg(id)(j)(i)) & ((1L << FIXED_WIDTH)-1)
+        }
+        writeMemInitFile(s"$memInitFileLocation/xreg${id}_$i.hex.txt", contents, 16)
+      }
+    }
+
     def readSregFile(): Unit = {
       val file = Source.fromFile(s"memdump/$testName/$hash/sreg_0.csv")
 
@@ -75,6 +95,11 @@ object SimulationMemInit extends App {
         sreg(j) = values(j).toDouble
       }
       file.close()
+    }
+
+    def writeSreg(): Unit = {
+      val contents = sreg.map(double2fixed).map(v => v & ((1L << FIXED_WIDTH)-1))
+      writeMemInitFile(s"$memInitFileLocation/sreg.hex.txt", contents, 16)
     }
 
     readMemFile("X", X)
@@ -105,6 +130,12 @@ object SimulationMemInit extends App {
     readXregFile(1)
     readSregFile()
 
+    //write reginit files
+    writeVreg(0)
+    writeVreg(1)
+    writeXreg(0)
+    writeXreg(1)
+    writeSreg()
 
     wordsPerBank
   }

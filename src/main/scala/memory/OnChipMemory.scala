@@ -85,25 +85,17 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
   if(memInitFileLocation.nonEmpty) {
     for (i <- 0 until NUM_MEMORY_BANKS) {
       val file = if (memInitFileLocation.takeRight(1).equals("/")) {
-        memInitFileLocation + "membank_" + i + ".txt"
+        s"${memInitFileLocation}membank_$i.txt"
       } else {
-        memInitFileLocation + "/membank_" + i + ".txt"
+        s"$memInitFileLocation/membank_$i.txt"
       }
-      if(SIMULATION) {
-        initMemBanks(wordsPerBank, memInitFileLocation)
-        loadMemoryFromFile(membank(i), file)
-      } else {
+      if(INLINE) {
         loadMemoryFromFileInline(membank(i), file)
+      } else {
+        loadMemoryFromFile(membank(i), file)
       }
     }
   }
-
-
-  //NOTE: SyncReadMem does not keep the read value until the next read is issued.
-  //If a write is performed to the previously read value, the read data will also update
-  //To fix this, a register is necessary to sample the output data whenever validOp is asserted
-  //See UsingSyncReadMem for implementation ideas.
-
 
   def initMemBanks(wordsPerBank: Int, memInitFileLocation: String): Unit = {
     for(bank <- 0 until NUM_MEMORY_BANKS) {

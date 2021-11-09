@@ -49,13 +49,99 @@ class Test extends Module {
 
 object Test extends App {
 
-  val f = new File("\\wsl$")
-  if(f.isDirectory) {
-    println("Is directory")
-  } else if (f.exists()) {
-    print("It exists at least")
-  } else {
-    println("Doesn't exist")
+  def P(x: Long, s: String = ""): Unit = {
+    println(f"$s ${fixed2double(x)}%.10f")
   }
-//  f.list().foreach(println)
+
+  def D(x: Long, d: Double = 0.235043): Unit = {
+    println(math.abs(fixed2double(x)-d))
+  }
+
+  def betterVolfrac(): Unit = {
+    val start = imm2fixed(0.2)
+
+    val e1 = imm2fixed(0.0546875)
+    val e2 = fixedMul(e1, e1)
+    val imm2 = fixedSub(start, e2)
+
+    val f1 = imm2fixed(0.109375)
+    val f2 = fixedMul(f1, f1)
+    val f3 = fixedMul(f2, f2)
+    val imm3 = fixedSub(imm2, f3)
+
+    val g1 = imm2fixed(0.05446539631)
+    val g2 = fixedMul(g1, g1)
+    val g3 = fixedMul(g2, g2)
+    val imm4 = fixedAdd(imm3, g3)
+
+    P(start, "start")
+    D(start, 0.2)
+    P(imm2, "imm2")
+    D(imm2, 0.2)
+    P(imm3, "imm3")
+    D(imm3, 0.2)
+
+    P(g1, "g1")
+    P(imm4, "imm4")
+    D(imm4, 0.2)
+
+    //Final result: Delta of 1.1e-7
+  }
+
+  def betterKeDiag(): Unit = {
+    val start = imm2fixed(0.235043)
+
+    val d1 = imm2fixed(0.0258457)
+    val d2 = fixedMul(d1, d1)
+
+    val imm2 = fixedAdd(start, d2)
+
+    val e1 = imm2fixed(0.0491455)
+    val e2 = fixedMul(e1, e1)
+    val e3 = fixedMul(e1, e2)
+    val imm3 = fixedAdd(imm2, e3)
+
+    val f1 = imm2fixed(0.06293374700)
+    val f2 = fixedMul(f1, f1)
+    val f3 = fixedMul(f2, f2)
+    val imm4 = fixedAdd(imm3, f3)
+
+    P(start, "start")
+    D(start)
+    P(imm2, "imm2")
+    D(imm2)
+    P(imm3, "imm3")
+    D(imm3)
+    P(f1, "f1")
+    P(imm4, "imm4")
+    D(imm4)
+
+    //Result: Delta of 5e-5
+  }
+
+  def betterOmega(): Unit = {
+    val start = imm2fixed(0.6)
+
+
+
+    val d1 = imm2fixed(0.03952847075)
+    val d2 = fixedMul(d1, d1)
+    val imm2 = fixedSub(start, d2)
+
+    val e1 = imm2fixed(0.07779162548)
+    val e2 = fixedMul(e1,e1)
+    val e3 = fixedMul(e2, e2)
+    val imm3 = fixedSub(imm2, e3)
+
+    P(start, "start")
+    D(start, 0.6)
+    P(imm2, "imm2")
+    D(imm2, 0.6)
+    P(imm3, "imm3")
+    D(imm3, 0.6)
+  }
+
+  betterOmega()
+
+
 }

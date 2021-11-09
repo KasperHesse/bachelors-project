@@ -39,7 +39,7 @@ class Decode extends Module {
   val threads = for(i <- 0 until 2) yield {
     Module(new Thread(i))
   }
-  val sRegFile = Module(new ScalarRegisterFile("src/resources/meminit/sreg.hex.txt"))
+  val sRegFile = Module(new ScalarRegisterFile())
   val branchTargetGen = Module(new BranchTargetGenerator)
 
   // --- REGISTERS ---

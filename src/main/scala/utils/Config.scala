@@ -91,6 +91,10 @@ object Config {
    * or out-of-line using a 'binds' statement (false, for simulation) */
   var INLINE = false
 
+  /** Location of register initialization files. Only used for simulation purposes.
+   *  The default reginit files at src/resources/meminit_default/ will initialize registers to increasing values */
+  var REGINIT_FILE_LOCATION = "src/resources/meminit_default"
+
   checkRequirements()
 
   /** Checks if all configurations requirements are held. This *must* be called in a tester if config values are changed */

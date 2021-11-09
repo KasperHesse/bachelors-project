@@ -45,7 +45,6 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
     val src = Source.fromFile(memfile)
     require(src.getLines.length <= memsize, s"Memory file (${src.getLines.length}) too large for memory size ($memsize)")
     src.close()
-    loadMemoryFromFile(imem, memfile)
   }
   if(INLINE) loadMemoryFromFileInline(imem, memfile) else loadMemoryFromFile(imem, memfile)
 

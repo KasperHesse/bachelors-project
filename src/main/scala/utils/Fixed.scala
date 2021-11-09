@@ -331,12 +331,22 @@ object Fixed {
    * @param imm
    * @return
    */
-  def imm2fixed(imm: Double): Long = {
+  def imm2long(imm: Double): Long = {
     val immRounded = math.round(imm*math.pow(2,IMM_FRAC_WIDTH))*math.pow(2,-IMM_FRAC_WIDTH)
     require(immRounded >= -math.pow(2,IMM_INT_WIDTH) && immRounded < math.pow(2, IMM_INT_WIDTH), s"Immediate value must be between ${-math.pow(2,IMM_INT_WIDTH)} and ${math.pow(2,IMM_INT_WIDTH)-math.pow(2,-IMM_FRAC_WIDTH)}")
     val immfixed = math.round(imm*math.pow(2,IMM_FRAC_WIDTH))
     immfixed
   }
+
+  /**
+   * Converts an immediate value to its Qs15.38 representation
+   * @param imm The immedaite value to convert
+   * @return
+   */
+  def imm2fixed(imm: Double): Long = {
+    imm2long(imm) << (FRAC_WIDTH - IMM_FRAC_WIDTH)
+  }
+
 
   /**
    * Converts a fixed-point immediate into its constituent parts

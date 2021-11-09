@@ -33,7 +33,7 @@ object Assembler {
   var code: ListBuffer[Long] = ListBuffer.empty[Long]
 
   val symbolRegex: Regex = "([\\w]+:)".r//Any characters, followed by a :
-  val functionRegex: Regex = "func (\\w+) *\\(((?:\\w+)(?: *, *\\w+)*)\\) *= *\\{\\s+([^}]*)[\\n\\r]+\\s*\\}".r
+  val functionRegex: Regex = "func (\\w+) *\\(((?:\\w+)*(?: *, *\\w+)*)\\) *= *\\{\\s+([^}]*)[\\n\\r]+\\s*\\}".r
 
   /**
    * Resets the state of the assembler, resetting all member variables
@@ -179,7 +179,7 @@ object Assembler {
     } catch {
       case e: NumberFormatException => throw new NumberFormatException(s"Unable to parse '$imms' as a double")
     }
-    val immFixed = imm2fixed(immd)
+    val immFixed = imm2long(immd)
     fixedImm2parts(immFixed)
   }
 
@@ -600,6 +600,8 @@ object Assembler {
       }
       case "eend" => if(!pstart || !estart) {
         throw new IllegalArgumentException("eend must be preceded by pstart end estart")
+      } else if(eend) {
+        throw new IllegalArgumentException("Cannot have nested eend instructions")
       } else {
         eend = true
       }
@@ -656,7 +658,7 @@ object Assembler {
    * @return
    */
   def replaceFunctionCalls(str: String): String = {
-    val functionCallRegex = "(\\w+)\\((.+)\\)".r
+    val functionCallRegex = "(\\w+)\\((.*)\\)".r
     //For all lines in the string, either perform function replacement, or just return that line.
     //Finally, recombine all lines back into a single string
     str.lines.map {

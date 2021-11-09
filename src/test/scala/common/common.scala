@@ -706,7 +706,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     }
 
     def writeRegisterHeader(num: Int, bw: BufferedWriter): Unit = {
-      bw.write(s"reg")
+      bw.write(s"reg \\ index")
       for(i <- 0 until num) { bw.write(s",$i") }
       bw.write("\n")
     }
@@ -718,11 +718,14 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       writeRegisterHeader(VREG_DEPTH, vreg0)
       writeRegisterHeader(VREG_DEPTH, vreg1)
       for(i <- 0 until NUM_VREG) {
+        //Write first column containing prefix
         vreg0.write(s"$i (${i/VREG_SLOT_WIDTH}:${i%VREG_SLOT_WIDTH})")
         vreg1.write(s"$i (${i/VREG_SLOT_WIDTH}:${i%VREG_SLOT_WIDTH})")
+
+        //Write values
         for(j <- 0 until VREG_DEPTH) {
-          vreg0.write(s",${fixed2double(sc.vReg(0)(i)(j))}")
-          vreg1.write(s",${fixed2double(sc.vReg(1)(i)(j))}")
+          vreg0.write(f",${fixed2double(sc.vReg(0)(i)(j))}%.10f")
+          vreg1.write(f",${fixed2double(sc.vReg(1)(i)(j))}%.10f")
         }
         vreg0.write("\n")
         vreg1.write("\n")
@@ -736,11 +739,14 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       writeRegisterHeader(XREG_DEPTH, xreg0)
       writeRegisterHeader(XREG_DEPTH, xreg1)
       for(i <- 0 until NUM_XREG) {
+        //Write prefix
         xreg0.write(s"$i")
         xreg1.write(s"$i")
+
+        //Write values
         for(j <- 0 until XREG_DEPTH) {
-          xreg0.write(s",${fixed2double(sc.xReg(0)(i)(j))}")
-          xreg1.write(s",${fixed2double(sc.xReg(1)(i)(j))}")
+          xreg0.write(f",${fixed2double(sc.xReg(0)(i)(j))}%.10f")
+          xreg1.write(f",${fixed2double(sc.xReg(1)(i)(j))}%.10f")
         }
         xreg0.write("\n")
         xreg1.write("\n")
@@ -753,7 +759,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       writeRegisterHeader(NUM_SREG, sreg)
       sreg.write("0")
       for(i <- 0 until NUM_SREG) {
-        sreg.write(s",${fixed2double(sc.sReg(i))}")
+        sreg.write(f",${fixed2double(sc.sReg(i))}%.10f")
       }
       sreg.write("\n")
       sreg.close()
@@ -770,5 +776,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     dumpNelem()
     dumpNdof()
     dumpRegisters()
+
+    println(s"Succesfully dumped memory and register contents to memdump/$testName/$currentTime")
   }
 }

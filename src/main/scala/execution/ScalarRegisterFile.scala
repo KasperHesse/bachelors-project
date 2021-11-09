@@ -8,21 +8,15 @@ import utils.Fixed.FIXED_WIDTH
 import utils.Fixed.double2fixed
 
 import java.io.{BufferedWriter, FileWriter}
+import scala.io.Source
 
 /**
  * A scalar register file. Register at index 0 is always tied to the value 0. Implements [[ScalarRegFileIO]].
  */
-class ScalarRegisterFile(memInitFileLocation: String) extends Module {
+class ScalarRegisterFile extends Module {
   val io = IO(new ScalarRegFileIO)
-
   val arr: Array[SInt] = Array.fill[SInt](NUM_SREG)(0.S(FIXED_WIDTH.W))
-  if(SIMULATION) {
-    for(i <- 0 until NUM_SREG) {
-      arr(i) = double2fixed(i).S(FIXED_WIDTH.W)
-    }
-  }
 
-  //Trying to map it down to syncreadmem
   val mem = SyncReadMem(NUM_SREG, SInt(FIXED_WIDTH.W))
   when(io.we && io.rd =/= 0.U) {
     mem.write(io.rd, io.wrData)
@@ -30,19 +24,26 @@ class ScalarRegisterFile(memInitFileLocation: String) extends Module {
   io.rdData1 := mem.read(io.rs1)
   io.rdData2 := mem.read(io.rs2)
 
-  //Create meminit file
-  val writer = new BufferedWriter(new FileWriter(memInitFileLocation))
-  for(v <- arr) {
-    v.litValue.toByteArray.foreach(b => writer.write(f"$b%02x"))
-    writer.write("\n")
-  }
-  writer.close()
 
-  if(INLINE) {
-    loadMemoryFromFileInline(mem, memInitFileLocation)
-  } else {
-    loadMemoryFromFile(mem, memInitFileLocation)
+
+  if(SIMULATION) {
+    val mif = s"$REGINIT_FILE_LOCATION/sreg.hex.txt"
+    if(INLINE) {
+      loadMemoryFromFileInline(mem, mif)
+    } else {
+      loadMemoryFromFile(mem, mif)
+    }
+
+    //Populate arr
+    val src = Source.fromFile(mif)
+    val values = src.getLines().map(java.lang.Long.parseLong(_, 16).S).toSeq
+    for(i <- arr.indices) {
+      arr(i) = values(i)
+    }
+    src.close()
   }
+
+
 }
 
 class ScalarRegFileIO extends Bundle {
