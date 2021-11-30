@@ -1,0 +1,16 @@
+pstart ndof
+estart
+add.iv v1, v1, 7
+add.iv v2, v2, 6.5
+eend
+st.vec v1, R
+st.vec v2, Z
+pend
+
+pstart ndof
+ld.vec v0, R
+ld.vec v1, Z
+estart
+mac.vv s1, v0, v1
+eend
+pend

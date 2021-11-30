@@ -77,6 +77,49 @@ class FixedMulMultiCycle extends FixedPointMul {
   io.out.valid := validReg
 }
 
+class FixedMulKaratsuba extends FixedPointMul {
+
+  //Perform multiplication on the abs-values, flip sign afterwards
+  val a_abs = io.in.a.abs
+  val b_abs = io.in.b.abs
+
+  val a_sign = io.in.a(FIXED_WIDTH-1)
+  val b_sign = io.in.b(FIXED_WIDTH-1)
+
+  val a_high = Wire(UInt((FIXED_WIDTH/2).W))
+  val a_low = Wire(UInt((FIXED_WIDTH/2).W))
+  val b_high = Wire(UInt((FIXED_WIDTH/2).W))
+  val b_low = Wire(UInt((FIXED_WIDTH/2).W))
+
+  val z1 = Wire(UInt((FIXED_WIDTH+2).W))
+
+  a_high := a_abs(FIXED_WIDTH-1, FIXED_WIDTH/2)
+  a_low  := a_abs(FIXED_WIDTH/2-1, 0)
+  b_high := b_abs(FIXED_WIDTH-1, FIXED_WIDTH/2)
+  b_low := b_abs(FIXED_WIDTH/2-1, 0)
+
+  val z2 = a_high * b_high
+  val z0 = a_low * b_low
+
+  val ahl = a_low  +& a_high
+  val bhl = b_high +& b_low
+  val z1_1 = (ahl * bhl)
+  val z1_2 = z1_1 - z2
+  z1 := (z1_2 - z0)
+
+  val prod = (z2 << (FIXED_WIDTH)).asUInt + (z1 << FIXED_WIDTH/2).asUInt + z0.asUInt
+
+  val prod2 = (prod >> FRAC_WIDTH).asUInt()
+  val lastBit = Cat(0.S(1.W), prod(FRAC_WIDTH-1)).asUInt()
+  val res = prod2 + lastBit
+
+  io.out.res := Mux(a_sign ^ b_sign, (~res).asSInt + 1.S, res.asSInt)
+
+//  io.out.res := prod2 + lastBit
+  io.out.q := prod(2*FIXED_WIDTH-1,FIXED_WIDTH+FRAC_WIDTH) =/= 0.U
+  io.out.valid := io.in.valid
+}
+
 /**
  * Companion object for the fixed-point multipliers. Should be used to instantiate new multipliers
  */
@@ -90,6 +133,8 @@ object FixedPointMul {
     v match {
       case SINGLECYCLE => new FixedMulSingleCycle
       case MULTICYCLE => new FixedMulMultiCycle
+      case KARATSUBA => new FixedMulKaratsuba
+
       case _ => throw new IllegalArgumentException("Only single-cycle multipliers are supported as of right now")
     }
   }

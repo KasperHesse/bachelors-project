@@ -68,6 +68,7 @@ func sqrt_S(REG1, REG2, REG3, REG4) = {
 }
 
 CG_MAIN_LOOP:
+
 //Clear z vector
 pstart double
 estart
@@ -103,12 +104,12 @@ pend
 applyStateOperator(XPHYS, Z, TMP)
 
 pstart ndof
-ld.vec v0, F
+ld.vec v0, R
 ld.vec v1, TMP
 ld.vec v2, INVD
 ld.vec v3, Z
 estart
-sub.vv v0, v0, v1 //v0 = b[i]-tmp[i], b=F
+sub.vv v0, v0, v1 //v0 = b[i]-tmp[i], b=R
 mul.vv v0, v0, v2 //v0 = invD[i]*(b[i]-tmp[i])
 mul.sv v0, s4, v0 //v0 = omega*invD[i]*(b[i]-tmp[i])
 add.vv v0, v0, v3 //v0 = u[i] += omega*...
@@ -120,18 +121,20 @@ pend
 applyStateOperator(XPHYS, Z, TMP)
 
 pstart ndof
-ld.vec v0, F
+ld.vec v0, R
 ld.vec v1, TMP
 ld.vec v2, INVD
 ld.vec v3, Z
 estart
-sub.vv v0, v0, v1 //v0 = b[i]-tmp[i], b=F
+sub.vv v0, v0, v1 //v0 = b[i]-tmp[i], b=R
 mul.vv v0, v2, v0 //v0 = invD[i]*(b[i]-tmp[i])
 mul.sv v0, s4, v0 //v0 = omega*invD[i]*(b[i]-tmp[i])
 add.vv v0, v0, v3 //v0 = u[i] += omega*...
 eend
 st.vec v0, Z
 pend
+
+//End of preconditionDampedJacobi
 
 //Calculate rho=dpr(R, Z)
 pstart ndof
@@ -143,8 +146,8 @@ eend
 pend
 
 //Update values in P
-bne s8, s0, CG_P_NOT_FIRST_ITER //when iter != 0, branch
-pstart ndof //First ieration, p=z
+bne s8, s0, CG_P_NOT_FIRST_ITER //when cgIter != 0, branch
+pstart ndof //First iteration, p[i]=z[i]
 ld.vec v0, Z
 estart
 eend
@@ -153,7 +156,7 @@ pend
 beq s0, s0 CG_POST_P_UPDATE
 
 CG_P_NOT_FIRST_ITER:
-pstart single //Not first iteration, p=beta*p+z
+pstart single //Not first iteration, p=beta*p[i]+z[i]
 estart
 div.ss s1, s12, s11 //s1 = beta=rho/rhoOld
 eend
@@ -188,6 +191,7 @@ add.ss s11, s12, s0 //s11 = rhoold = rho
 eend
 pend
 
+
 //Update values of U and R
 pstart ndof
 ld.vec v0, U
@@ -216,14 +220,18 @@ sqrt_S(s1, s2, s3, s4)
 
 pstart single
 estart
+div.ss s1, s1, s13 //s1 = norm(r)/bnorm = relres
 add.is s8, s8, 1 //cgIter++
+add.is s2, s0, 7 //Number of iteration to perform while testing
+mul.is s2, s2, 7 //num iters = 36
 eend
 pend
 
+
 blt s1, s7, CG_END_LOOP //if relres < tol, break out
-bge s8, s7, CG_END_LOOP //if cgIter >= maxIter, break out
+blt s8, s2, CG_MAIN_LOOP //While cgIter < custom maxIter, keep running the loop
+
+//bge s8, s7, CG_END_LOOP //if cgIter >= maxIter, break out
 //beq s0, s0 CG_MAIN_LOOP: //else, return to top of loop
 //Commented out for sim. purposes
 CG_END_LOOP:
-
-

@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util.experimental.loadMemoryFromFile
 import chisel3.util.experimental.loadMemoryFromFileInline
 import utils.Config._
-import utils.Fixed.FIXED_WIDTH
+import utils.Fixed.{FIXED_WIDTH, string2fixed}
 
 import scala.io.Source
 
@@ -77,8 +77,9 @@ class InlineVectorRegisterFile(width: Int, depth: Int, id: Int) {
     //Populate 'arr' array
     for(d <- 0 until depth) {
       val src = Source.fromFile(s"${mif}_$d.hex.txt")
+      val lines = src.getLines().toArray
 
-      val values = src.getLines().toSeq.map(x => java.lang.Long.parseLong(x, 16).S(FIXED_WIDTH.W))
+      val values = lines.map(string2fixed)
       for(w <- 0 until width) {
         arr(w)(d) = values(w)
       }

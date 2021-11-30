@@ -163,5 +163,5 @@ object DivTypes extends Enumeration {
 
 object MulTypes extends Enumeration {
   type MulType = Value
-  val SINGLECYCLE, MULTICYCLE = Value
+  val SINGLECYCLE, MULTICYCLE, KARATSUBA = Value
 }

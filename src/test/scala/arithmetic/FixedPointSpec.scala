@@ -1,12 +1,14 @@
 package arithmetic
 
-import java.math.BigInteger
 import chisel3._
 import chiseltest._
 import org.scalatest.{FlatSpec, Matchers}
 import execution.Opcode
 import utils.Fixed._
 import execution.Opcode._
+import chiseltest.experimental.TestOptionBuilder._
+import chiseltest.internal.{WriteVcdAnnotation, VerilatorBackendAnnotation}
+
 
 class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Fixed Point Circuitry"
@@ -67,18 +69,52 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   def testMultiplication(dut: FixedPointMul, iters: Int):Unit = {
-    val r = scala.util.Random
     for(i <- 0 until iters) {
       val x = genDouble()
       val y = genDouble()
       val a = double2fixed(x)
       val b = double2fixed(y)
+//      val a = 0x33e
+//      val b = 0x227
+//      val a = -94
+//      val b = -431
       dut.io.in.a.poke(a.S)
       dut.io.in.b.poke(b.S)
       dut.clock.step()
       val res = fixedMul(a,b)
+      println(f"a=$a/$x%.3f, b=$b/$y%.3f, res=$res/${fixed2double(res)}%.3f. Peeking ${dut.io.out.res.peek()}")
       dut.io.out.res.expect(res.S)
     }
+  }
+
+  def multiplyNegativeOne(dut: FixedPointMul, iters: Int):Unit = {
+
+    val a0 = double2fixed(0)
+    val b0 = string2fixed("3ffe5e527029ab")
+
+    val a = double2fixed(0)
+    val b = string2fixed("00020a159dc7ef")
+
+    val c = double2fixed(-1)
+    val d = string2fixed("3fffedf1d00c38")
+
+
+    dut.io.in.a.poke(a0.S)
+    dut.io.in.b.poke(b0)
+    dut.io.in.valid.poke(true.B)
+    dut.clock.step()
+
+
+    dut.io.in.a.poke(a.S)
+    dut.io.in.b.poke(b)
+    dut.clock.step()
+
+    dut.io.in.a.poke(c.S)
+    dut.io.in.b.poke(d)
+    dut.clock.step()
+    val res = fixedMul(c.S,d)
+    dut.io.out.res.expect(res)
+
   }
 
   def testMultiplicationOverflow(dut: FixedPointMul, iters: Int): Unit = {
@@ -110,7 +146,7 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   }
 
   it should "correctly multiply numbers in a single cycle" in {
-    test(FixedPointMul(utils.Config.MULTYPE)) { c =>
+    test(FixedPointMul(utils.MulTypes.KARATSUBA)) { c =>
       testMultiplication(c, 20)
     }
   }
@@ -118,6 +154,21 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
   it should "correct multiply numbers over multiple clock cycles" in {
     test(FixedPointMul(utils.MulTypes.MULTICYCLE)) {dut =>
       testMultiplication(dut, 20)
+    }
+  }
+
+  it should "correctly multiply numbers using karatsuba" in {
+//    FIXED_WIDTH = 10
+//    INT_WIDTH = 4
+//    FRAC_WIDTH = 5
+    test(FixedPointMul(utils.MulTypes.KARATSUBA)).withAnnotations(Seq(WriteVcdAnnotation, VerilatorBackendAnnotation)) {dut =>
+      testMultiplication(dut, 50)
+    }
+  }
+
+  it should "multiply with negative one" in {
+    test(FixedPointMul(utils.MulTypes.SINGLECYCLE)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      multiplyNegativeOne(dut, 5)
     }
   }
 
@@ -147,4 +198,6 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       testMultiplicationOverflow(c, 5)
     }
   }
+
+
 }

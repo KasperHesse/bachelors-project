@@ -3,6 +3,7 @@
 *.out
 *.v
 *.fir
+*.hex.txt
 *.idea
 *.bak
 *.json

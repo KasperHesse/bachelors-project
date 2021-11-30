@@ -1,0 +1,87 @@
+func applyStateOperator(DENS, INPUT, OUTPUT) = {
+
+    pstart double //Setu up e0, emin constants. Being setup twice, but that's OK
+    estart
+    add.is s1, s0, 0.0078125
+    mul.ss s1, s1, s1 //s1 = 6.1e-5
+    add.is s2, s0, 0.015625
+    mul.ss s2, s1, s2 //s2 = 9.5e-7 ~= 1e-6 = emin
+    add.is s1, s0, 1 //s1 = 1 = e0
+    sub.ss s1, s1, s2 //s1 = e0-emin
+    mul.sv v0, s0, v0 //clear v0
+    eend
+    pend
+
+    //Clear output vector
+    pstart ndof
+    estart
+    eend
+    st.vec v0, OUTPUT
+    pend
+
+    pstart nelemdof //Loop over elements and perform applyStateOperator
+    ld.dof v0, INPUT
+    ld.dof v1, OUTPUT
+    ld.elem x0, DENS
+    estart
+    mul.xx x1, x0, x0 //x0 = pow(x,2)
+    mul.xx x1, x1, x0 //x1 = pow(x,3)
+    mul.sx x1, s1, x1 //x1 = pow(x,3)*(e0-emin)
+    add.sx x1, s2, x1 //x1 = emin+pow(x,3)*(e0-emin)
+    mul.xv v2, x1, v0 //v2 = u_local*elementScale
+    mac.kv v2, v2     //v2 = out_local = ke*(u_local*elementScale)
+    add.vv v2, v2, v1 //out[edof[i]] += out_local[i]
+    eend
+    st.dof v2, OUTPUT
+    st.fdof v0, OUTPUT //Store fixed DOFs from inp. values
+    pend
+}
+
+
+//Scalar square root
+//REG1: Input value to take sqrt of, will also contain result when finished
+//REG2, REG3, REG4: Additional registers than can be used as temps
+func sqrt_S(REG1, REG2, REG3, REG4) = {
+    pstart single
+    estart
+    mul.is REG2, REG1, 0.5 //REG2 = xn = S/2
+    add.is REG3, s0, 0.5 //s3 = constant 1/2
+
+    //Unrolled loop
+    div.ss REG4, REG1, REG2 //REG4 = S/xn
+    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
+    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), first iteration
+    div.ss REG4, REG1, REG2 //REG4 = S/xn
+    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
+    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), second iteration
+    div.ss REG4, REG1, REG2 //REG4 = S/xn
+    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
+    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), third iteration
+    div.ss REG4, REG1, REG2 //REG4 = S/xn
+    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
+    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), fourth iteration
+    div.ss REG4, REG1, REG2 //REG4 = S/xn
+    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
+    mul.ss REG1, REG3, REG4 //REG1 = xnew = sqrt(S), fifth and final iteration
+    eend
+    pend
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

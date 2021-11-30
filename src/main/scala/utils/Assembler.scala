@@ -661,12 +661,15 @@ object Assembler {
     val functionCallRegex = "(\\w+)\\((.*)\\)".r
     //For all lines in the string, either perform function replacement, or just return that line.
     //Finally, recombine all lines back into a single string
-    str.lines.map {
+//    functionCallRegex
+
+    str.linesIterator.map {
       case functionCallRegex(name, args) => functions(name).invoke(args)
       case x => x
     }.foldLeft("")((a,b) => a + b + "\n")
   }
 }
+
 
 /**
  * A class representing an assembler function call

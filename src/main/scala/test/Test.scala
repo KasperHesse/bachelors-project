@@ -141,7 +141,28 @@ object Test extends App {
     D(imm3, 0.6)
   }
 
-  betterOmega()
+//  betterOmega()
 
+  val a = string2fixed("3fffc000000000") //-1
+  val b = string2fixed("3fffedf1d00c38") //-0.28211592489969917... very precise
+  val c = string2fixed("3fffedf1d00c30") //-0.282115924928803..., almost as precise, no 4 LSB set
+  val d = string2fixed("3fffee00000000") //-0.28125
+  val e = string2fixed("00001200000000") //+0.28125
+
+  def pf(v: SInt): Unit = println(fixed2double(v))
+
+  val x = fixedMul(a,b)
+  val y = fixedMul(a,c)
+  val z = fixedMul(a,d)
+  pf(a)
+  pf(b)
+  pf(c)
+  pf(d)
+  pf(e)
+
+  println("\n")
+  pf(x)
+  pf(y)
+  pf(z)
 
 }

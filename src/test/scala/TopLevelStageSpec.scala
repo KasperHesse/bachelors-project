@@ -5,7 +5,7 @@ import chisel3.util.log2Ceil
 import common._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
+import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 import execution.Opcode.MAC
 import execution._
 import firrtl.AnnotationSeq
@@ -510,7 +510,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    *
    */
   def testFun(filename: String,
-              timeout: Int = 500,
+              timeout: Int = 1000,
               annos: AnnotationSeq = Seq(),
               dumpMemory: Boolean = false,
               memDumpName: String = "",
@@ -602,6 +602,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     testFun("generateMatrixDiagonal")
   }
 
+  it should "perform macvv" in {
+    testFun("macvv", timeout=0)
+  }
+
 
   // ======= PROGRAM FLOW =======
 
@@ -613,15 +617,19 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     testFun("adfg", dumpMemory = true, timeout=0)
   }
 
-  it should "run into solveStateCG and first ASO" in {
-    testFun("adfg_aso", dumpMemory = true, timeout = 0, memDumpName = "adfg/bef6db")
+  it should "run into solveStateCG and first ASO" in { //adfg/bef6db
+    testFun("adfg_aso", dumpMemory = true, timeout = 0, memDumpName = "adfg/736847", annos=Seq(VerilatorBackendAnnotation))
   }
 
-  it should "generate matrix diagonal and setup before cg loop" in {
-    testFun("aso_gmd", dumpMemory = true, timeout = 0, memDumpName = "adfg_aso/82c30c")
+  it should "generate matrix diagonal and setup before cg loop" in { //adfg_aso/82c30c
+    testFun("aso_gmd", dumpMemory = true, timeout = 0, memDumpName = "adfg_aso/1d3367", annos=Seq(VerilatorBackendAnnotation))
   }
 
   it should "perform an iteration of the CG loop" in { //aso_gmd/78612e has errors of size 0.0025 and down
-    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "aso_gmd/78612e")
+    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "aso_gmd/78612e", annos=Seq(VerilatorBackendAnnotation))
   } //gmd_cgiter/466092 is final version only running through preconditionDampedJacobi
+
+  it should "more iterations of CG loop" in {
+    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "gmd_cgiter/c2037b", annos=Seq(VerilatorBackendAnnotation))
+  }
 }
