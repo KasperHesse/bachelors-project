@@ -8,27 +8,85 @@ import scala.io.Source
  */
 object MemoryCompare extends App {
 
-  val testName = "gmd_cgiter"
-  val hash = "c2037b"
+  val testName = "matrixvectorproduct"
+  val hash = "cda414"
 
   def apply(): Unit = {
     val DV = compare("DV")
-    val INVD = compare("INVD") //Not comparing INVD right now since 1/(small difference) => large difference
+    val INVD = compare("INVD")
     val R = compare("R")
     val Z = compare("Z")
     val TMP = compare("TMP")
     val P = compare("P")
     val Q = compare("Q")
     val U = compare("U")
+    val X = compare("X")
+    val XPHYS = compare("XPHYS")
 
-    println(f"DV: ${DV._2}%.5f / ${DV._1}")
-    println(f"INVD: ${INVD._2}%.5f / ${INVD._1}")
-    println(f"R: ${R._2}%.5f / ${R._1}")
-    println(f"Z: ${Z._2}%.5f / ${Z._1}")
-    println(f"TMP: ${TMP._2}%.5f / ${TMP._1}")
-    println(f"P: ${P._2}%.5f / ${P._1}")
-    println(f"Q: ${Q._2}%.5f / ${Q._1}")
-    println(f"U: ${U._2}%.5f / ${U._1}")
+
+    def print(x: (Int, Double), name: String): Unit = {
+      println(f"$name: ${x._2}%.5f / ${x._1}")
+    }
+
+//    print(DV, "DV")
+//    print(INVD, "INVD")
+//    print(R, "R")
+//    print(Z, "Z")
+//    print(TMP, "TMP")
+    print(P, "P")
+    print(Q, "Q")
+//    print(U, "U")
+    print(X, "X")
+    print(XPHYS, "XPHYS")
+
+/*
+    //Compare values of P,Q-vectors in gmd_cgiter/d7026d and gmd_cgiter/587719
+    val p1 = Source.fromFile("memdump/gmd_cgiter/d7026d/mem_P.csv")
+    val p2 = Source.fromFile("memdump/gmd_cgiter/587719/mem_P.csv")
+    val q1 = Source.fromFile("memdump/gmd_cgiter/d7026d/mem_Q.csv")
+    val q2 = Source.fromFile("memdump/gmd_cgiter/587719/mem_Q.csv")
+
+    val P1 = p1.getLines().toArray
+    val P2 = p2.getLines().toArray
+    val Q1 = q1.getLines().toArray
+    val Q2 = q2.getLines().toArray
+
+    var errCnt = 0
+    var errAvg = 0.0
+    for (i <- 1 until P1.length) {
+      val v1 = P1(i).split(',').last.toDouble
+      val v2 = P2(i).split(',').last.toDouble
+      if(math.abs(v1-v2) > 0.001) {
+        println(f"ERROR at $i. P1: $v1%.5f, P2: $v2%.5f, Delta: ${math.abs(v1-v2)}%.5f")
+        errCnt += 1
+        errAvg += math.abs(v1-v2)
+      }
+    }
+    if(errCnt > 0) {
+      errAvg = errAvg / errCnt
+      println(f"$errCnt errors found for [P]")
+      println(f"Average error: $errAvg%.5f")
+    }
+    println("Comparison finished for P\n")
+
+    errCnt = 0
+    errAvg = 0.0
+    for (i <- 1 until Q1.length) {
+      val v1 = Q1(i).split(',').last.toDouble
+      val v2 = Q2(i).split(',').last.toDouble
+      if(math.abs(v1-v2) > 0.0000001) {
+        println(f"ERROR at $i. Q1: $v1, Q2: $v2, Delta: ${math.abs(v1-v2)}")
+        errCnt += 1
+        errAvg += math.abs(v1-v2)
+      }
+    }
+    if(errCnt > 0) {
+      errAvg = errAvg / errCnt
+      println(f"$errCnt errors found for [Q]")
+      println(f"Average error: $errAvg%.7f")
+    }
+    println("Comparison finished for Q\n")
+    */
   }
 
   /**
@@ -49,7 +107,7 @@ object MemoryCompare extends App {
 
     println(s"Comparing values for [$name]")
     var errCnt = 0
-    var errSum = 0.0
+    var errAvg = 0.0
     for(i <- 1 until lines1.length) {
       val scala = lines1(i).split(',').last.toDouble
       val c = lines2(i).split(',').last.toDouble
@@ -57,19 +115,19 @@ object MemoryCompare extends App {
       if(math.abs(scala-c) > delta) {
         println(f"ERROR at $i. Scala: $scala%.5f, C: $c%.5f, Delta: ${math.abs(scala-c)}%.5f")
         errCnt += 1
-        errSum += math.abs(scala-c)
+        errAvg += math.abs(scala-c)
       }
     }
     if(errCnt > 0) {
-      errSum = errSum / errCnt
+      errAvg = errAvg / errCnt
       println(f"$errCnt errors found for [$name] at delta=$delta")
-      println(f"Average error: $errSum%.5f")
+      println(f"Average error: $errAvg%.5f")
     }
     println("Comparison finished\n\n")
 
     file1.close()
     file2.close()
-    (errCnt, errSum)
+    (errCnt, errAvg)
   }
 
   apply()

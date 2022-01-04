@@ -33,7 +33,7 @@ class MemoryStage(wordsPerBank: Int, memInitFileLocation: String) extends Module
   val io = IO(new MemoryStageIO)
 
   // --- MODULES ---
-  val addrGen = Module(new AddressGenerator(false))
+  val addrGen = Module(new AddressGenerator(true))
   val mem = Module(new OnChipMemory(wordsPerBank, memInitFileLocation))
   val wb = Module(new MemoryWriteback)
   val edof = Module(new EdofGenerator)

@@ -20,7 +20,7 @@ class WriteQueueWrapper extends Module {
 
   io.out <> io.in
 
-  //ELEM operations require us to select the correct element from the incoming data. After any ELEM operation,
+  //ELEM operations require us to select the correct element from the incoming data stream. After any ELEM operation,
   //the counter should always have reset to 0
   val cnt = RegInit(0.U(log2Ceil(XREG_DEPTH+1).W))
   cnt := Mux(io.in.valid && io.in.bits.mod === ELEM, Mux(cnt === (XREG_DEPTH-1).U, 0.U, cnt + 1.U), cnt)

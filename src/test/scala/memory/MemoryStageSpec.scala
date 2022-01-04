@@ -9,17 +9,17 @@ import utils.Config._
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import execution.RegisterFileType.SREG
-import execution.{RegisterBundle, RegisterFileType, StypeBaseAddress, StypeLoadStore, StypeMod, WbIdIO, seed}
+import execution.{RegisterBundle, RegisterFileType, StypeBaseAddress, StypeLoadStore, StypeMod, seed}
 import execution.StypeMod._
 import execution.StypeBaseAddress._
 import execution.RegisterFileType._
+import utils.DefaultMemInit
 
 class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   behavior of "Memory stage"
 
-  val wordsPerBank = 1300
-  val memInitFileLocation = "src/resources/meminit/"
+  val wordsPerBank = WORDS_PER_BANK
+  val memInitFileLocation = "src/resources/meminit_default/"
   val mem: Array[Array[Long]] = Array.ofDim[Long](NUM_MEMORY_BANKS, wordsPerBank)
 
   /**
@@ -256,6 +256,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform a ld.vec" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage ld.vec")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
       setupClock(dut)
@@ -282,6 +283,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform a st.vec" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage st.dof")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
       setupClock(dut)
@@ -323,6 +325,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "zero out remaining bits in ld.vec" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage ld.vec with final zeros")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
       dut.clock.setTimeout(20)
@@ -358,6 +361,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform a ld.dof" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage ld.dof")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
       setupClock(dut)
@@ -383,6 +387,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform a st.dof" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage st.dof")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
       setupClock(dut)
@@ -422,6 +427,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform a st.fdof" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage st.fdof")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
       setupClock(dut)
@@ -474,6 +480,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform a ld.elem" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage ld.elem")
     //Try generating multiple IJK values
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
@@ -500,23 +507,26 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform a st.elem" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage st.elem")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) { dut =>
       setupClock(dut)
       dut.clock.setTimeout(30)
       val ijk = genIJKmultiple()
-      val instrs = ijk.map(e => genIJKinput(IJK = Some(e), pad=false, mod=ELEM))
+      val baseAddr = randomElement(baseAddresses)
+      val instrs = ijk.map(e => genIJKinput(IJK = Some(e), pad=false, mod=ELEM, baseAddress = Some(baseAddr)))
       val rdq = ijk.map(e => genReadQueueBundle(reg=0, rf=XREG, iter=e(3), mod=ELEM))
       val wrData = Seq.range[Long](0, XREG_DEPTH)
       val expData = wrData
+
 
       //Poke data onto queue
       dut.io.id.ls.poke(StypeLoadStore.STORE)
       fork {
         dut.io.id.neighbour.enqueueSeq(instrs)
       } .fork {
-        for(i <- wrData.indices) { //Same data being poked every time, iteration value may change
-          pokeWriteQueue(wq=dut.io.id.writeQueue, clock=dut.clock, wrData, mod=ELEM, iter=ijk(i)(3))
+        for(i <- wrData.indices) { //Only the data written at index (0) is actually used
+          pokeWriteQueue(wq=dut.io.id.writeQueue, clock=dut.clock, Seq(wrData(i)), mod=ELEM, iter=ijk(i)(3))
         }
       }.join
       while(dut.io.ctrl.wqCount.peek.litValue() > 0) {
@@ -536,6 +546,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform a ld.sel" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage ld.sel")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)) {dut =>
       setupClock(dut)
@@ -563,6 +574,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     //This test should first write a value to a location in memory, and then try to retrieve that same value
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage st.sel")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
       setupClock(dut)
@@ -595,6 +607,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform a ld.fcn" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage ld.fcn")
     scala.util.Random.setSeed(-7334395889145041688L)
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
@@ -618,6 +631,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform a ld.edn1" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage ld.edn1")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
       setupClock(dut)
@@ -640,6 +654,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform a ld.edn2" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage ld.edn2")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)) {dut =>
       setupClock(dut)
@@ -662,6 +677,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform ld.fcn, ld.edn1, ld.edn2 and ld.sel in a row" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage neighbour loads")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)) {dut =>
       setupClock(dut)
@@ -701,6 +717,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform ld.dof followed by ld.elem" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage ld.dof followed by ld.elem")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       setupClock(dut)
@@ -736,6 +753,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "perform ld.elem followed by ld.dof" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage ld.elem followed by ld.dof")
     scala.util.Random.setSeed(1)
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
@@ -769,6 +787,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
   it should "returns all 0's on ld.dof when pad is asserted" in {
     simulationConfig(true)
     initMemory()
+    DefaultMemInit()
     seed("Memory stage ld.dof with padding")
     test(new MemoryStage(wordsPerBank, memInitFileLocation)).withAnnotations(annos) {dut =>
       setupClock(dut)

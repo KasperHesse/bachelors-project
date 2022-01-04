@@ -50,7 +50,7 @@ class AddressGenerator(pipe: Boolean = false) extends Module {
   val addresses = Wire(Vec(NUM_MEMORY_BANKS, UInt(MEM_ADDR_WIDTH.W)))
 
   /** Decoded base address */
-  val baseAddr = addrDecode(io.in.bits.baseAddr.asUInt())
+  val baseAddr = addrDecode(in.baseAddr.asUInt())
 
 
   // --- LOGIC ---
@@ -66,12 +66,21 @@ class AddressGenerator(pipe: Boolean = false) extends Module {
   io.mem.bits.validAddress := vectorOrderer.io.validsOut
 
   //Ready/valid handshake
+  //Not outputting valid data, prod is not valid => valid=false
+  //Not outputting valid data, prod is valid and cons is ready => valid=true
+  //Not outputting valid, prod is valid, cons is not ready => valid=true
+  //Outputting valid data, prod is valid and cons is ready => valid=true
+  //Outputting valid data, prod is valid and cons is not ready => valid=true
+  //Outputting valid data, prod is not valid and cons is ready => valid=false
+  //Outputting valid data, prod is not valid, cons is not ready => valid=false
   if(pipe) {
-    when(!validInternal && io.in.valid && readyInternal) { //Not outputting valid data, but cons is valid and prod is ready
+    //valid logic
+    when(!validInternal && io.in.valid) { //Not outputting valid data, but prod is valid
       validInternal := true.B
-    } .elsewhen(validInternal /*&& io.mem.ready*/ && !io.in.valid) { //Outputting data, but prod does not have valid data
+    } .elsewhen(validInternal && !io.in.valid) { //Outputting data, but prod does not have valid data
       validInternal := false.B
     }
+    //ready logic
     when(!validInternal) { //When not outputting data, we're always ready
       readyInternal := true.B
     } .otherwise { //When outputting data, only ready if consumer is ready

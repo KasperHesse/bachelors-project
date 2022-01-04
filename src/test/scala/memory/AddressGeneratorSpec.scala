@@ -11,7 +11,7 @@ import chiseltest.internal.WriteVcdAnnotation
 import execution.StypeBaseAddress
 
 class AddressGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers  {
-
+  behavior of "Address Generator"
 
 
   def pokeIndex(dut: AddressGenerator, index: Int, value: Int, valid: Boolean = true): Unit = {
@@ -24,7 +24,7 @@ class AddressGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matc
     dut.io.mem.bits.validAddress(addr).expect(valid.B)
   }
 
-  "Address generator" should "reorder inputs based on the LSB" in {
+  it should "reorder inputs based on the LSB" in {
     test(new AddressGenerator(true)) {dut =>
       //Generate input vectors
       val addr = Seq(1,2,3,4,5,6,7,0)
@@ -51,7 +51,7 @@ class AddressGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matc
     }
   }
 
-  "Address generator" should "prioritize later inputs" in {
+  it should "prioritize later inputs" in {
     test(new AddressGenerator(true)) {dut =>
       for(i <- 0 until NUM_MEMORY_BANKS) {
         pokeIndex(dut, i, i << 3) //0, 8, 16, 24 etc. All have LSB 000
@@ -67,7 +67,7 @@ class AddressGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matc
     }
   }
 
-  "Address generator" should "only reorder inputs that have the valid flag set" in {
+  it should "only reorder inputs that have the valid flag set" in {
     test(new AddressGenerator(true)) {dut =>
       //Attempt to poke two elements that map to the same bank.
       //One is valid, the other is invalid

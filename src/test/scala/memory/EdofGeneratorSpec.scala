@@ -17,7 +17,7 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
   /**
    * Tests whether the element DOF generator follows the expected logic and outputs correctly.
    * Will generate a random ijk-value, and will also randomize the values of NX, NY and NZ to ensure that
-   * everything works as expected every t ime
+   * everything works as expected every time
    * @param dut
    */
   def edofGenTest(dut: EdofGenerator): Unit = {
@@ -32,18 +32,23 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
     dut.io.in.bits.ijk.j.poke(j.U)
     dut.io.in.bits.ijk.k.poke(k.U)
     dut.io.in.valid.poke(true.B)
-    dut.io.addrGen.ready.poke(true.B)
+    dut.io.addrGen.ready.poke(false.B)
     dut.io.in.bits.mod.poke(StypeMod.DOF)
     dut.io.in.ready.expect(true.B)
 
 
     dut.clock.step() //latch in values
     dut.io.in.ready.expect(false.B)
+    dut.io.in.valid.poke(false.B) //No more data
+    dut.io.addrGen.valid.expect(false.B) //no output yet
+    dut.clock.step(4) //Wait for output to be presented
+    dut.io.addrGen.ready.poke(true.B)
     dut.io.addrGen.valid.expect(true.B)
 
     for(i <- 0 until 8) {
       dut.io.addrGen.bits.indices(i).expect(edof(i).U)
       dut.io.addrGen.bits.validIndices(i).expect(true.B)
+      dut.io.addrGen.valid.expect(true.B)
     }
     dut.clock.step()
     for(i <- 0 until 8) {
@@ -55,6 +60,7 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
       dut.io.addrGen.bits.indices(i).expect(edof(i+16).U)
       dut.io.addrGen.bits.validIndices(i).expect(true.B)
     }
+    dut.io.in.ready.expect(true.B)
   }
 
 
@@ -139,7 +145,7 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
         dut.clock.step()
       }
       dut.io.in.valid.poke(true.B)
-      dut.clock.step()
+      dut.clock.step(2) //Latch in values, and then clock to present output on register
       dut.io.addrGen.valid.expect(true.B)
       dut.io.in.ready.expect(false.B)
     }
@@ -147,32 +153,36 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
   it should "change output values when ready is asserted" in {
     test(new EdofGenerator).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
-      val edof = getEdof(1,2,3)
+      val ijk =  genIJK()
+      val edof = getEdof(ijk(0), ijk(1), ijk(2))
 
       dut.io.in.valid.poke(true.B)
-      pokeIJK(dut, 1,2,3)
+      dut.io.in.ready.expect(true.B)
+      pokeIJK(dut, ijk(0), ijk(1), ijk(2))
+      dut.clock.step(1)
+      dut.io.in.ready.expect(false.B)
+
+      //another cc is required for output to be present
       dut.clock.step()
 
-      //Observe outputs for 2 clock cycles when consumer is not ready
+      //Observe constant output for 2 clock cycles when consumer is not ready
       for(i <- 0 until 3) {
         expectIndices(dut, edof.slice(0,8))
         dut.clock.step()
       }
       dut.io.in.ready.expect(false.B)
+
+      //When ready is asserted, the output changes on the next clock cycle
       dut.io.addrGen.ready.poke(true.B)
       dut.clock.step()
 
-      //Step through outputs when consumer is ready
-      expectIndices(dut, edof.slice(8, 16))
-      dut.io.in.ready.expect(false.B)
+      //New inputs can be latched in now
+      expectIndices(dut, edof.slice(8,16))
+      dut.io.in.ready.expect(true.B)
       dut.clock.step()
 
-      expectIndices(dut, edof.slice(16, 24))
-      //Verify that producer ready-signal is combinationally coupled to consumer ready-signal
-      dut.io.in.ready.expect(true.B)
-      dut.io.addrGen.ready.poke(false.B)
+      expectIndices(dut, edof.slice(16,24))
       dut.io.in.ready.expect(false.B)
     }
   }
-
 }

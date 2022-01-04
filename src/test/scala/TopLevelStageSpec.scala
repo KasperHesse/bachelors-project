@@ -25,7 +25,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
   var logFile: Writer = null
 
   /**
-   * Logs a string to stdout if the class' [[LOGGING]] flag is set
+   * Logs a string to stdout if the [[LOGGING]] flag is set
    * @param l The string to log
    */
   def log(l: String): Unit = {
@@ -92,19 +92,19 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the actual data loading into a VREG
    * @param memid Interface between memory writeback and instruction decode stages
    * @param clock DUT clock
-   * @param rd Destination V-register
+   * @param instr The instruction being processed
    * @param expected Expected data. Each entry of expected(i) must contain exactly 24 entries
    * @param sc The simulation container used for this simulation
    */
-  def loadIntoVreg(memid: WbIdIO, clock: Clock, rd: UInt, expected: Seq[Seq[SInt]], sc: SimulationContainer): Unit = {
+  def loadIntoVreg(memid: WbIdIO, clock: Clock, instr: StypeInstruction, expected: Seq[Seq[SInt]], sc: SimulationContainer): Unit = {
     for(i <- expected.indices) {
       while(!memid.we.peek.litToBoolean) { clock.step() }
 
       val exp = expected(i)
-      val reg = rd.litValue.toInt*VREG_SLOT_WIDTH + i
+      val reg = instr.rsrd.litValue.toInt*VREG_SLOT_WIDTH + i
       for(j <- exp.indices) {
         val rdData = memid.wrData(j).peek()
-        assertEquals(rdData, exp(j))
+        assertEquals(rdData, exp(j), instr=instr, extra=s"loadIntoVreg. i=$i, j=$j")
         sc.vReg(sc.memThread)(reg)(j) = rdData
       }
       memid.rd.rf.expect(RegisterFileType.VREG)
@@ -121,17 +121,17 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * @param expected Expected data. Must be at most 8 entries large
    * @param sc The simulation container used for this simulation
    */
-  def loadIntoXreg(memid: WbIdIO, clock: Clock, rd: UInt, expected: Seq[SInt], sc: SimulationContainer): Unit = {
+  def loadIntoXreg(memid: WbIdIO, clock: Clock, instr: StypeInstruction, expected: Seq[SInt], sc: SimulationContainer): Unit = {
     while(!memid.we.peek.litToBoolean) { clock.step() }
 
-    val reg = rd.litValue.toInt
+    val reg = instr.rsrd.litValue.toInt
     for(j <- expected.indices) {
       val rdData = memid.wrData(j).peek()
-      assertEquals(rdData, expected(j))
+      assertEquals(rdData, expected(j), instr=instr, extra=s"loadIntoXreg: j=$j")
       sc.xReg(sc.memThread)(reg)(j) = rdData
     }
     memid.rd.rf.expect(RegisterFileType.XREG)
-    memid.rd.reg.expect(rd)
+    memid.rd.reg.expect(instr.rsrd)
     clock.step()
   }
 
@@ -154,7 +154,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val ijk = sc.ijkBase(sc.memThread)
     val indices = getEdn1Indices(ijk)
     val expectedData = determineExpectedLoadData(indices, instr.baseAddr, sc)
-    loadIntoXreg(memid, clock, instr.rsrd, expectedData, sc)
+    loadIntoXreg(memid, clock, instr, expectedData, sc)
   }
 
   /**
@@ -168,7 +168,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val ijk = sc.ijkBase(sc.memThread)
     val indices = getEdn2Indices(ijk)
     val expectedData = determineExpectedLoadData(indices, instr.baseAddr, sc)
-    loadIntoXreg(memid, clock, instr.rsrd, expectedData, sc)
+    loadIntoXreg(memid, clock, instr, expectedData, sc)
   }
 
   /**
@@ -182,7 +182,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val ijk = sc.ijkBase(sc.memThread)
     val indices = getFcnIndices(ijk)
     val expectedData = determineExpectedLoadData(indices, instr.baseAddr, sc)
-    loadIntoXreg(memid, clock, instr.rsrd, expectedData, sc)
+    loadIntoXreg(memid, clock, instr, expectedData, sc)
   }
 
   /**
@@ -196,7 +196,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val ijk = sc.ijkBase(sc.memThread)
     val indices = Seq(elementIndex(ijk))
     val expectedData = determineExpectedLoadData(indices, instr.baseAddr, sc)
-    loadIntoXreg(memid, clock, instr.rsrd, expectedData, sc)
+    loadIntoXreg(memid, clock, instr, expectedData, sc)
   }
 
   /**
@@ -226,7 +226,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val ijk = genIJKmultiple(start=Some(sc.ijkBase(sc.memThread))) //All IJK tuples accessed
     val indices = ijk.map(elementIndex)
     val expectedData = determineExpectedLoadData(indices, instr.baseAddr, sc)
-    loadIntoXreg(memid, clock, instr.rsrd, expectedData, sc)
+    loadIntoXreg(memid, clock, instr, expectedData, sc)
   }
 
   /**
@@ -258,7 +258,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val ijk = genIJKmultiple(start=Some(sc.ijkBase(sc.memThread))) //Generate all ijk tuples accessed
     val edof = ijk.map(e => getEdof(e(0), e(1), e(2))) //And the corresponding memory locations
     val expectedData = edof.map(e => determineExpectedLoadData(e, instr.baseAddr, sc))
-    loadIntoVreg(memid, clock, instr.rsrd, expectedData, sc)
+    loadIntoVreg(memid, clock, instr, expectedData, sc)
   }
 
   /**
@@ -317,7 +317,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val indices = Seq.tabulate(VREG_SLOT_WIDTH)(n => Seq.range(baseIndex+n*VREG_DEPTH, baseIndex+(n+1)*VREG_DEPTH))
     val expectedData = indices.map(i => determineExpectedLoadData(i, instr.baseAddr, sc))
 
-    loadIntoVreg(memid, clock, instr.rsrd, expectedData, sc)
+    loadIntoVreg(memid, clock, instr, expectedData, sc)
   }
 
 
@@ -618,18 +618,29 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "run into solveStateCG and first ASO" in { //adfg/bef6db
-    testFun("adfg_aso", dumpMemory = true, timeout = 0, memDumpName = "adfg/736847", annos=Seq(VerilatorBackendAnnotation))
+    testFun("adfg_aso", dumpMemory = true, timeout = 0, memDumpName = "adfg/736847")
   }
 
   it should "generate matrix diagonal and setup before cg loop" in { //adfg_aso/82c30c
     testFun("aso_gmd", dumpMemory = true, timeout = 0, memDumpName = "adfg_aso/1d3367", annos=Seq(VerilatorBackendAnnotation))
   }
 
-  it should "perform an iteration of the CG loop" in { //aso_gmd/78612e has errors of size 0.0025 and down
-    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "aso_gmd/78612e", annos=Seq(VerilatorBackendAnnotation))
+  //aso_gmd/9ce633 has invD equal to all 1's
+  //aso_gmd/fae968 has errors in invD of average size 0.0014 (132x)
+  //aso_gmd/fromcc has invD equal to all 1's and R-values from C code (should be no differences whatsoever)
+  it should "perform an iteration of the CG loop" in {
+    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "aso_gmd/fromcc", annos=Seq(VerilatorBackendAnnotation))
   } //gmd_cgiter/466092 is final version only running through preconditionDampedJacobi
 
   it should "more iterations of CG loop" in {
-    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "gmd_cgiter/c2037b", annos=Seq(VerilatorBackendAnnotation))
+    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "gmd_cgiter/bf533b", annos=Seq(VerilatorBackendAnnotation))
+  }
+
+  it should "run compliance and ADFG after CG loop" in {
+    testFun("cgiter_comp_adfg", dumpMemory=true, timeout=0, memDumpName="gmd_cgiter/8eeb4f", annos=Seq(VerilatorBackendAnnotation))
+  }
+
+  it should "perform a matrix-vector product" in {
+    testFun("matrixvectorproduct", dumpMemory=true, timeout=4000, memDumpName="matrixvectorproduct/init", annos=Seq(VerilatorBackendAnnotation, WriteVcdAnnotation))
   }
 }

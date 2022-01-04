@@ -34,9 +34,14 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * @param a The first value
    * @param b The second value
    * @param delta Maximum allowed deviation (not inclusive)
+   * @param instr The instruction being processed
+   * @param rd The destination register being written to
+   * @param extra Additional data to be logged in case of a miscompare
    */
-  def assertEquals(a: SInt, b: SInt, delta: Double = 0.01): Unit = {
-    org.scalatest.Assertions.assert(math.abs(fixed2double((a.litValue-b.litValue).toLong)) < delta, s"[a=$a (${fixed2double(a)}), b=$b (${fixed2double(b)})]")
+  def assertEquals(a: SInt, b: SInt, delta: Double = 0.01, instr: Bundle = null, rd: UInt = 9001.U, extra: String = ""): Unit = {
+    val clue = s"[a=$a (${fixed2double(a)}), b=$b (${fixed2double(b)})]\nInstruction: ${if (instr != null) instr else "Not given"}\nRd: ${if (rd.litValue() != 9001) rd.litValue else "Not given"}\nExtra: $extra"
+
+    org.scalatest.Assertions.assert(math.abs(fixed2double((a.litValue-b.litValue).toLong)) < delta, clue)
   }
 
   /**
@@ -224,8 +229,9 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       throw new IllegalArgumentException("Unknown Rtype modifier")
     }
     wbid.rd.rf.expect(RegisterFileType.VREG)
-    assertEquals(wbid.wrData(0).peek, sc.results(0))
+
     for(i <- 0 until VREG_DEPTH) {
+      assertEquals(wbid.wrData(i).peek, sc.results(i), instr=instr, rd=wbid.rd.reg.peek())
       sc.results(i) = wbid.wrData(i).peek //to avoid any incremental changes we store the calculated values
     }
   }
@@ -249,8 +255,9 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     }
     wbid.rd.rf.expect(RegisterFileType.XREG)
     wbid.rd.subvec.expect(0.U)
-    assertEquals(wbid.wrData(0).peek, sc.results(0))
+//    assertEquals(wbid.wrData(0).peek, sc.results(0), instr=instr, rd=wbid.rd.reg.peek())
     for (i <- 0 until NUM_PROCELEM) {
+      assertEquals(wbid.wrData(i).peek, sc.results(i), instr=instr, rd=wbid.rd.reg.peek(), extra=f"expectXreg: i=$i")
       sc.results(i) = wbid.wrData(i).peek
     }
     wbid.wrData(NUM_PROCELEM).expect(0.S)
@@ -278,7 +285,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     wbid.rd.rf.expect(RegisterFileType.SREG)
     wbid.rd.reg.expect(instr.rd)
     wbid.rd.subvec.expect(0.U)
-    assertEquals(wbid.wrData(0).peek, sc.results(0))
+    assertEquals(wbid.wrData(0).peek, sc.results(0), instr=instr, rd=wbid.rd.reg.peek())
     for(i <- 0 until NUM_PROCELEM) {
       sc.results(i) = wbid.wrData(i).peek
     }

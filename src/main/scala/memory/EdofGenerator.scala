@@ -59,6 +59,8 @@ class EdofGenerator extends Module {
   val in = RegEnable(io.in.bits, io.in.valid && readyInternal)
   /** Vector holding the indices being output to address generator */
   val indices = Wire(Vec(NUM_MEMORY_BANKS, UInt(log2Ceil(NDOF+1).W)))
+  /** Output registers holding the values to addr. generator */
+  val indicesReg = RegInit(VecInit(Seq.fill(NUM_MEMORY_BANKS)(0.U(log2Ceil(NDOF+1).W))))
   /** vector holding the valid flags for output indices */
   val validIndices = Wire(Vec(NUM_MEMORY_BANKS, Bool()))
 
@@ -104,8 +106,19 @@ class EdofGenerator extends Module {
   } .elsewhen(outputStep === 2.U && io.addrGen.ready) {
     processing := false.B
   }
-  outputStep := Mux(processing && io.addrGen.ready, Mux(outputStep === 2.U, 0.U, outputStep + 1.U), outputStep)
 
+  when(processing && outputStep === 0.U) {
+    outputStep := outputStep + 1.U
+    indicesReg := indices
+  } .elsewhen(processing && io.addrGen.ready && outputStep === 1.U) {
+    outputStep := outputStep + 1.U
+    indicesReg := indices
+  } .elsewhen(processing && io.addrGen.ready && outputStep === 2.U) {
+    outputStep := 0.U
+    indicesReg := indices
+  } .otherwise {
+    outputStep := outputStep
+  }
 
   for(i <- 0 until 8) {
     //24*nIndex(i) + outputStep*8 + i
@@ -116,6 +129,7 @@ class EdofGenerator extends Module {
     val out = Cat(indexX3 + outputStep, offset) //Defined as separate value to make VCD outputs nicer
     indices(i) := out
   }
+
   when(in.mod === StypeMod.DOF) {
     for(i <- 0 until 8) {
       validIndices(i) := !in.pad
@@ -132,7 +146,7 @@ class EdofGenerator extends Module {
   //Must delay the output by one clock cycle to ensure that write data has arrived in write queue and
   //this module is connected to address generator
   io.addrGen.bits.validIndices := RegNext(validIndices)
-  io.addrGen.bits.indices := RegNext(indices)
+  io.addrGen.bits.indices := indicesReg
   io.addrGen.bits.baseAddr := RegNext(in.baseAddr)
   io.addrGen.valid := RegNext(processing)
   io.in.ready := readyInternal

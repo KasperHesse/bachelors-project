@@ -4,6 +4,7 @@ import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
+import common.calculateKVresult
 import execution.Opcode.{ADD, DIV, MAC, RED}
 import execution._
 import org.scalatest.{FlatSpec, Matchers}

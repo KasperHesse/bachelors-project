@@ -4,7 +4,7 @@ import chisel3._
 import chiseltest._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import common.{InstructionBuffer, fillInstructionBuffer}
+import common.{InstructionBuffer, calculateKVresult, fillInstructionBuffer}
 import execution.BranchComp._
 import execution.Opcode.{ADD, MAC, MUL, SUB}
 import execution._

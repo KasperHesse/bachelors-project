@@ -206,30 +206,30 @@ package object execution {
       throw new IllegalArgumentException("Could not calculate result register type")
     }
   }
-
-  /**
-   * Calculates the result of an instruction with R-type modifier KV
-   * @param instr The instruction
-   * @param results Result buffer
-   * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
-   */
-  def calculateKVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
-                        vReg: Array[Array[SInt]]): Unit = {
-    val KE = KEWrapper.getKEMatrix()
-    val rs1 = instr.rs1.litValue.toInt
-    val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
-    //Zero out results
-    for(i <- 0 until VREG_DEPTH) {
-      results(i) = 0.S(FIXED_WIDTH.W)
-    }
-    for(i <- 0 until KE_SIZE) {
-      for(j <- 0 until KE_SIZE) {
-        val a = double2fixed(KE(i)(j)).S
-        val b = vReg(rs1*VREG_SLOT_WIDTH + rdOffset)(j)
-        results(i) = fixedAdd(results(i), fixedMul(a, b))
-      }
-    }
-  }
+//
+//  /**
+//   * Calculates the result of an instruction with R-type modifier KV
+//   * @param instr The instruction
+//   * @param results Result buffer
+//   * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
+//   */
+//  def calculateKVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
+//                        vReg: Array[Array[SInt]]): Unit = {
+//    val KE = KEWrapper.getKEMatrix()
+//    val rs1 = instr.rs1.litValue.toInt
+//    val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
+//    //Zero out results
+//    for(i <- 0 until VREG_DEPTH) {
+//      results(i) = 0.S(FIXED_WIDTH.W)
+//    }
+//    for(i <- 0 until KE_SIZE) {
+//      for(j <- 0 until KE_SIZE) {
+//        val a = double2fixed(KE(i)(j)).S
+//        val b = vReg(rs1*VREG_SLOT_WIDTH + rdOffset)(j)
+//        results(i) = fixedAdd(results(i), fixedMul(a, b))
+//      }
+//    }
+//  }
 
   /**
    * Calculates the result of an instruction with R-type modifier SS

@@ -20,7 +20,7 @@ object Fixed {
   /** Number of bits in the fractional part of an immediate value */
   val IMM_FRAC_WIDTH = 7
 
-  require(FRAC_WIDTH+INT_WIDTH == FIXED_WIDTH-1, "Width of Fixed-point numbers must be 1(sign) + frac_width+int_width")
+  require(FRAC_WIDTH+INT_WIDTH+1 == FIXED_WIDTH, "Width of Fixed-point numbers must be 1(sign) + frac_width+int_width")
 
   /**
    * Converts a given double value into its corresponding fixed-point representation
