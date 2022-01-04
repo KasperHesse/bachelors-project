@@ -1,0 +1,12 @@
+
+    //A simple mac.kv loop
+
+    pstart nelemdof
+    ld.dof v0, P
+    estart
+    mac.kv v1, v0
+    add.ss s0, s0, s0
+    eend
+    st.dof v1, Q
+    pend
+

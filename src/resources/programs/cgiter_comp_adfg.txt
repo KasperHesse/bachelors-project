@@ -1,0 +1,125 @@
+//DENS: Input densities (nelem long)
+//INPUT: Input vector (ndof long)
+//OUTPUT: Output densities (nelem long)
+func complianceAndSensitivity(DENS, INPUT, OUTPUT) = {
+
+    pstart single //Setup e0, emin constants
+    estart
+    add.is s1, s0, 0.0078125
+    mul.ss s1, s1, s1 //s1 = 6.1e-5
+    add.is s2, s0, 0.015625
+    mul.ss s2, s1, s2 //s2 = 9.5e-7 ~= 1e-6 = emin
+    add.is s1, s0, 1 //s1 = 1 = e0
+    sub.ss s1, s1, s2 //s1 = e0-emin
+    mul.is s1, s1, -2 //s1 = -penal*(e0-emin)
+    eend
+    pend
+
+    pstart nelemdof
+    ld.elem x0, DENS
+    ld.dof v0, INPUT
+    estart
+    mac.kv v1, v0 //v1 = tmp=u_local*ke
+    red.vv x1, v0, v1 //s2 = clocal = sum(u_local[ii]*tmp[ii])
+    mul.xx x0, x0, x0 //x0 = pow(x[elementIndex], penal-1) //penal = 3 => pow(x,2)
+    mul.xx x0, x0, x1 //x0 = clocal*pow(x,penal-1)
+    mul.sx x0, s1, x0 //x0 = clocal*(-penal*(e0-emin))*pow(x,penal-1)
+    eend
+    st.elem x0, OUTPUT
+    pend
+}
+
+// VEC: The NELEM long vector that ADFG should be applied to. Should be either DV or DC
+func applyDensityFilterGradient(VEC) = {
+    //For each element, calculate unityscale and scale the central element by this value. Store that value in tmp
+    //Unityscale is obtained by getting all neighbours, dividing by themselves to get 1, and then multiplying
+    //neighbours with their known, constant filterweight. Summing all filterweights gives unityscale
+    pstart double //Initial setup
+    estart
+    mul.sx x0, s0, x0 //clear x0
+    add.ix x0, x0, 1 //Set x0=1
+    eend
+    pend
+
+    pstart nelemstep //Step through all elements
+    ld.sel x1,  VEC //x1 = v[e1]
+    ld.fcn x2,  VEC //x2 = fcn[e1]
+    ld.edn1 x3, VEC //x3 = edn1[e1]
+    ld.edn2 x4, VEC //x4 = edn2[e1]
+    estart
+    div.xx x2, x2, x2 //x2 = x2/x2 (all non-zero elements become 1, zeros stay zero)
+    div.xx x3, x3, x3 //x3 = x3/x3
+    div.xx x4, x4, x4 //x4 = ones
+    mul.ix x2, x2, 0.5 //face neighbour weight = 0.5
+    mul.ix x3, x3, 0.08578 //Edge neighbour weight = 0.08578
+    mul.ix x4, x4, 0.08578 //edge neighbour weight = 0.08578
+    red.xx s1, x0, x2 //Sum all face neighbour weightings
+    red.xx s2, x0, x3 //Sum some edge neigbour weights
+    add.ss s1, s1, s2 //Add partial sum
+    red.xx s2, x0, x4 //Sum remaining edge neighbour weights
+    add.ss s1, s1, s2 //Add remaining edge neighbours
+    add.is s1, s1, 1.5 //Add central element weighting. s1 = unityscale
+    div.is s1, s1, 1 //s1 = 1/unityscale
+    mul.sx x1, s1, x1 //x1 = v[e1]/unityscale
+    eend
+    st.sel x1, TMP
+    pend
+
+    //For each element in DV, clear its value. Then loop through neighbourhood, setting new element
+    //value to be a scaled version of all input values in tmp
+    pstart nelemstep //Through all elements
+    ld.sel x1, TMP
+    ld.fcn x2, TMP
+    ld.edn1 x3, TMP
+    ld.edn2 x4, TMP
+    estart //We need both the original values AND count of values
+    mul.ix x2, x2, 0.5 //scale face neighbours
+    mul.ix x3, x3, 0.08578 //Scale edge neighbours
+    mul.ix x4, x4, 0.08578 //Scale edge neighbours
+    mul.ix x1, x1, 1.5 //Scale central element
+    red.xx s1, x1, x0 //Sum values in x1
+    red.xx s2, x2, x0 //Sum values in x2
+    add.ss s1, s1, s2
+    red.xx s2, x3, x0 //Sum values in x3
+    add.ss s1, s1, s2
+    red.xx s2, x4, x0 //Sum values in x4
+    add.ss s1, s1, s2 //s1 = v[e1] += filterWeight*tmp[e2] for all neighbours
+    div.xx x1, x1, x1 //Reset value in x1 to a single value
+    mul.sx x1, s1, x1 //Set first value in x1 to new element value
+    eend
+    st.sel x1, VEC
+    pend
+}
+
+complianceAndSensitivity(XPHYS, U, DC)
+applyDensityFilterGradient(DC)
+
+//Setup value of g
+pstart double
+estart
+mul.sv v0, s0, v0 //clear v0
+add.iv v0, v0, 1 //set v0=1
+eend
+pend
+
+
+pstart nelemvec
+ld.vec v1, XPHYS
+estart
+mac.vv s13, v0, v1 //s13 = g = sum(xPhys)
+eend
+pend
+
+pstart single
+estart
+add.is s1, s0, 6 //s1=6
+mul.ss s2, s1, s1 //s2 = 36
+mul.ss s2, s1, s2 //s2 = 216 = nelem
+div.ss s13, s13, s2 //s2 = g/nelem
+add.is s13, s13, -0.2 //s13  = g/nelem-volfrac
+eend
+pend
+
+//-20.829 er kun på (4,147) og (76,165)
+//21.64 er kun på (84,166) og (12, 148)
+//scala(4) bliver skrevet til 327/4

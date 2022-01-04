@@ -69,14 +69,17 @@ func sqrt_S(REG1, REG2, REG3, REG4) = {
 
 CG_MAIN_LOOP:
 
-//Update values of z
-pstart ndof
-ld.vec v0, INVD
-ld.vec v1, R
+//Clear z vector
+pstart double
 estart
-mul.vv v2, v0, v1 //z[i]=invd[i]*r[i]
+mul.sv v0, s0, v0
 eend
-st.vec v2, Z
+pend
+
+pstart ndof
+estart
+eend
+st.vec v0, Z
 pend
 
 //Calculate rho=dpr(R, Z)
@@ -101,7 +104,7 @@ beq s0, s0 CG_POST_P_UPDATE
 CG_P_NOT_FIRST_ITER:
 pstart single //Not first iteration, p=beta*p[i]+z[i]
 estart
-div.ss s6, s12, s11 //s1 = beta=rho/rhoOld
+div.ss s1, s12, s11 //s1 = beta=rho/rhoOld
 eend
 pend
 
@@ -109,14 +112,13 @@ pstart ndof
 ld.vec v0, Z
 ld.vec v1, P
 estart
-mul.sv v1, s6, v1 //v1 = beta*p[i]
+mul.sv v1, s1, v1 //v1 = beta*p[i]
 add.vv v1, v1, v0 //v1 = beta*pi[i] + z[i]
 eend
 st.vec v1, P
 pend
 
 CG_POST_P_UPDATE:
-
 //xphys=dens, P=in, Q=out
 applyStateOperator(XPHYS, P, Q)
 
@@ -166,9 +168,9 @@ pstart single
 estart
 div.ss s1, s1, s13 //s1 = norm(r)/bnorm = relres
 add.is s8, s8, 1 //cgIter++
-add.is s2, s0, 1 //Number of iteration to perform while testing
-//mul.is s2, s2, 5 //num iters = 25
-//mul.is s2, s2, 3 //num iters = 50
+add.is s2, s0, 5 //Number of iteration to perform while testing = 5
+//mul.is s2, s2, 6 //num iters = 36
+//mul.is s2, s2, 4 //num iters = 144
 eend
 pend
 
