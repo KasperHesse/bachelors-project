@@ -252,7 +252,8 @@ package object memory {
   /**
    * Calculates the next ijk value to be accessed
    * @param ijkIter An array holding the i,j,k,iteration values at indices 0,1,2,3 respectively
-   * @return Another ijkIter array, holding the indices and iteration values for the next ijk coordinates
+   * @return Another ijkIter array, holding the indices and iteration values for the next ijk coordinates.
+   *         If the next IJK coordinate is invalid, returns (-1, -1, -1, 8) instead
    */
   def nextIJK(ijkIter:  Array[Int]): Array[Int] = {
     val i = ijkIter(0)

@@ -484,7 +484,7 @@ object Assembler {
     val key = tokens(0).dropRight(1)
     if(tokens.length == 1) {
       if(symbols.contains(key)) {
-        throw new IllegalArgumentException(s"Duplicate label '$key' already exists, mapping to PC ${symbols(key)}'")
+        throw new IllegalArgumentException(s"Duplicate label '$key' already exists, mapping to PC ${symbols(key)}")
       }
       symbols += (key -> pc)
     } else {

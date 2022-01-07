@@ -19,9 +19,9 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * @param dut The DUT
    * @param instr The branch instruction being evaluated
    */
-  def verifyBranchOutcome(idctrl: IdControlIO, clock: Clock, instr: BtypeInstruction, mc: SimulationContainer): Unit = {
-    val a = mc.sReg(instr.rs1.litValue.toInt)
-    val b = mc.sReg(instr.rs2.litValue.toInt)
+  def verifyBranchOutcome(idctrl: IdControlIO, clock: Clock, instr: BtypeInstruction, sc: SimulationContainer): Unit = {
+    val a = sc.sReg(instr.rs1.litValue.toInt)
+    val b = sc.sReg(instr.rs2.litValue.toInt)
     val comp = instr.comp
     val branch = branchOutcome(a, b, comp)
     clock.step() //Branch outcomes are evaluated on next clock cycle
@@ -38,7 +38,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * @param rd The destination register being written to
    * @param extra Additional data to be logged in case of a miscompare
    */
-  def assertEquals(a: SInt, b: SInt, delta: Double = 0.01, instr: Bundle = null, rd: UInt = 9001.U, extra: String = ""): Unit = {
+  def assertEquals(a: SInt, b: SInt, delta: Double = 1, instr: Bundle = null, rd: UInt = 9001.U, extra: String = ""): Unit = {
     val clue = s"[a=$a (${fixed2double(a)}), b=$b (${fixed2double(b)})]\nInstruction: ${if (instr != null) instr else "Not given"}\nRd: ${if (rd.litValue() != 9001) rd.litValue else "Not given"}\nExtra: $extra"
 
     org.scalatest.Assertions.assert(math.abs(fixed2double((a.litValue-b.litValue).toLong)) < delta, clue)
@@ -218,7 +218,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
   def expectVREG(wbid: WbIdIO, instr: RtypeInstruction, sc: SimulationContainer): Unit = {
     val mod = instr.mod.litValue
     if(instr.op.litValue() == MAC.litValue && mod == RtypeMod.KV.litValue) {
-      calculateKVresult(instr, sc.results, wbid.rd.reg.peek, sc.vReg(sc.execThread))
+      calculateKVresult(instr, sc.results, wbid.rd.reg.peek, sc.vReg(sc.execThread), Some(sc))
     } else if(mod == RtypeMod.VV.litValue) {
       calculateVVresult(instr, sc.results, wbid.rd.reg.peek, sc.vReg(sc.execThread))
     } else if (mod == RtypeMod.XV.litValue) {
@@ -231,7 +231,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     wbid.rd.rf.expect(RegisterFileType.VREG)
 
     for(i <- 0 until VREG_DEPTH) {
-      assertEquals(wbid.wrData(i).peek, sc.results(i), instr=instr, rd=wbid.rd.reg.peek())
+      assertEquals(wbid.wrData(i).peek, sc.results(i), instr=instr, rd=wbid.rd.reg.peek(), extra = f"i=$i")
       sc.results(i) = wbid.wrData(i).peek //to avoid any incremental changes we store the calculated values
     }
   }
@@ -298,12 +298,20 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * @param instr The instruction
    * @param results Result buffer
    * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
+   * @param sc An optional simulationcontainer object. If none, KE-0 is used, otherwise, appropriate KE-values depending on the ijk
+   *           values from [[SimulationContainer.ijkBase]] is used.
    */
   def calculateKVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
-                        vReg: Array[Array[SInt]]): Unit = {
-    val KE = KEWrapper.getKEMatrix()
+                        vReg: Array[Array[SInt]], sc: Option[SimulationContainer] = None): Unit = {
+
+
     val rs1 = instr.rs1.litValue.toInt
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
+
+    val KE = sc match {
+      case None => KEWrapper.getKEMatrix(0)
+      case Some(x) => KEWrapper.getKEMatrix(x.vregIter(x.execThread)(rs1 + rdOffset))
+    }
     //Zero out results
     for(i <- 0 until VREG_DEPTH) {
       results(i) = 0.S(FIXED_WIDTH.W)

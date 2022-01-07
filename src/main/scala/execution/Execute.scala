@@ -49,6 +49,8 @@ class Execute extends Module {
   op := opSignal
 
   //Select between forwarding values or original values
+  //Notice: We are using values directly from ID stage since SyncReadMem delays memory reads by 1 clock cycle
+  //All other signals are taken from pipeline register, but data is taken straight from ID input
   val a = Mux(io.fwd.rs1swap, io.fwd.rs1newData, io.id.a)
   val b = Mux(io.fwd.rs2swap, io.fwd.rs2newData, io.id.b)
   val immVec = Wire(Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W)))

@@ -14,12 +14,15 @@ import scala.io.Source
  *              (nelem x nelem)
  * @param sync Whether the output is synchronous or asynchronous. If sync=false, the output is immediatedly available after
  *             issuing a read. If sync=true, the output is available on the following clock cycle
+ * @param iter Which iteration-transformed version of the KE matrix that this KE wrapper should instantiate. Legal values are [0:7]
  */
-class KEWrapper(val nelem: Int, val sync: Boolean = false) extends Module {
+class KEWrapper(val nelem: Int, val sync: Boolean = false, val iter: Int = 0) extends Module {
+  require(iter >= 0 && iter < 8, "KE wrapper iteration value must be between 0 and 7 inclusive")
+
   val io = IO(new KEWrapperIO(nelem))
 
   //Setup constants
-  val KE = getKEslices(nelem)
+  val KE = getKEslices(nelem, iter)
   val subMatricesPerRow = KE_SIZE / nelem
 
 
@@ -69,11 +72,14 @@ class KEWrapperIO(val nelem: Int) extends Bundle {
 object KEWrapper {
   /**
    * Gets the 2D-array representing the KE-matrix
+   * @param iter Which iteration-transformed KE-matrix to get
    * @return A 2D-array of doubles representing the KE-matrix values
    */
-  def getKEMatrix(): Array[Array[Double]] = {
+  def getKEMatrix(iter: Int): Array[Array[Double]] = {
+    require(0 <= iter && iter < 8)
+
     val KE = Array.ofDim[Double](KE_SIZE, KE_SIZE)
-    val src = Source.fromFile("src/resources/ke.csv")
+    val src = Source.fromFile(f"src/resources/ke-${iter}.csv")
     val lines = src.getLines().toArray
 
     if(lines.length != KE_SIZE) {
@@ -93,11 +99,11 @@ object KEWrapper {
   }
 
   def main(args: Array[String]): Unit = {
-    printKE()
+    printKE(0)
   }
 
-  def printKE(): Unit = {
-    val KE = getKEMatrix()
+  def printKE(iter: Int): Unit = {
+    val KE = getKEMatrix(iter)
     for (i <- 0 until KE_SIZE) {
       for (j <- 0 until KE_SIZE) {
         print(s"${KE(i)(j)}, ")
@@ -115,12 +121,11 @@ object KEWrapper {
    * @param nelem The number of processing elements.
    * @return (nelem*nelem*2) slices, holding all submatrix slices in the KE array
    */
-  def getKEslices(nelem: Int): Array[Array[Double]] = {
+  def getKEslices(nelem: Int, iter: Int): Array[Array[Double]] = {
+    require(KE_SIZE % nelem == 0, "Can only split KE matrix into equally sized chunks")
+
     val width = KE_SIZE
-    if(width % nelem != 0) {
-      throw new IllegalArgumentException("Can only split KE matrix into equally sized chunks")
-    }
-    val KE = getKEMatrix()
+    val KE = getKEMatrix(iter)
 
     val numSlices = (math.pow(width/nelem,2)*nelem).toInt
     val keSlices = Array.ofDim[Double](numSlices, nelem)

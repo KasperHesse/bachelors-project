@@ -104,7 +104,7 @@ pend
 
 generateMatrixDiagonal()
 
-//Setup scalars for CG loop
+
 pstart ndof //Calculate sum(F[i]*F[i])
 ld.vec v0, F
 estart
@@ -115,6 +115,7 @@ pend
 //Calculate bnorm into s13, use s1,s2,s3 as temp registers
 sqrt_S(s13, s1, s2, s3)
 
+//Setup scalars for CG loop
 pstart single
 estart
 //s13 = bnorm, setup above

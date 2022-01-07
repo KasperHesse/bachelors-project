@@ -1,43 +1,50 @@
-pstart nelemvec //Set up values
+//Scalar square root
+//REG1: Input value to take sqrt of, will also contain result when finished
+//REG2, REG3, REG4: Additional registers than can be used as temps
+//LABEL: A label to be used for the square root loop. Must be unique from any other label in the program
+func sqrt_S(REG1, REG2, REG3, REG4, LABEL) = {
+    pstart single
+    estart
+    add.ss REG2, REG1, s0 //REG2 = REG1 = S = initial estimate
+    add.ss REG3, s0, s0   //s3 = loop counter = 0
+    eend
+    pend
+
+    //Cannot add label as we have multiple sqrts in the system. Using it for now, though
+    LABEL:
+    pstart single
+    estart
+    div.ss REG4, REG1, REG2 //REG4 = S/xn
+    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
+    mul.is REG2, REG4, 0.5  //REG2 = xnew = 1/2*(xn+S/xn), iteration finished
+    add.is REG3, REG3, 1    //increment loop counter
+    add.is REG4, s0, 3      //REG4 = 3
+    mul.is REG4, REG4, 5    //REG4 = 15 = number of iterations to perform
+    eend
+    pend
+
+    blt REG3, REG4, LABEL
+
+    pstart single
+    estart
+    add.ss REG1, REG2, s0 //copy result from REG2 into REG1
+    eend
+    pend
+}
+
+pstart ndof //Calculate relres
+ld.vec v0, R
 estart
-mul.sv v0, s0, v0 //Clear v0
-add.iv v1, v0, 0.375
-add.iv v2, v0, 0.75
+mac.vv s1, v0, v0 //s1 = dpr(R, R)
 eend
-st.vec v1, U
-st.vec v2, R
 pend
 
-pstart nelemvec //Calculate inner product
-ld.vec v1, U
-ld.vec v2, R
-estart
-mac.vv s1, v1, v2
-eend
-pend
+//s1 = norm(R). s1=input/output, s2,s3,s4 are temp registers
+sqrt_S(s1, s2, s3, s4, RELRES)
 
-//Calculate square root
-pstart single
+
+pstart single //Calculate relres
 estart
-//s1 holds S value
-mul.is s2, s1, 0.5 //s2 = xn = S/2
-add.is s3, s0, 0.5 //s3 = constant 1/2
-//Start looping
-div.ss s4, s1, s2 //s4 = S/xn
-add.ss s4, s4, s2 //s4 = xn + S/xn
-mul.ss s2, s3, s4 //s2 = xnew = 1/2*(xn+S/xn) //First loop
-div.ss s4, s1, s2 //s4 = S/xn
-add.ss s4, s4, s2 //s4 = xn + S/xn
-mul.ss s2, s3, s4 //s2 = xnew = 1/2*(xn+S/xn) //Second loop
-div.ss s4, s1, s2 //s4 = S/xn
-add.ss s4, s4, s2 //s4 = xn + S/xn
-mul.ss s2, s3, s4 //s2 = xnew = 1/2*(xn+S/xn) //Third iteration
-div.ss s4, s1, s2 //s4 = S/xn
-add.ss s4, s4, s2 //s4 = xn + S/xn
-mul.ss s2, s3, s4 //s2 = xnew = 1/2*(xn+S/xn) //Fourth iteration
-div.ss s4, s1, s2 //s4 = S/xn
-add.ss s4, s4, s2 //s4 = xn + S/xn
-mul.ss s13, s3, s4 //s13 = sqrt(S) = bnorm  //Fifth iteration
-//s2 = sqrt(x1)
+div.ss s1, s1, s13 //s1 = norm(r)/bnorm = relres
 eend
 pend

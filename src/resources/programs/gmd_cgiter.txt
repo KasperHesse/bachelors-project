@@ -1,7 +1,7 @@
 // Picks up after generateMatrixDiagonal and cgLoop setup, performing one iteration of the CG loop
 func applyStateOperator(DENS, INPUT, OUTPUT) = {
 
-    pstart double //Setu up e0, emin constants. Being setup twice, but that's OK
+    pstart double //Setup e0, emin constants. Running twice to also clear v0 in both threads
     estart
     add.is s1, s0, 0.0078125
     mul.ss s1, s1, s1 //s1 = 6.1e-5
@@ -37,32 +37,36 @@ func applyStateOperator(DENS, INPUT, OUTPUT) = {
     st.fdof v0, OUTPUT //Store fixed DOFs from inp. values
     pend
 }
-
 //Scalar square root
 //REG1: Input value to take sqrt of, will also contain result when finished
 //REG2, REG3, REG4: Additional registers than can be used as temps
-func sqrt_S(REG1, REG2, REG3, REG4) = {
+//LABEL: A label to be used for the square root loop. Must be unique from any other label in the program
+func sqrt_S(REG1, REG2, REG3, REG4, LABEL) = {
     pstart single
     estart
-    mul.is REG2, REG1, 0.5 //REG2 = xn = S/2
-    add.is REG3, s0, 0.5 //s3 = constant 1/2
+    add.ss REG2, REG1, s0 //REG2 = REG1 = S = initial estimate
+    add.ss REG3, s0, s0   //s3 = loop counter = 0
+    eend
+    pend
 
-    //Unrolled loop
+    //Cannot add label as we have multiple sqrts in the system. Using it for now, though
+    LABEL:
+    pstart single
+    estart
     div.ss REG4, REG1, REG2 //REG4 = S/xn
     add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
-    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), first iteration
-    div.ss REG4, REG1, REG2 //REG4 = S/xn
-    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
-    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), second iteration
-    div.ss REG4, REG1, REG2 //REG4 = S/xn
-    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
-    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), third iteration
-    div.ss REG4, REG1, REG2 //REG4 = S/xn
-    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
-    mul.ss REG2, REG3, REG4 //REG2 = xnew = 1/2*(xn+S/xn), fourth iteration
-    div.ss REG4, REG1, REG2 //REG4 = S/xn
-    add.ss REG4, REG4, REG2 //REG4 = xn + S/xn
-    mul.ss REG1, REG3, REG4 //REG1 = xnew = sqrt(S), fifth and final iteration
+    mul.is REG2, REG4, 0.5  //REG2 = xnew = 1/2*(xn+S/xn), iteration finished
+    add.is REG3, REG3, 1    //increment loop counter
+    add.is REG4, s0,   4    //REG4 = 4
+    mul.is REG4, REG4, 5    //REG4 = 20 = number of iterations to perform
+    eend
+    pend
+
+    blt REG3, REG4, LABEL
+
+    pstart single
+    estart
+    add.ss REG1, REG2, s0 //copy result from REG2 into REG1
     eend
     pend
 }
@@ -101,7 +105,7 @@ beq s0, s0 CG_POST_P_UPDATE
 CG_P_NOT_FIRST_ITER:
 pstart single //Not first iteration, p=beta*p[i]+z[i]
 estart
-div.ss s6, s12, s11 //s1 = beta=rho/rhoOld
+div.ss s1, s12, s11 //s1 = beta=rho/rhoOld
 eend
 pend
 
@@ -109,7 +113,7 @@ pstart ndof
 ld.vec v0, Z
 ld.vec v1, P
 estart
-mul.sv v1, s6, v1 //v1 = beta*p[i]
+mul.sv v1, s1, v1 //v1 = beta*p[i]
 add.vv v1, v1, v0 //v1 = beta*pi[i] + z[i]
 eend
 st.vec v1, P
@@ -159,16 +163,16 @@ mac.vv s1, v0, v0 //s1 = dpr(R, R)
 eend
 pend
 
-//s1 = norm(R). s1=input/output, s2,s3,s4 are temp registers
-sqrt_S(s1, s2, s3, s4)
+//s1 = norm(R). s1=input/output, s2,s3,s4 are temp registers, RELRES is the label used for symbol table
+sqrt_S(s1, s2, s3, s4, RELRES)
 
 pstart single
 estart
 div.ss s1, s1, s13 //s1 = norm(r)/bnorm = relres
 add.is s8, s8, 1 //cgIter++
-add.is s2, s0, 1 //Number of iteration to perform while testing
-//mul.is s2, s2, 5 //num iters = 25
-//mul.is s2, s2, 3 //num iters = 50
+add.is s2, s0, 5 //Number of iteration to perform while testing
+mul.is s2, s2, 4 //num iters = 20
+mul.is s2, s2, 3 //num iters = 60
 eend
 pend
 

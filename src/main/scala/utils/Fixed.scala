@@ -225,10 +225,11 @@ object Fixed {
    * @return The square root of v
    */
   def fixedSqrt(S: SInt): SInt = {
-    var x0 = fixedMul(S, double2fixed(0.5).S(FIXED_WIDTH.W)) //Initial estimate, S/2
+//    var x0 = fixedMul(S, double2fixed(0.5).S(FIXED_WIDTH.W)) //Initial estimate, S/2
+    var x0 = S
     val onehalf = double2fixed(0.5).S(FIXED_WIDTH.W) //Constant: 1/2
     var xnew = 0.S(FIXED_WIDTH.W) //New value
-    for(i <- 0 until 6) {
+    for(i <- 0 until 20) {
       xnew = fixedMul(onehalf, fixedAdd(x0, fixedDiv(S, x0)))
       x0 = xnew
     }

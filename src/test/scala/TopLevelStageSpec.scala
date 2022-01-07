@@ -259,6 +259,12 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val edof = ijk.map(e => getEdof(e(0), e(1), e(2))) //And the corresponding memory locations
     val expectedData = edof.map(e => determineExpectedLoadData(e, instr.baseAddr, sc))
     loadIntoVreg(memid, clock, instr, expectedData, sc)
+
+    //Extract iteration values from ijk values, for use in mac.kv instructions
+    for(idx <- ijk.indices) {
+      val iter = ijk(idx)(3) % 8
+      sc.vregIter(sc.memThread)(instr.rsrd.litValue.toInt * VREG_SLOT_WIDTH + idx) = iter
+    }
   }
 
   /**
@@ -344,7 +350,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
   /**
    * Wrapper function used to encapsulate all operations happening in the memory store part of an instruction packet
-   * @param memid Interface between memory and instruction decode
+   * @param memid Interface between memory writeback and instruction decode
    * @param clock DUT clock
    * @param sc Simulation container object
    */
@@ -618,22 +624,21 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "run into solveStateCG and first ASO" in { //adfg/bef6db
-    testFun("adfg_aso", dumpMemory = true, timeout = 0, memDumpName = "adfg/736847")
+    testFun("adfg_aso", dumpMemory = true, timeout = 0, memDumpName = "adfg/736847", annos=Seq(VerilatorBackendAnnotation))
   }
 
-  it should "generate matrix diagonal and setup before cg loop" in { //adfg_aso/82c30c
-    testFun("aso_gmd", dumpMemory = true, timeout = 0, memDumpName = "adfg_aso/1d3367", annos=Seq(VerilatorBackendAnnotation))
+  it should "generate matrix diagonal and setup before cg loop" in {
+    testFun("aso_gmd", dumpMemory = true, timeout = 0, memDumpName = "adfg_aso/99d6df", annos=Seq(VerilatorBackendAnnotation))
   }
 
-  //aso_gmd/9ce633 has invD equal to all 1's
-  //aso_gmd/fae968 has errors in invD of average size 0.0014 (132x)
+  //aso_gmd/03f410 has errors in invD of average size 0.0014 (132x)
   //aso_gmd/fromcc has invD equal to all 1's and R-values from C code (should be no differences whatsoever)
   it should "perform an iteration of the CG loop" in {
-    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "aso_gmd/fromcc", annos=Seq(VerilatorBackendAnnotation))
-  } //gmd_cgiter/466092 is final version only running through preconditionDampedJacobi
+    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "aso_gmd/03f410", annos=Seq(VerilatorBackendAnnotation))
+  }
 
   it should "more iterations of CG loop" in {
-    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "gmd_cgiter/bf533b", annos=Seq(VerilatorBackendAnnotation))
+    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "gmd_cgiter/1a34ef", annos=Seq(VerilatorBackendAnnotation))
   }
 
   it should "run compliance and ADFG after CG loop" in {
@@ -641,6 +646,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "perform a matrix-vector product" in {
-    testFun("matrixvectorproduct", dumpMemory=true, timeout=4000, memDumpName="matrixvectorproduct/init", annos=Seq(VerilatorBackendAnnotation, WriteVcdAnnotation))
+    testFun("matrixvectorproduct", dumpMemory=true, timeout=20000, memDumpName="matrixvectorproduct/init", annos=Seq(VerilatorBackendAnnotation))
+  }
+
+  it should "calculate norm and relres" in {
+    testFun("norm", dumpMemory=true, timeout=0, memDumpName="gmd_cgiter/1a34ef", annos=Seq(VerilatorBackendAnnotation, WriteVcdAnnotation))
   }
 }

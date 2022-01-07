@@ -50,6 +50,8 @@ class SimulationContainer {
   var firstMAC: Boolean = true
   /** Number of mac instructions seen in the current iteration */
   var macCnt: Int = 0
+  /** Iteration values associated with each vector register in each thread */
+  var vregIter: Array[Array[Int]] = Array.ofDim(2, NUM_VREG)
 
   /** Signals asserted whenever a simulation thread is finished in its current packet section */
   private val signals: Array[Boolean] = Array.ofDim[Boolean](2)

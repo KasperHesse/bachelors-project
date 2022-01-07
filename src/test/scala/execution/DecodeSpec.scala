@@ -38,7 +38,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
 
   def expectKVvalues(dut: Decode, inst: RtypeInstruction): Unit = {
     val smpr = KE_SIZE / NUM_PROCELEM //Submatrices per row
-    val KE = dut.threads(0).KE.KE
+    val KE = dut.threads(0).KE(0).KE
     val vReg = dut.threads(0).vRegFile.arr
     val rs1 = inst.rs1.litValue.toInt
     val rd = inst.rd.litValue().toInt

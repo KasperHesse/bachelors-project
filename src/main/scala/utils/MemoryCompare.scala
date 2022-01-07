@@ -8,8 +8,8 @@ import scala.io.Source
  */
 object MemoryCompare extends App {
 
-  val testName = "matrixvectorproduct"
-  val hash = "cda414"
+  val testName = "gmd_cgiter"
+  val hash = "745473"
 
   def apply(): Unit = {
     val DV = compare("DV")
@@ -28,14 +28,14 @@ object MemoryCompare extends App {
       println(f"$name: ${x._2}%.5f / ${x._1}")
     }
 
-//    print(DV, "DV")
-//    print(INVD, "INVD")
-//    print(R, "R")
-//    print(Z, "Z")
-//    print(TMP, "TMP")
+    print(DV, "DV")
+    print(INVD, "INVD")
+    print(R, "R")
+    print(Z, "Z")
+    print(TMP, "TMP")
     print(P, "P")
     print(Q, "Q")
-//    print(U, "U")
+    print(U, "U")
     print(X, "X")
     print(XPHYS, "XPHYS")
 
@@ -107,6 +107,7 @@ object MemoryCompare extends App {
 
     println(s"Comparing values for [$name]")
     var errCnt = 0
+    var signCnt = 0
     var errAvg = 0.0
     for(i <- 1 until lines1.length) {
       val scala = lines1(i).split(',').last.toDouble
@@ -117,12 +118,18 @@ object MemoryCompare extends App {
         errCnt += 1
         errAvg += math.abs(scala-c)
       }
+      if(scala <= 0 && c > 0 || c <= 0 && scala > 0) {
+        signCnt += 1
+        println(f"SIGNERR at $i")
+      }
     }
     if(errCnt > 0) {
       errAvg = errAvg / errCnt
       println(f"$errCnt errors found for [$name] at delta=$delta")
       println(f"Average error: $errAvg%.5f")
     }
+    println(f"Signcnt=$signCnt")
+
     println("Comparison finished\n\n")
 
     file1.close()

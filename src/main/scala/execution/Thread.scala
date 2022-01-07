@@ -67,7 +67,9 @@ class Thread(id: Int) extends Module {
     xRegFile.initMemory()
   }
   /** Wrapper for KE-matrix, holding all KE-values */
-  val KE = Module(new KEWrapper(NUM_PROCELEM, sync=true))
+  val KE = for(i <- 0 until 8) yield {
+    Module(new KEWrapper(NUM_PROCELEM, sync=true, iter=i))
+  }
   /** Immediate generator */
   val immGen = Module(new ImmediateGenerator)
   /** Module handling all memory access related stuff */
@@ -93,22 +95,12 @@ class Thread(id: Int) extends Module {
   val maxIndex = RegInit(0.U(log2Ceil(NDOFSIZE+1).W))
   /** O-type length of currently executing instruction packet */
   val instrLen = RegInit(OtypeLen.SINGLE)
+  /** Iteration value associated with all V-register files. Used when processing mac.kv instructions */
+  val vRegIter = RegInit(VecInit(Seq.fill(NUM_VREG)(0.U(3.W))))
 
   // --- WIRES AND SIGNALS ---
   /** Handle to the current instruction */
   val currentInstr: UInt = io.instr
-
-//  /** Lut to determince MAC limit to set into processing elements */
-//  val macLimitDecode = VecInit(Array( //MAClimit into each PE should be the total number of elements processed / NUM_PROCELEM
-//    (NDOFLENGTH/NUM_PROCELEM).U, //len == NDOF. MAC instructions
-//    1.U, //len is invalid
-//    (ELEMS_PER_VSLOT/NUM_PROCELEM).U, //len == SINGLE. Is this correct?
-//    1.U, //len == DOUBLE
-//    (NELEMLENGTH/NUM_PROCELEM).U, //len == NELEMVEC. MAC instructions
-//    (VREG_DEPTH/NUM_PROCELEM).U, //len == NELEMDOF. RED.VV and MAC.KV instructions
-//    1.U, //len == NELEMSTEP. RED.XX instructions
-//    1.U //len is invalid
-//  ))
 
   /** LUT to determine maximum index to access for ld.vec and st.vec operations */
    //If eg. NDOFSIZE != NDOFLENGTH, the system will start loading/storing values from the next vector in memory.
@@ -123,6 +115,15 @@ class Thread(id: Int) extends Module {
     0.U,
     0.U
   ))
+
+  /** Vector that allows us to read KE-values from all 8 iteration-transformed KE-matrices */
+  //This is necessary since we can't index into the Seq[Module..] using a UInt, so we must create a Vec of outputs
+  val keVals: Vec[Vec[SInt]] = Wire(Vec(8, Vec(8, SInt(FIXED_WIDTH.W))))
+  for(i <- KE.indices) {
+    for(j <- KE(i).io.keVals.indices) {
+      keVals(i)(j) := KE(i).io.keVals(j)
+    }
+  }
 
   val Rinst = currentInstr.asTypeOf(new RtypeInstruction)
   val Oinst = currentInstr.asTypeOf(new OtypeInstruction)
@@ -160,6 +161,7 @@ class Thread(id: Int) extends Module {
   val v_rs2 = Wire(UInt(log2Ceil(NUM_VREG+1).W))
   /** Index into vector register file */
   val v_rd = Wire(UInt(log2Ceil(NUM_VREG+1).W))
+
   //Generate vector register selects based on slot defined in instruction + slot select
   //Use lookup tables to avoid multiplications in case we don't have a power of two
   if(!isPow2(VREG_SLOT_WIDTH)) {
@@ -184,6 +186,7 @@ class Thread(id: Int) extends Module {
   val vRegRdData1 = vRegFile.setReadPort(vrs1)
   val vRegRdData2 = vRegFile.setReadPort(v_rs2)
   vRegFile.setWritePort(io.wb.rd.reg, io.wb.wrData, io.wb.we && io.wb.rd.rf === RegisterFileType.VREG)
+
   //This makes it easier to address subvectors of the output vectors from register file
   val a_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
   val b_subvec = Wire(Vec(SUBVECTORS_PER_VREG, Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W))))
@@ -204,9 +207,12 @@ class Thread(id: Int) extends Module {
   io.sRegFile.rs1 := Rinst.rs1
   io.sRegFile.rs2 := Rinst.rs2
 
-  KE.io.keX := X
-  KE.io.keY := Y
-  KE.io.keCol := col
+  //Connect X,Y,col inputs to all KE matrices
+  KE.foreach(ke => {
+    ke.io.keX := X
+    ke.io.keY := Y
+    ke.io.keCol := col
+  })
 
   //Immediate generator
   immGen.io.instr := Rinst
@@ -218,7 +224,7 @@ class Thread(id: Int) extends Module {
   memAccess.io.ijkIn := io.threadIn.ijk
   memAccess.io.otherThreadState := io.threadIn.state
 
-  //All inputs to scalar reg file are supplied via writeback stage, hence these are dontcares
+  //These inputs to scalar reg file are supplied via writeback stage, hence these are dontcares
   io.sRegFile.we := DontCare
   io.sRegFile.rd := DontCare
   io.sRegFile.wrData := DontCare
@@ -282,7 +288,6 @@ class Thread(id: Int) extends Module {
       IP := 0.U
       when(Oinst.mod === OtypeMod.PACKET && Oinst.se === OtypeSE.START && Oinst.fmt === InstructionFMT.OTYPE && io.start) {
         IP := 1.U
-//        macLimit := macLimitDecode(Oinst.len.asUInt())
         maxIndex := maxIndexDecode(Oinst.len.asUInt())
         instrLen := Oinst.len
         if(id == 0) {
@@ -450,7 +455,6 @@ class Thread(id: Int) extends Module {
       }
 
       is(RtypeMod.KV) {
-//        macLimit := KE_SIZE.U //These instructions must override macLimit
         dest.reg := v_rd
         dest.subvec := Y
         dest.rf := VREG
@@ -467,7 +471,7 @@ class Thread(id: Int) extends Module {
         slotSelect := Mux(Xtick && Ytick && colTick, Mux(SStick, 0.U, slotSelect + 1.U), slotSelect)
 
         finalCycle := Xtick && Ytick && colTick && SStick
-        //Rs/rf-values have no relevance here
+        //Rs/rf-values have no relevance here, but must be assigned to avoid latches
         assignRsRfValues(v_rs1, X, Y, VREG, KREG)
       }
     }
@@ -512,7 +516,9 @@ class Thread(id: Int) extends Module {
         for (i <- 0 until NUM_PROCELEM) {
           a(i) := a_subvec(RegNext(X))(RegNext(col))
         }
-        b := KE.io.keVals
+
+        //Must use RegNext(v_rs1) since
+        b := keVals(vRegIter(RegNext(v_rs2)))
       }
     }
   }
@@ -523,7 +529,7 @@ class Thread(id: Int) extends Module {
   } .elsewhen(Rinst.op === RED && Rinst.mod === RtypeMod.XX) {
     macLimit := 1.U
   } .elsewhen(Rinst.op === MAC && Rinst.mod === RtypeMod.KV) {
-    macLimit := (KE_SIZE).U
+    macLimit := KE_SIZE.U
   } .elsewhen(Rinst.op === MAC && (Rinst.mod === RtypeMod.VV || Rinst.mod === RtypeMod.SV)) {
     //Performing MAC.VV/MAC.SV/MAC.IV instructions should only take place in lengths NDOF and NELEMVEC
     when(instrLen === OtypeLen.NDOF) {
@@ -553,6 +559,11 @@ class Thread(id: Int) extends Module {
         wrData := wrData_subvec(RegNext(memAccess.io.subvec))
       }
     }
+  }
+
+  //Vreg iteration value update when loading
+  when(state === sLoad && memAccess.io.edof.valid && io.mem.edof.ready && memAccess.io.readQueue.bits.mod === StypeMod.DOF) {
+    vRegIter(memAccess.io.readQueue.bits.rd.reg) := memAccess.io.readQueue.bits.iter
   }
 
   //Stall management

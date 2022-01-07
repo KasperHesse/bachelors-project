@@ -143,26 +143,41 @@ object Test extends App {
 
 //  betterOmega()
 
-  val a = string2fixed("3fffc000000000") //-1
-  val b = string2fixed("3fffedf1d00c38") //-0.28211592489969917... very precise
-  val c = string2fixed("3fffedf1d00c30") //-0.282115924928803..., almost as precise, no 4 LSB set
-  val d = string2fixed("3fffee00000000") //-0.28125
-  val e = string2fixed("00001200000000") //+0.28125
-
-  def pf(v: SInt): Unit = println(fixed2double(v))
-
-  val x = fixedMul(a,b)
-  val y = fixedMul(a,c)
-  val z = fixedMul(a,d)
-  pf(a)
-  pf(b)
-  pf(c)
-  pf(d)
-  pf(e)
-
-  println("\n")
-  pf(x)
-  pf(y)
-  pf(z)
+//  val a = string2fixed("3fffc000000000") //-1
+//  val b = string2fixed("3fffedf1d00c38") //-0.28211592489969917... very precise
+//  val c = string2fixed("3fffedf1d00c30") //-0.282115924928803..., almost as precise, no 4 LSB set
+//  val d = string2fixed("3fffee00000000") //-0.28125
+//  val e = string2fixed("00001200000000") //+0.28125
+//
+//
+//
+//  def pf(v: SInt): Unit = println(fixed2double(v))
+//
+//  val x = fixedMul(a,b)
+//  val y = fixedMul(a,c)
+//  val z = fixedMul(a,d)
+//  pf(a)
+//  pf(b)
+//  pf(c)
+//  pf(d)
+//  pf(e)
+//
+//  println("\n")
+//  pf(x)
+//  pf(y)
+//  pf(z)
+  def p(s: String): Unit = {
+  println(fixed2double(string2fixed(s)))
+}
+  p("3ffeefb57a9e20")
+  p("3fff77dabd4f10")
+  p("000000000026ab")
+  P(fixedSqrt(double2fixed(3.21321e-8)))
+  P(fixedSqrt(double2fixed(1.63184e-8)))
+  P(fixedSqrt(double2fixed(6.44208e-9)))
+  P(fixedSqrt(double2fixed(2.33914e-9)))
+  P(fixedSqrt(double2fixed(7.27576e-10)))
+  P(fixedSqrt(double2fixed(3.71982e-10)))
+  P(fixedDiv(fixedSqrt(double2fixed(3.71982e-10)).S(FIXED_WIDTH.W), double2fixed(2.64575).S(FIXED_WIDTH.W)).litValue.toLong)
 
 }
