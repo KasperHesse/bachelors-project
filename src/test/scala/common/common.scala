@@ -19,7 +19,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * @param dut The DUT
    * @param instr The branch instruction being evaluated
    */
-  def verifyBranchOutcome(idctrl: IdControlIO, clock: Clock, instr: BtypeInstruction, sc: SimulationContainer): Unit = {
+  def verifyBranchOutcome(idctrl: IdControlIO, clock: Clock, instr: BtypeInstruction, sc: SimulationContext): Unit = {
     val a = sc.sReg(instr.rs1.litValue.toInt)
     val b = sc.sReg(instr.rs2.litValue.toInt)
     val comp = instr.comp
@@ -38,8 +38,8 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * @param rd The destination register being written to
    * @param extra Additional data to be logged in case of a miscompare
    */
-  def assertEquals(a: SInt, b: SInt, delta: Double = 1, instr: Bundle = null, rd: UInt = 9001.U, extra: String = ""): Unit = {
-    val clue = s"[a=$a (${fixed2double(a)}), b=$b (${fixed2double(b)})]\nInstruction: ${if (instr != null) instr else "Not given"}\nRd: ${if (rd.litValue() != 9001) rd.litValue else "Not given"}\nExtra: $extra"
+  def assertEquals(a: SInt, b: SInt, delta: Double = 0.01, instr: Bundle = null, rd: UInt = 9001.U, extra: String = ""): Unit = {
+    val clue = s"[a(chisel)=$a (${fixed2double(a)}), b(simulator)=$b (${fixed2double(b)})]\nInstruction: ${if (instr != null) instr else "Not given"}\nRd: ${if (rd.litValue() != 9001) rd.litValue else "Not given"}\nExtra: $extra"
 
     org.scalatest.Assertions.assert(math.abs(fixed2double((a.litValue-b.litValue).toLong)) < delta, clue)
   }
@@ -98,9 +98,9 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * Performs bookkeeping when operating MAC instructions by storing the intermediate MAC results in a buffer
    * until they are used. RED instructions are not handled here
    * @param idex Interface between ID and EX stages
-   * @param sc The Simulation Container used for this simulation
+   * @param sc The Simulation context used for this simulation
    */
-  def handleMACSVandMACVV(idex: IdExIO, sc: SimulationContainer): Unit = {
+  def handleMACSVandMACVV(idex: IdExIO, sc: SimulationContext): Unit = {
     val isMACinstruction = idex.valid.peek().litToBoolean &&
       idex.opUInt.peek.litValue == Opcode.MAC.litValue() &&
       idex.dest.rfUint.peek.litValue == RegisterFileType.SREG.litValue
@@ -114,13 +114,19 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
      */
     if((isMACinstruction && !sc.firstMAC) || (0 < sc.macCnt && sc.macCnt < macLimit)) {
       for(i <- 0 until NUM_PROCELEM) {
-        val a = idex.a(i).peek
-        val b = if(idex.useImm.peek.litToBoolean) idex.imm.peek else idex.b(i).peek
+        val a = if(sc.macUseImm) sc.macImmValue else idex.a(i).peek
+        val b = idex.b(i).peek
         sc.MACresults(i) = fixedAdd(sc.MACresults(i), fixedMul(a,b))
       }
       sc.macCnt += 1
     } else if (isMACinstruction && sc.firstMAC) {
       sc.firstMAC = false
+      //On the final set of values coming from a thread on a mac.sv instruction,
+      //The immediate flag is one clock cycle ahead of what we can see in the simulator
+      //For any mac instruction, the imm flag will always be the same, so we sample the imm
+      //flag at the start of the instruction
+      sc.macUseImm = idex.useImm.peek.litToBoolean
+      sc.macImmValue = idex.imm.peek()
     } else if (!isMACinstruction && sc.macCnt >= macLimit) {
       sc.firstMAC = true
       sc.macCnt = 0
@@ -133,10 +139,10 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * Updates the register files in the DUT with all new values
    * @param wbid The output of the execute writeback stage
    * @param idex Output of the instruction decode stage
-   * @param sc The simulation container used for this simulation
+   * @param sc The simulation context used for this simulation
    * @param instr Instruction to expect the output of
    */
-  def expectAndUpdate(wbid: WbIdIO, idex: IdExIO, clock: Clock, sc: SimulationContainer, instr: RtypeInstruction): Unit = {
+  def expectAndUpdate(wbid: WbIdIO, idex: IdExIO, clock: Clock, sc: SimulationContext, instr: RtypeInstruction): Unit = {
     import RegisterFileType._
     val rf = getResultRegisterType(instr).litValue
     if(rf == VREG.litValue) {
@@ -213,9 +219,9 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * Expects the output of an instruction going into the vector register file
    * @param wbid Interface between execute writeback and decode stage
    * @param instr The instrution to check against
-   * @param sc The simulation container being used
+   * @param sc The simulation context being used
    */
-  def expectVREG(wbid: WbIdIO, instr: RtypeInstruction, sc: SimulationContainer): Unit = {
+  def expectVREG(wbid: WbIdIO, instr: RtypeInstruction, sc: SimulationContext): Unit = {
     val mod = instr.mod.litValue
     if(instr.op.litValue() == MAC.litValue && mod == RtypeMod.KV.litValue) {
       calculateKVresult(instr, sc.results, wbid.rd.reg.peek, sc.vReg(sc.execThread), Some(sc))
@@ -231,7 +237,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     wbid.rd.rf.expect(RegisterFileType.VREG)
 
     for(i <- 0 until VREG_DEPTH) {
-      assertEquals(wbid.wrData(i).peek, sc.results(i), instr=instr, rd=wbid.rd.reg.peek(), extra = f"i=$i")
+      assertEquals(wbid.wrData(i).peek, sc.results(i), instr=instr, rd=wbid.rd.reg.peek(), extra = f"expectVreg: i=$i")
       sc.results(i) = wbid.wrData(i).peek //to avoid any incremental changes we store the calculated values
     }
   }
@@ -241,9 +247,9 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * Expects the output of an instruction going into x-vector register file
    * @param wbid Interface between execute writeback and decode stage
    * @param instr The instrution to check against
-   * @param sc The simulation container being used
+   * @param sc The simulation context being used
    */
-  def expectXREG(wbid: WbIdIO, instr: RtypeInstruction, sc: SimulationContainer): Unit = {
+  def expectXREG(wbid: WbIdIO, instr: RtypeInstruction, sc: SimulationContext): Unit = {
     if(instr.mod.litValue == RtypeMod.SX.litValue) {
       calculateSXresult(instr, sc.results, sc.sReg, sc.xReg(sc.execThread))
     } else if (instr.mod.litValue == RtypeMod.XX.litValue) {
@@ -255,7 +261,6 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     }
     wbid.rd.rf.expect(RegisterFileType.XREG)
     wbid.rd.subvec.expect(0.U)
-//    assertEquals(wbid.wrData(0).peek, sc.results(0), instr=instr, rd=wbid.rd.reg.peek())
     for (i <- 0 until NUM_PROCELEM) {
       assertEquals(wbid.wrData(i).peek, sc.results(i), instr=instr, rd=wbid.rd.reg.peek(), extra=f"expectXreg: i=$i")
       sc.results(i) = wbid.wrData(i).peek
@@ -267,9 +272,9 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * Expects the output of an instruction going into scalar register file
    * @param wbid Interface between execute writeback and decode stage
    * @param instr The instrution to check against
-   * @param sc The simulation container being used
+   * @param sc The simulation context being used
    */
-  def expectSREG(wbid: WbIdIO, instr: RtypeInstruction, sc: SimulationContainer): Unit = {
+  def expectSREG(wbid: WbIdIO, instr: RtypeInstruction, sc: SimulationContext): Unit = {
     val mod = instr.mod.litValue
     if(mod == RtypeMod.SS.litValue) {
       calculateSSresult(instr, sc.results, sc.sReg)
@@ -282,10 +287,11 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     } else {
       throw new IllegalArgumentException("R-type mod not recognized")
     }
+    assertEquals(wbid.wrData(0).peek, sc.results(0), instr=instr, rd=wbid.rd.reg.peek(), extra="expectSreg")
     wbid.rd.rf.expect(RegisterFileType.SREG)
     wbid.rd.reg.expect(instr.rd)
     wbid.rd.subvec.expect(0.U)
-    assertEquals(wbid.wrData(0).peek, sc.results(0), instr=instr, rd=wbid.rd.reg.peek())
+
     for(i <- 0 until NUM_PROCELEM) {
       sc.results(i) = wbid.wrData(i).peek
     }
@@ -295,14 +301,15 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
 
   /**
    * Calculates the result of an instruction with R-type modifier KV
-   * @param instr The instruction
+ *
+   * @param instr   The instruction
    * @param results Result buffer
-   * @param rd Current rd-value from DUT. Used to select correct vector from vector slot
-   * @param sc An optional simulationcontainer object. If none, KE-0 is used, otherwise, appropriate KE-values depending on the ijk
-   *           values from [[SimulationContainer.ijkBase]] is used.
+   * @param rd      Current rd-value from DUT. Used to select correct vector from vector slot
+   * @param sc      An optional simulationcontainer object. If none, KE-0 is used, otherwise, appropriate KE-values depending on the ijk
+   *                values from [[SimulationContext.ijkBase]] is used.
    */
   def calculateKVresult(instr: RtypeInstruction, results: Array[SInt], rd: UInt,
-                        vReg: Array[Array[SInt]], sc: Option[SimulationContainer] = None): Unit = {
+                        vReg: Array[Array[SInt]], sc: Option[SimulationContext] = None): Unit = {
 
 
     val rs1 = instr.rs1.litValue.toInt
@@ -310,7 +317,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
 
     val KE = sc match {
       case None => KEWrapper.getKEMatrix(0)
-      case Some(x) => KEWrapper.getKEMatrix(x.vregIter(x.execThread)(rs1 + rdOffset))
+      case Some(x) => KEWrapper.getKEMatrix(x.vregIter(x.execThread)(rdOffset))
     }
     //Zero out results
     for(i <- 0 until VREG_DEPTH) {
@@ -318,8 +325,8 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     }
     for(i <- 0 until KE_SIZE) {
       for(j <- 0 until KE_SIZE) {
-        val a = double2fixed(KE(i)(j)).S
-        val b = vReg(rs1*VREG_SLOT_WIDTH + rdOffset)(j)
+        val a = vReg(rs1*VREG_SLOT_WIDTH + rdOffset)(j)
+        val b = double2fixed(KE(i)(j)).S
         results(i) = fixedAdd(results(i), fixedMul(a, b))
       }
     }
@@ -504,9 +511,9 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
   /**
    * Dumps the contents of all memory and registers to csv files for postprocessing
    * @param testName The name of the test being run. Used to prepend an identifier to memory dumps
-   * @param sc The simulation container object used in the simulation being processed
+   * @param sc The simulation context for the simulation being processed
    */
-  def dumpMemoryContents(testName: String, sc: SimulationContainer): Unit = {
+  def dumpMemoryContents(testName: String, sc: SimulationContext): Unit = {
     import java.io.{BufferedWriter, FileWriter}
     import execution.StypeBaseAddress
 

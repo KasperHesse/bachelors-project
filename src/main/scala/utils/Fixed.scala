@@ -204,11 +204,20 @@ object Fixed {
    * Divides two SInts the way the hardware would (to some degree of precision, at least)
    * @param n The numerator
    * @param d The denominator
-   * @return the fixed-point number representing n/d. If d==0, returns 0 instead (as the hardware does)
+   * @return the fixed-point number representing n/d.
    */
   def fixedDiv(n: SInt, d: SInt): SInt = {
-    if(d.litValue == 0) return 0.S(FIXED_WIDTH.W)
     double2fixed(fixed2double(n) / fixed2double(d)).S(FIXED_WIDTH.W)
+  }
+
+  /**
+   * Divides two SInts the way the hardware would (to some degree of precision, at least)
+   * @param n The numerator
+   * @param d The denominator
+   * @return the fixed-point number representing n/d.
+   */
+  def fixedDiv(n: Long, d: Long): Long = {
+    double2fixed(fixed2double(n) / fixed2double(d))
   }
 
   /**
@@ -224,12 +233,12 @@ object Fixed {
    * @param S The value to calculate the square root of
    * @return The square root of v
    */
-  def fixedSqrt(S: SInt): SInt = {
+  def fixedSqrt(S: SInt, iters: Int = 20): SInt = {
 //    var x0 = fixedMul(S, double2fixed(0.5).S(FIXED_WIDTH.W)) //Initial estimate, S/2
     var x0 = S
     val onehalf = double2fixed(0.5).S(FIXED_WIDTH.W) //Constant: 1/2
     var xnew = 0.S(FIXED_WIDTH.W) //New value
-    for(i <- 0 until 20) {
+    for(i <- 0 until iters) {
       xnew = fixedMul(onehalf, fixedAdd(x0, fixedDiv(S, x0)))
       x0 = xnew
     }
@@ -241,8 +250,8 @@ object Fixed {
    * @param S The value to calculate the square root of. Should be a fixed-point value
    * @return The square root of v
    */
-  def fixedSqrt(S: Long): Long = {
-    fixedSqrt(S.S(FIXED_WIDTH.W)).litValue.toLong
+  def fixedSqrt(S: Long, iters: Int): Long = {
+    fixedSqrt(S.S(FIXED_WIDTH.W), iters).litValue.toLong
   }
 
   /**
@@ -316,6 +325,35 @@ object Fixed {
   def fixedAbs(a: Long): Long = {
     double2fixed(math.abs(fixed2double(a)))
   }
+
+  /**
+   * Returns 1 if a value is nonzero, 0 if it is exactly zero
+   * @param a The input value
+   * @return 1 if the value is nonzero, 0 otherwise
+   */
+  def fixedNez(a: Long): Long = {
+    if (a == 0) 0 else double2fixed(1)
+  }
+
+  /**
+   * Returns 1 if a value is nonzero, 0 if it is exactly zero
+   * @param a The input value
+   * @return 1 if the value is nonzero, 0 otherwise
+   */
+  def fixedNez(a: SInt): SInt = {
+    if (a.litValue.toLong == 0) 0.S(FIXED_WIDTH.W) else double2fixed(1).S(FIXED_WIDTH.W)
+  }
+
+  /**
+   * Returns 1 if a value is nonzero, 0 if it is exactly zero
+   * @param a The input value
+   * @return 1 if the value is nonzero, 0 otherwise
+   */
+  def fixedNez(a: Double): Double = {
+    if(a == 0.0) 0.0 else 1.0
+  }
+
+
 
   /**
    * Returns the absolute value of the input

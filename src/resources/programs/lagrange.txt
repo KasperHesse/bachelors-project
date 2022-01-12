@@ -97,6 +97,7 @@ pend
     div.vv v1, v3, v0 //v1 = S/xn
     add.vv v1, v1, v0 //v1 = xn+S/xn
     mul.iv v0, v1, 0.5 //v0 = sqrt(-dc[i]/dv[i]*lmid) //Fifth loop, sqrt done
+
     mul.vv v3, v2, v0 //v3 = x[i]*sqrt(-dc[i]/(dv[i]*lmid))
     add.iv v0, v2, 0.2 //v0 = x[i] + move
     min.vv v3, v0, v3 //v3 = min(x[i]+move, x[i]*sqrt(...))

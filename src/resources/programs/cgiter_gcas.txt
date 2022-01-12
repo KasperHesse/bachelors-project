@@ -1,0 +1,47 @@
+//Computes compliance and sensitivity metrics after solving the CG loop
+//DENS: Element densitites (XPHYS)
+//INPUT: Element stiffness values (U)
+//CHANGE: Change in element densities (DC)
+func getComplianceAndSensitivity(DENS, INPUT, CHANGE) = {
+
+    //Setup e0, emin constant. Set up scaling value 100 to avoid overflows when performing arithmetic
+    pstart double
+    estart
+    add.is s1, s0, 0.0078125
+    mul.ss s1, s1, s1 //s1 = 6.1e-5
+    add.is s2, s0, 0.015625
+    mul.ss s2, s1, s2 //s2 = 9.5e-7 ~= 1e-6 = emin
+    add.is s1, s0, 1  //s1 = 1 = e0
+    sub.ss s1, s1, s2 //s1 = e0-emin
+    mul.sv v2, s0, v0 //clear v2
+    add.iv v2, v2, 5  //v2=5
+    mul.iv v2, v2, 5  //v2=25
+    mul.iv v2, v2, 4  //v2 =100
+    div.iv v2, v2, 1 //v2 = 1/100
+    mul.sx x2, s0, x0 //clear x2
+    add.ix x2, x2, 5  //x2 = 5
+    mul.ix x2, x2, 5  //x2 = 25
+    mul.ix x2, x2, 4  //x2 = 100
+    mul.xx x2, x2, x2 //x2 = 10000, to rescale values after computation
+    eend
+    pend
+
+    //Perform compliance and sensitivity loop
+    pstart nelemdof
+    ld.elem x0, DENS
+    ld.dof v0, INPUT
+    estart
+    mul.vv v0, v0, v2 //v0 = v0/100
+    mac.kv v1, v0 //calculate ke*u_local
+    red.vv x1, v1, v0 //calculate u_local^T*(ke*u_local), eight scalars going into x-registers
+    mul.xx x0, x0, x0 //x0 = pow(x[elementIndex],2)
+    mul.sx x0, s1, x0 //x0 = (e0-emin)*(pow(x,2))
+    mul.ix x0, x0, -3 //x0 = (-penal)*(e0-emin)*(pow(x,2))
+    mul.xx x0, x0, x1 //x2 = clocal*(-penal)*(e0-emin)*(pow(x,2))
+    mul.xx x0, x0, x2 //x2 = x2*10000, rescale values
+    eend
+    st.elem x0, CHANGE
+    pend
+}
+
+getComplianceAndSensitivity(XPHYS, U, DC)

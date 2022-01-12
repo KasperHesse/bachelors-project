@@ -18,9 +18,9 @@ func applyDensityFilterGradient(VEC) = {
     ld.edn1 x3, VEC //x3 = edn1[e1]
     ld.edn2 x4, VEC //x4 = edn2[e1]
     estart
-    div.xx x2, x2, x2 //x2 = x2/x2 (all non-zero elements become 1, zeros stay zero)
-    div.xx x3, x3, x3 //x3 = x3/x3
-    div.xx x4, x4, x4 //x4 = ones
+    nez.xx x2, x2 //x2 = x2/x2 (all non-zero elements become 1, zeros stay zero)
+    nez.xx x3, x3 //x3 = x3/x3
+    nez.xx x4, x4 //x4 = ones
     mul.ix x2, x2, 0.5 //face neighbour weight = 0.5
     mul.ix x3, x3, 0.08578 //Edge neighbour weight = 0.08578
     mul.ix x4, x4, 0.08578 //edge neighbour weight = 0.08578
@@ -55,7 +55,7 @@ func applyDensityFilterGradient(VEC) = {
     add.ss s1, s1, s2
     red.xx s2, x4, x0 //Sum values in x4
     add.ss s1, s1, s2 //s1 = v[e1] += filterWeight*tmp[e2] for all neighbours
-    div.xx x1, x1, x1 //Reset value in x1 to a single value
+    nez.xx x1, x1     //Reset value in x1 to a single value
     mul.sx x1, s1, x1 //Set first value in x1 to new element value
     eend
     st.sel x1, VEC
@@ -98,9 +98,9 @@ func applyDensityFilter(IN, OUT) = {
     add.ss s1, s1, s3 //faces + remaining edges
     add.ss s1, s1, s4 //add central element. s1 = out[e1] = sum(filterweight_i*rho[e2_i]
 
-    div.xx x1, x1, x1 //Divide x1 by itself to get 1's in all non-zero positions
-    div.xx x2, x2, x2 // --||--
-    div.xx x3, x3, x3 // --||--
+    nez.xx x1, x1 //Reduce x1 to get 1's in all non-zero positions
+    nez.xx x2, x2 // --||--
+    nez.xx x3, x3 // --||--
 
     mul.ix x1, x1, 0.5 //Multiply #face neighbours with fw
     mul.ix x2, x2, 0.08578 //Multiply #edge neighbours with fw
@@ -155,7 +155,7 @@ func applyStateOperator(DENS, INPUT, OUTPUT) = {
     mul.xx x1, x0, x0 //x0 = pow(x,2)
     mul.xx x1, x1, x0 //x1 = pow(x,3)
     mul.sx x1, s1, x1 //x1 = pow(x,3)*(e0-emin)
-    add.sx x1, s2, x1 //x1 = emin+pow(x,3)*(e0-emin)
+    add.sx x1, s2, x1 //x1 = emin+pow(x,3)*(e0-emin) = elementscale
     mul.xv v2, x1, v0 //v2 = u_local*elementScale
     mac.kv v2, v2     //ke*(u_local*elementScale)
     add.vv v2, v2, v1 //out[edof[i]] += out_local[i]
@@ -396,56 +396,6 @@ func sqrt_V_inline(REG1, REG2, REG3) = {
 //s10 : move
 //s9  : tol
 //s8  : lmid
-
-
-//START CODE
-//Populate design space
-//Get a very close approximation to 0.2 to use as volfrac
-pstart single
-estart
-add.is s1, s0, 0.203125 //Closest imm value to 0.2
-add.is s2, s0, 0.0546875 //Helper value to make 0.203125 more precise
-mul.ss s3, s2, s2 //s2 = 0.0029
-sub.ss s1, s1, s3 //s1 = 0.200134
-add.is s2, s0, 0.109375 //Helper value
-mul.ss s2, s2, s2 //s2 = 0.011962890625
-mul.ss s2, s2, s2 //s2 = 1.431e-4
-sub.ss s1, s1, s2 //s2 = 0.19999116, diff. from 0.20... is 8.83e-6
-add.is s2, s0, 0.0546875 //helper value
-mul.ss s2, s2, s2 //0.0029907
-mul.ss s2, s2, s2 //8.944e-6
-add.ss s1, s1, s2 //s1 = 0.2000001110. Diff from 0.20... is 1.11e-7
-eend
-pend
-
-//Set v0=0.2, v1=1 in both threads
-pstart double
-estart
-mul.sv v0, s0, v0 //clear v0
-add.iv v1, v0, 1  //v1 = 1
-add.sv v0, s1, v0 //v0 / 0.2
-eend
-pend
-
-//Init X, XPHYS and DV vectors
-//Using values already stored in v0,v1 in both threads
-pstart nelemvec
-estart
-eend
-st.vec v0, X
-st.vec v0, XPHYS
-st.vec v1, DV
-pend
-
-//First call to adfg before entering top3dcg loop
-applyDensityFilterGradient(DV)
-
-//Set up loop counter
-pstart single
-estart
-add.ss s15, s0, s0 //s15 = loop = 0
-eend
-pend
 
 //Start of the main loop
 TOP3DCG:
@@ -838,7 +788,7 @@ pstart single
 estart
 add.is s15, s15, 1 //loop++
 add.is s2, s0, 4   //s2 = 4 = threshold value for change and convergence
-add.is s3, s0, 2
+add.is s3, s0, 3
 //add.is s3, s0, 5   //s3 = 5
 //mul.is s3, s3, 5   //s3 = 25
 //mul.is s3, s3, 4   //s3 = 100, max number of top loops

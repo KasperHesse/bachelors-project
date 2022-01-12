@@ -1,4 +1,4 @@
-package vector
+package execution
 
 import chisel3._
 import chiseltest._
@@ -66,7 +66,8 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
         case SUB => fixedSub(a, b)
         case MUL => fixedMul(a, b)
         case ABS => fixedAbs(a)
-        case DIV => double2fixed(x / y)
+        case DIV => fixedDiv(a, b)
+        case NEZ => fixedNez(a)
         case _ => throw new IllegalArgumentException("Unsupported PE Operation")
       }
       as(i) = a
@@ -214,7 +215,6 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
 
   it should "divide a stream of numbers" in {
     test(new ProcessingElement).withAnnotations(Seq(WriteVcdAnnotation)) {c =>
-      scala.util.Random.setSeed(1L)
       generateStimuliSingleOperation(c, DIV, iters)
     }
   }
@@ -226,8 +226,14 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
   }
 
   it should "take the abs of a stream of numbers" in {
-    test(new ProcessingElement).withAnnotations(Seq(WriteVcdAnnotation)) {c =>
+    test(new ProcessingElement) {c =>
       generateStimuliSingleOperation(c, ABS, iters)
+    }
+  }
+
+  it should "perform nez on a stream of numbers" in {
+    test(new ProcessingElement) {dut =>
+      generateStimuliSingleOperation(dut, NEZ, iters)
     }
   }
 
@@ -240,6 +246,20 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
   it should "handle sequential mac instructions" in {
     test(new ProcessingElement) {c =>
       testMacMultiple(c, 10, 10)
+    }
+  }
+
+  it should "divide by zero" in {
+    test(new ProcessingElement) {dut =>
+      val a = 1.0
+      val b = 0.0
+      val n = double2fixed(a)
+      val d = double2fixed(b)
+
+      val c = fixedDiv(n,d)
+
+      testStreamBehaviour(dut, Array(n), Array(d), Array(c), Array(Opcode.DIV))
+
     }
   }
 }

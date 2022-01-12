@@ -15,7 +15,7 @@ import scala.io.Source
 /**
  * A container class with handles to memory, register files and common control values when executing a simulation
  */
-class SimulationContainer {
+class SimulationContext {
   /** S-register file */
   var sReg: Array[SInt] = _
   /** X-register files. (0) is thread 0, (1) is thread 1 */
@@ -48,10 +48,14 @@ class SimulationContainer {
   var MACresults: Array[SInt] = Array.fill(NUM_PROCELEM)(0.S(FIXED_WIDTH.W))
   /** Flag indicating if a MAC instruction is the first MAC in an iteration. See [[common.handleMACSVandMACVV]] for details */
   var firstMAC: Boolean = true
+  /** Flag indicating if a MAC instruction uses immediate values or register values. See [[common.handleMACSVandMACVV]] for details */
+  var macUseImm: Boolean = false
+  /** Immediate value used when performing MAC instructions. Will always be the same value for an entire MAC instruction */
+  var macImmValue: SInt = 0.S
   /** Number of mac instructions seen in the current iteration */
   var macCnt: Int = 0
   /** Iteration values associated with each vector register in each thread */
-  var vregIter: Array[Array[Int]] = Array.ofDim(2, NUM_VREG)
+  var vregIter: Array[Array[Int]] = Array.ofDim(2, VREG_SLOT_WIDTH)
 
   /** Signals asserted whenever a simulation thread is finished in its current packet section */
   private val signals: Array[Boolean] = Array.ofDim[Boolean](2)
@@ -210,7 +214,7 @@ class SimulationContainer {
 }
 
 object MemoryContainerTest extends App {
-  val mc = new SimulationContainer
+  val mc = new SimulationContext
 //  val decode = Module(new Decode)
 
   //Create memory init files with some simple values. Then read these back in

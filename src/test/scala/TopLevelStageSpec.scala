@@ -44,10 +44,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * in the simulation's memory.
    * @param indices The indices which should be accessed. If an index is less than 0, it is interpreted as a non-valid index and 0 is returned
    * @param baseAddr The base address for the memory load operation
-   * @param sc The simulation container object being used for this test
+   * @param sc The simulation context object being used for this test
    * @return A sequence of read data such that ret(0) is the data stored at mem(baseAddr+indices(0)), etc
    */
-  def determineExpectedLoadData(indices: Seq[Int], baseAddr: StypeBaseAddress.Type, sc: SimulationContainer): Seq[SInt] = {
+  def determineExpectedLoadData(indices: Seq[Int], baseAddr: StypeBaseAddress.Type, sc: SimulationContext): Seq[SInt] = {
     val baseAddrDec = AddressDecode.mapping(baseAddr.litValue.toInt)
     val addresses = indices.map(_ + baseAddrDec)
     val maxProg = maxProgress(sc.iBuffer)
@@ -70,10 +70,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Stores data into simulation memory
    * @param indices The indices to be accessed
    * @param baseAddr The base address for the memory store operation
-   * @param sc The simulation container object being used
+   * @param sc The simulation context object being used
    * @param wrData The data to be written
    */
-  def storeData(indices: Seq[Int], clock: Clock, baseAddr: StypeBaseAddress.Type, sc: SimulationContainer, wrData: Seq[SInt]): Unit = {
+  def storeData(indices: Seq[Int], clock: Clock, baseAddr: StypeBaseAddress.Type, sc: SimulationContext, wrData: Seq[SInt]): Unit = {
     val maxProg = maxProgress(sc.iBuffer)
     val baseAddrDec = AddressDecode.mapping(baseAddr.litValue.toInt)
     val addresses = indices.map(_ + baseAddrDec)
@@ -94,9 +94,9 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * @param clock DUT clock
    * @param instr The instruction being processed
    * @param expected Expected data. Each entry of expected(i) must contain exactly 24 entries
-   * @param sc The simulation container used for this simulation
+   * @param sc The simulation context used for this simulation
    */
-  def loadIntoVreg(memid: WbIdIO, clock: Clock, instr: StypeInstruction, expected: Seq[Seq[SInt]], sc: SimulationContainer): Unit = {
+  def loadIntoVreg(memid: WbIdIO, clock: Clock, instr: StypeInstruction, expected: Seq[Seq[SInt]], sc: SimulationContext): Unit = {
     for(i <- expected.indices) {
       while(!memid.we.peek.litToBoolean) { clock.step() }
 
@@ -117,11 +117,11 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Loads data from memory into an x-register in the thread which has memory access
    * @param memid Interface between memory writeback and instruction decode stages
    * @param clock DUT clock
-   * @param rd The destination register encoded in the instruction
+   * @param instr The instruction being processed
    * @param expected Expected data. Must be at most 8 entries large
-   * @param sc The simulation container used for this simulation
+   * @param sc The simulation context used for this simulation
    */
-  def loadIntoXreg(memid: WbIdIO, clock: Clock, instr: StypeInstruction, expected: Seq[SInt], sc: SimulationContainer): Unit = {
+  def loadIntoXreg(memid: WbIdIO, clock: Clock, instr: StypeInstruction, expected: Seq[SInt], sc: SimulationContext): Unit = {
     while(!memid.we.peek.litToBoolean) { clock.step() }
 
     val reg = instr.rsrd.litValue.toInt
@@ -129,6 +129,12 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
       val rdData = memid.wrData(j).peek()
       assertEquals(rdData, expected(j), instr=instr, extra=s"loadIntoXreg: j=$j")
       sc.xReg(sc.memThread)(reg)(j) = rdData
+    }
+    //All other registers have 0 written into them
+    for(j <- Seq.range(expected.length, XREG_DEPTH)) {
+      val rdData = memid.wrData(j).peek()
+      assertEquals(rdData, 0.S(FIXED_WIDTH.W), instr=instr, extra=s"loadIntoXreg: j=$j, expecting zeros for remainder of register")
+      sc.xReg(sc.memThread)(reg)(j) = 0.S(FIXED_WIDTH.W)
     }
     memid.rd.rf.expect(RegisterFileType.XREG)
     memid.rd.reg.expect(instr.rsrd)
@@ -147,10 +153,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a ld.edn1 instruction
    * @param memid Interface between memory writeback and instruction decode stage
    * @param clock DUT clock
-   * @param sc Simulation container object with test-global values
+   * @param sc simulation context object with test-global values
    * @param instr The current S-type instruction
    */
-  def performLoadEdn1(memid: WbIdIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performLoadEdn1(memid: WbIdIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val ijk = sc.ijkBase(sc.memThread)
     val indices = getEdn1Indices(ijk)
     val expectedData = determineExpectedLoadData(indices, instr.baseAddr, sc)
@@ -161,10 +167,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a ld.edn2 instruction
    * @param memid Interface between memory writeback and instruction decode stage
    * @param clock DUT clock
-   * @param sc Simulation container object with test-global values
+   * @param sc simulation context object with test-global values
    * @param instr The current S-type instruction
    */
-  def performLoadEdn2(memid: WbIdIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performLoadEdn2(memid: WbIdIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val ijk = sc.ijkBase(sc.memThread)
     val indices = getEdn2Indices(ijk)
     val expectedData = determineExpectedLoadData(indices, instr.baseAddr, sc)
@@ -175,10 +181,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a ld.fcn instruction
    * @param memid Interface between memory writeback and instruction decode stage
    * @param clock DUT clock
-   * @param sc Simulation container object with test-global values
+   * @param sc simulation context object with test-global values
    * @param instr The current S-type instruction
    */
-  def performLoadFcn(memid: WbIdIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performLoadFcn(memid: WbIdIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val ijk = sc.ijkBase(sc.memThread)
     val indices = getFcnIndices(ijk)
     val expectedData = determineExpectedLoadData(indices, instr.baseAddr, sc)
@@ -189,10 +195,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a ld.sel instruction
    * @param memid Interface between memory writeback and instruction decode stage
    * @param clock DUT clock
-   * @param sc Simulation container object with test-global values
+   * @param sc simulation context object with test-global values
    * @param instr The current S-type instruction
    */
-  def performLoadSel(memid: WbIdIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performLoadSel(memid: WbIdIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val ijk = sc.ijkBase(sc.memThread)
     val indices = Seq(elementIndex(ijk))
     val expectedData = determineExpectedLoadData(indices, instr.baseAddr, sc)
@@ -203,10 +209,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a st.sel instruction
    * @param idmem Interface between instruction decode and memory stage
    * @param clock DUT clock
-   * @param sc Simulation container object
+   * @param sc simulation context object
    * @param instr Current S-type instruction
    */
-  def performStoreSel(idmem: IdMemIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performStoreSel(idmem: IdMemIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val ijk = sc.ijkBase(sc.memThread)
     val indices = Seq(elementIndex(ijk))
 
@@ -219,10 +225,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a ld.elem instruction
    * @param memid Interface between memory writeback and instruction decode stage
    * @param clock DUT clock
-   * @param sc Simulation container object with test-global values
+   * @param sc simulation context object with test-global values
    * @param instr The current S-type instruction
    */
-  def performLoadElem(memid: WbIdIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performLoadElem(memid: WbIdIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val ijk = genIJKmultiple(start=Some(sc.ijkBase(sc.memThread))) //All IJK tuples accessed
     val indices = ijk.map(elementIndex)
     val expectedData = determineExpectedLoadData(indices, instr.baseAddr, sc)
@@ -233,10 +239,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a st.elem instruction
    * @param idmem Interface between instruction decode and memory stage
    * @param clock DUT clock
-   * @param sc Simulation container object
+   * @param sc simulation context object
    * @param instr Current S-type instruction
    */
-  def performStoreElem(idmem: IdMemIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performStoreElem(idmem: IdMemIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val ijk = genIJKmultiple(start=Some(sc.ijkBase(sc.memThread))) //Elements accessed
     val indices = ijk.map(elementIndex) //Indices accessed
     val wrData = Array.ofDim[SInt](NUM_MEMORY_BANKS)
@@ -251,10 +257,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a ld.dof instruction
    * @param memid Interface between memory writeback and instruction decode stage
    * @param clock DUT clock
-   * @param sc Simulation container object with test-global values
+   * @param sc simulation context object with test-global values
    * @param instr The current S-type instruction
    */
-  def performLoadDof(memid: WbIdIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performLoadDof(memid: WbIdIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val ijk = genIJKmultiple(start=Some(sc.ijkBase(sc.memThread))) //Generate all ijk tuples accessed
     val edof = ijk.map(e => getEdof(e(0), e(1), e(2))) //And the corresponding memory locations
     val expectedData = edof.map(e => determineExpectedLoadData(e, instr.baseAddr, sc))
@@ -263,7 +269,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     //Extract iteration values from ijk values, for use in mac.kv instructions
     for(idx <- ijk.indices) {
       val iter = ijk(idx)(3) % 8
-      sc.vregIter(sc.memThread)(instr.rsrd.litValue.toInt * VREG_SLOT_WIDTH + idx) = iter
+      sc.vregIter(sc.memThread)(idx) = iter
     }
   }
 
@@ -271,10 +277,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a st.dof instruction
    * @param idmem Interface between instruction decode and memory stage
    * @param clock DUT clock
-   * @param sc Simulation container object
+   * @param sc simulation context object
    * @param instr Current S-type instruction
    */
-  def performStoreDof(idmem: IdMemIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performStoreDof(idmem: IdMemIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val ijk = genIJKmultiple(start=Some(sc.ijkBase(sc.memThread))) //Generate accessed ijk-tuples
     val indices = ijk.flatMap(e => getEdof(e(0), e(1), e(2))).grouped(NUM_MEMORY_BANKS) //Generate dof values and split into sections of 8
     val wrData = Array.ofDim[SInt](NUM_MEMORY_BANKS)
@@ -292,10 +298,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a st.fdof instruction
    * @param idmem Interface between instruction decode and memory stage
    * @param clock DUT clock
-   * @param sc Simulation container object
+   * @param sc simulation context object
    * @param instr Current S-type instruction
    */
-  def performStoreFdof(idmem: IdMemIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performStoreFdof(idmem: IdMemIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val ijk = genIJKmultiple(start=Some(sc.ijkBase(sc.memThread)))
 
     val indices = ijk.flatMap(e => getFdof(e(0), e(1), e(2))).grouped(NUM_MEMORY_BANKS)
@@ -315,10 +321,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a ld.vec instruction
    * @param memid Interface between memory writeback and instruction decode stage
    * @param clock DUT clock
-   * @param sc Simulation container object with test-global values
+   * @param sc simulation context object with test-global values
    * @param instr The current S-type instruction
    */
-  def performLoadVec(memid: WbIdIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performLoadVec(memid: WbIdIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val baseIndex = sc.vecBaseIndex(sc.memThread)
     val indices = Seq.tabulate(VREG_SLOT_WIDTH)(n => Seq.range(baseIndex+n*VREG_DEPTH, baseIndex+(n+1)*VREG_DEPTH))
     val expectedData = indices.map(i => determineExpectedLoadData(i, instr.baseAddr, sc))
@@ -331,10 +337,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Performs the logic necessary to execute a st.vec instruction
    * @param idmem Interface between instruction decode and memory stage
    * @param clock DUT clock
-   * @param sc Simulation container object
+   * @param sc simulation context object
    * @param instr Current S-type instruction
    */
-  def performStoreVec(idmem: IdMemIO, clock: Clock, sc: SimulationContainer, instr: StypeInstruction): Unit = {
+  def performStoreVec(idmem: IdMemIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val baseIndex = sc.vecBaseIndex(sc.memThread) //Base index to access
     val indices = Seq.tabulate(VREG_DEPTH)(n => Seq.range(baseIndex+n*NUM_MEMORY_BANKS, baseIndex+(n+1)*NUM_MEMORY_BANKS)) //All indices to access
     val wrData = Array.ofDim[SInt](NUM_MEMORY_BANKS)
@@ -352,9 +358,9 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Wrapper function used to encapsulate all operations happening in the memory store part of an instruction packet
    * @param memid Interface between memory writeback and instruction decode
    * @param clock DUT clock
-   * @param sc Simulation container object
+   * @param sc simulation context object
    */
-  def handleMemoryLoadOperations(memid: WbIdIO, clock: Clock, sc: SimulationContainer): Unit = {
+  def handleMemoryLoadOperations(memid: WbIdIO, clock: Clock, sc: SimulationContext): Unit = {
     for(li <- sc.iBuffer.load) {
       while(!memid.we.peek.litToBoolean) {
         clock.step()
@@ -389,9 +395,9 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * @param idex Interface between ID and EX stages
    * @param wbid Interface between WB and ID stages
    * @param clock DUT Clock
-   * @param sc The simulation container object
+   * @param sc The simulation context object
    */
-  def handleExecuteInstruction(idex: IdExIO, wbid: WbIdIO, clock: Clock, sc: SimulationContainer): Unit = {
+  def handleExecuteInstruction(idex: IdExIO, wbid: WbIdIO, clock: Clock, sc: SimulationContext): Unit = {
     var instrCnt = 0
     while(instrCnt < sc.iBuffer.exec.length) {
       handleMACSVandMACVV(idex, sc)
@@ -407,8 +413,8 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
           instrCnt += 1
         }
 
-        if(instrCnt < sc.iBuffer.exec.length) { //Must wrap in if-statement if only instruction in packet
-          //is mac.vv or mac.sv
+        if(instrCnt < sc.iBuffer.exec.length ) {
+          //Must wrap in if-statement if only instruction in packet is mac.vv or mac.sv or mac.iv
           log(f"${sc.execThread} Executing instruction ${sc.iBuffer.exec(instrCnt)}")
           expectAndUpdate(wbid, idex, clock, sc, sc.iBuffer.exec(instrCnt))
           instrCnt += 1
@@ -422,9 +428,9 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * Wrapper function used to encapsulate all operations happening in the memory store part of an instruction packet
    * @param idmem Interface between ID and MEM stages
    * @param clock DUT Clock
-   * @param sc The simulation container object
+   * @param sc The simulation context object
    */
-  def handleMemoryStoreOperations(idmem: IdMemIO, clock: Clock, sc: SimulationContainer): Unit = {
+  def handleMemoryStoreOperations(idmem: IdMemIO, clock: Clock, sc: SimulationContext): Unit = {
     //Wait until an operation is started on one of the three channels
     for(si <- sc.iBuffer.store) {
       while(!idmem.writeQueue.valid.peek.litToBoolean) {
@@ -449,7 +455,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
 
-  def performExecution(dut: TopLevel, sc: SimulationContainer): Unit = {
+  def performExecution(dut: TopLevel, sc: SimulationContext): Unit = {
     sc.packetSetup()
 
     def perform(id: Int): Unit = {
@@ -504,7 +510,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * @param timeout The clock timeout value to be used
    * @param annos Annotations to pass to the tester
    * @param dumpMemory Whether to dump all memory contents to csv files after simulation is finished
-   * @param memDumpName The name of the test/hexcode directory where initialization files generated by a
+   * @param memInitName The name of the test/hexcode directory where initialization files generated by a
    *                    previous simulation are stored.
    *                    If this parameter is set, the memory init file from a previous simulation is used
    *                    to initialize memory and registers. Must be of the format "testname/hexstring".
@@ -519,7 +525,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
               timeout: Int = 1000,
               annos: AnnotationSeq = Seq(),
               dumpMemory: Boolean = false,
-              memDumpName: String = "",
+              memInitName: String = "",
               memInitFileLocation: String = "src/resources/meminit"): Unit = {
 
     val source = Source.fromFile(f"src/resources/programs/$filename.txt")
@@ -529,23 +535,23 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     REGINIT_FILE_LOCATION = memInitFileLocation
     REGINIT_FILE_LOCATION = memInitFileLocation
 
-    val wordsPerBank = if(memDumpName.isEmpty) {
+    val wordsPerBank = if(memInitName.isEmpty) {
       SIMULATION = false //Setting to false to avoid loading values into registers
 
       SynthesisMemInit(memInitFileLocation)
     } else {
       SIMULATION = true //Setting true to also load register values
 
-      val s = memDumpName.split('/')
+      val s = memInitName.split('/')
       val wbp = SimulationMemInit(s(0), s(1), memInitFileLocation)
-      println(s"Initialized memory with data from test $memDumpName")
+      println(s"Initialized memory with data from test $memInitName")
 
       wbp
     }
-    val sc = new SimulationContainer
+    val sc = new SimulationContext
 
 
-    test(new TopLevel(IMsize = 256,
+    test(new TopLevel(IMsize = 1024,
       IMinitFileLocation = s"src/resources/programs/$filename.hex.txt",
       wordsPerBank,
       memInitFileLocation = memInitFileLocation)).withAnnotations(annos) {dut =>
@@ -587,69 +593,85 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
     }
   }
-
-  it should "execute a simple program" in {
-    testFun("simple", dumpMemory = true)
-  }
-
-  it should "perform applyStateOperator" in {
-    testFun("applystateoperator", timeout=20000)
-  }
-
-  it should "perform applyDensityFilter" in {
-    testFun("applydensityfilter", timeout=30000)
-  }
-
-  it should "perform getComplianceAndSensitivity" in {
-    testFun("getComplianceAndSensitivity", 20000)
-  }
-
-  it should "perform generateMatrixDiagonal" in {
-    testFun("generateMatrixDiagonal")
-  }
-
-  it should "perform macvv" in {
-    testFun("macvv", timeout=0)
-  }
-
+//
+//  it should "execute a simple program" in {
+//    testFun("simple", dumpMemory = true)
+//  }
+//
+//  it should "perform applyStateOperator" in {
+//    testFun("applystateoperator", timeout=20000)
+//  }
+//
+//  it should "perform applyDensityFilter" in {
+//    testFun("applydensityfilter", timeout=30000)
+//  }
+//
+//  it should "perform getComplianceAndSensitivity" in {
+//    testFun("getComplianceAndSensitivity", 20000)
+//  }
+//
+//  it should "perform generateMatrixDiagonal" in {
+//    testFun("generateMatrixDiagonal")
+//  }
+//
+//  it should "perform macvv" in {
+//    testFun("macvv", timeout=0)
+//  }
 
   // ======= PROGRAM FLOW =======
 
-  it should "run the full program" in {
-    testFun("top", dumpMemory = true, timeout=0)
-  }
-
   it should "run up to the first ADFG" in {
-    testFun("adfg", dumpMemory = true, timeout=0)
+    testFun("adfg", dumpMemory = true, timeout=0, annos=Seq(VerilatorBackendAnnotation))
   }
 
   it should "run into solveStateCG and first ASO" in { //adfg/bef6db
-    testFun("adfg_aso", dumpMemory = true, timeout = 0, memDumpName = "adfg/736847", annos=Seq(VerilatorBackendAnnotation))
+    testFun("adfg_aso", dumpMemory = true, timeout = 0, memInitName = "top3dcg/119828", annos=Seq(VerilatorBackendAnnotation))
   }
 
+  //should use adfg_aso/99d6df
   it should "generate matrix diagonal and setup before cg loop" in {
-    testFun("aso_gmd", dumpMemory = true, timeout = 0, memDumpName = "adfg_aso/99d6df", annos=Seq(VerilatorBackendAnnotation))
+    testFun("aso_gmd", dumpMemory = true, timeout = 0, memInitName = "adfg_aso/e65a64", annos=Seq(VerilatorBackendAnnotation, WriteVcdAnnotation))
   }
 
   //aso_gmd/03f410 has errors in invD of average size 0.0014 (132x)
   //aso_gmd/fromcc has invD equal to all 1's and R-values from C code (should be no differences whatsoever)
   it should "perform an iteration of the CG loop" in {
-    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "aso_gmd/03f410", annos=Seq(VerilatorBackendAnnotation))
+    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memInitName = "aso_gmd/03f410", annos=Seq(VerilatorBackendAnnotation))
   }
 
   it should "more iterations of CG loop" in {
-    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memDumpName = "gmd_cgiter/1a34ef", annos=Seq(VerilatorBackendAnnotation))
+    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memInitName = "gmd_cgiter/2fe4ea", annos=Seq(VerilatorBackendAnnotation))
   }
 
-  it should "run compliance and ADFG after CG loop" in {
-    testFun("cgiter_comp_adfg", dumpMemory=true, timeout=0, memDumpName="gmd_cgiter/8eeb4f", annos=Seq(VerilatorBackendAnnotation))
+  it should "get compliance and sensitivity after CG loop" in {
+    testFun("cgiter_gcas", dumpMemory = true, timeout = 0, memInitName = "gmd_cgiter/745473", annos=Seq(VerilatorBackendAnnotation))
   }
 
-  it should "perform a matrix-vector product" in {
-    testFun("matrixvectorproduct", dumpMemory=true, timeout=20000, memDumpName="matrixvectorproduct/init", annos=Seq(VerilatorBackendAnnotation))
+  it should "perform adfg after compliance and sensitivity" in {
+    testFun("gcas_adfg2", dumpMemory=true, timeout=0, memInitName="cgiter_gcas/6f7234", annos=Seq(VerilatorBackendAnnotation))
   }
 
-  it should "calculate norm and relres" in {
-    testFun("norm", dumpMemory=true, timeout=0, memDumpName="gmd_cgiter/1a34ef", annos=Seq(VerilatorBackendAnnotation, WriteVcdAnnotation))
+  it should "peform lagrange update" in {
+    testFun("adfg2_lagrange", dumpMemory=true, timeout=0, memInitName = "gcas_adfg2/1dc068", annos=Seq(VerilatorBackendAnnotation))
   }
+
+  it should "update xnew and perform applyDensityFilter" in {
+    testFun("lagrange_adf", dumpMemory=true, timeout=0, memInitName="adfg2_lagrange/839ec7", annos=Seq(VerilatorBackendAnnotation))
+  }
+
+  it should "run the full program" in {
+    testFun("top", dumpMemory = true, timeout=0, annos=Seq(VerilatorBackendAnnotation))
+  }
+
+  it should "run multiple iterations of the top3dcg loop" in {
+    testFun("top3dcg", dumpMemory=true, timeout=0, memInitName="top3dcg/119828", annos=Seq(VerilatorBackendAnnotation))
+  }
+
+//  it should "perform a matrix-vector product" in {
+//    testFun("matrixvectorproduct", dumpMemory=true, timeout=20000, memDumpName="matrixvectorproduct/init", annos=Seq(VerilatorBackendAnnotation))
+//  }
+//
+//  it should "calculate norm and relres" in {
+//    testFun("norm", dumpMemory=true, timeout=0, memDumpName="gmd_cgiter/1a34ef", annos=Seq(VerilatorBackendAnnotation, WriteVcdAnnotation))
+//  }
 }

@@ -112,6 +112,8 @@ object RtypeInstruction {
       MIN
     } else if (opval.litValue == ABS.litValue()) {
       ABS
+    } else if (opval.litValue == NEZ.litValue()) {
+      NEZ
     } else if(opval.litValue == RED.litValue()) {
       RED
     } else {
@@ -554,11 +556,12 @@ object BranchComp extends ChiselEnum {
  */
 object Opcode extends ChiselEnum {
   val NOP = Value("b000000".U)
-  val ADD = Value("b000100".U)
-  val SUB = Value("b000101".U)
-  val MAX = Value("b000110".U)
-  val MIN = Value("b000111".U)
-  val ABS = Value("b001000".U)
+  val ADD = Value("b001000".U)
+  val SUB = Value("b001001".U)
+  val MAX = Value("b001010".U)
+  val MIN = Value("b001011".U)
+  val ABS = Value("b001100".U)
+  val NEZ = Value("b001101".U)
   val MUL = Value("b010000".U)
   val MAC = Value("b010001".U)
   val RED = Value("b010011".U)

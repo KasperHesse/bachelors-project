@@ -122,6 +122,7 @@ object Assembler {
       case "max" => MAX
       case "min" => MIN
       case "abs" => ABS
+      case "nez" => NEZ
       case "red" => RED
       case _ => throw new IllegalArgumentException(s"Opcode '$op' not recognized")
     }
@@ -215,7 +216,7 @@ object Assembler {
     } else if (op == RED) mod match {
       case VV => xReg(tokens(1))
       case XX => sReg(tokens(1))
-      case _ => throw new IllegalArgumentException(s"RED instructions cannot be executed with modifier ${tokens(1)}, only with .vv and .xx")
+      case _ => throw new IllegalArgumentException(s"RED instructions cannot be executed with modifier ${tokens(0).split(".").last}, only with .vv and .xx")
     } else mod match {
       case VV | XV | SV | KV => vReg(tokens(1))
       case SS => sReg(tokens(1))
@@ -235,14 +236,17 @@ object Assembler {
       case SX => xReg(tokens(2))
       case SS => sReg(tokens(2))
       case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs2 field")
-    } else if (op != ABS) mod match {
+    } else if (op != ABS && op != NEZ) mod match {
       case VV | SV | XV => vReg(tokens(3))
       case SS => sReg(tokens(3))
       case XX | SX => xReg(tokens(3))
       case KV => 0 //MVP instructions don't use rs2
       case _ => throw new IllegalArgumentException(s"Unrecognized modifier '$mod' for setting rs2 field")
     } else {
-      0 //ABS instructions only take one operand
+      if(tokens.length > 3 && !tokens(3).startsWith("//")) {
+        throw new IllegalArgumentException("ABS and NEZ instructions do not take a second source register as operands")
+      }
+      0 //ABS, NEZ instructions only take one operand
     }
 
     //Build the instruction
@@ -562,7 +566,7 @@ object Assembler {
   def matchTokens(tokens: Array[String], pass2: Boolean): Option[Int] = {
     //All of these regexes must use a surrounding capture group to evaluate true in the match statement below
     val OType = "(?i)((?:pstart|estart|eend|pend|tstart|tend).*)".r
-    val RType = "(?i)((?:add|sub|mul|div|mac|max|min|abs|red)\\..+)".r
+    val RType = "(?i)((?:add|sub|mul|div|mac|max|min|abs|nez||red)\\..+)".r
     val BType = "(?i)(beq|bne|blt|bge)".r
     val SType = "(?i)((?:st|ld)\\..+)".r
 
@@ -742,11 +746,12 @@ object LitVals {
 //  val x = new AssemblerFunctionCall
 
   //Opcodes
-  val ADD = 0x04 //000100
-  val SUB = 0x05 //000101
-  val MAX = 0x06 //000110
-  val MIN = 0x07 //000111
-  val ABS = 0x08 //001000
+  val ADD = 0x08 //001000
+  val SUB = 0x09 //001001
+  val MAX = 0x0A //001010
+  val MIN = 0x0B //001011
+  val ABS = 0x0C //001100
+  val NEZ = 0x0D //001101
   val MUL = 0x10 //010000
   val MAC = 0x11 //010001
   val RED = 0x13 //010011

@@ -129,6 +129,8 @@ package object execution {
       fixedMax(A, b)
     } else if (ol == ABS.litValue) {
       fixedAbs(A)
+    } else if (ol == NEZ.litValue) {
+      fixedNez(A)
     } else {
         throw new IllegalArgumentException("Unknown opcode")
     }

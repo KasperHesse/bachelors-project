@@ -161,6 +161,25 @@ class AssemblerSpec extends FlatSpec with Matchers {
     Assembler.parseRtype(Assembler.splitInstruction("abs.xx x0, x1"))
   }
 
+  it should "only take one operand when parsing nez instruction" in {
+    Assembler.parseRtype(Assembler.splitInstruction("nez.vv v0, v1"))
+  }
+
+  it should "raise an error if two operands are given in abs and nez instructions" in {
+    try {
+      Assembler.parseRtype(Assembler.splitInstruction("nez.vv v0, v1, v2"))
+    } catch {
+      case e: IllegalArgumentException => assert(true)
+    }
+
+    try {
+      Assembler.parseRtype(Assembler.splitInstruction("abs.vv v0, v1, v2"))
+    } catch {
+      case e: IllegalArgumentException => assert(true)
+    }
+
+  }
+
   it should "throw an error if branch offset is not a multiple of 4" in {
     try {
       val map = scala.collection.mutable.Map[String, Int]()
@@ -176,7 +195,7 @@ class AssemblerSpec extends FlatSpec with Matchers {
     "L1:\n" +
       "pstart single\n" + //0
       "estart\n" + //4
-      "add.is s1, s1, 1\n" + //8
+      "add.is s1, s1, 1 //ignore this comment\n" + //8
       "add.is s2, s0, 5\n" + //12
       "eend\n" + //16
       "pend\n" + //20

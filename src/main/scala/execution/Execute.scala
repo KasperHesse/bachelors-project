@@ -72,7 +72,7 @@ class Execute extends Module {
   //When inserting RED.XX instructions, every input is valid
   //When inserting RED.VV instructions, only every SUBVECTORS_PER_VREG'th input is valid (as all VREG_DEPTH elements go into one slot in the dest. X-register)
   //When inserting MAC.KV/MAC.VV/MAC.SV instructions, inputs are only valid if the dest. queue is empty
-  redVVcounter := Mux(opSignal === RED && io.id.dest.rf === RegisterFileType.XREG, //If op===RED and rf === XREG, instruction is RED.VV
+  redVVcounter := Mux(opSignal === RED && io.id.dest.rf === RegisterFileType.XREG && validSignal, //If op===RED and rf === XREG, instruction is RED.VV
     Mux(redVVcounter === (SUBVECTORS_PER_VREG-1).U, 0.U, redVVcounter + 1.U),
     redVVcounter)
   macDestQueue.io.enq.valid := validSignal && ((opSignal === RED && redVVcounter === 0.U) || (opSignal === MAC && macDestQueue.io.count === 0.U))

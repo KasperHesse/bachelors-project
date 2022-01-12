@@ -58,14 +58,14 @@ class ProcessingElement extends Module {
   alu.io.in.a := alu_a
   alu.io.in.b := alu_b
   alu.io.in.op := tmp.op //All operations not SUB, MAX, MIN, ABS will add the operands
-  alu.io.in.valid := Mux(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN || tmp.op === ABS, tmp.valid, mulDivValidReg)
+  alu.io.in.valid := Mux(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN || tmp.op === ABS || tmp.op === NEZ, tmp.valid, mulDivValidReg)
   val resReg = RegEnable(alu.io.out.res, alu.io.out.valid && (tmp.op === MAC || tmp.op === RED))
   val macLimit = RegInit(0.U(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W))
   val macCnt = RegInit(0.U(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W))
 
 
   //Signal multiplexers for alu and result reg
-  when(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN || tmp.op === ABS) {
+  when(tmp.op === ADD || tmp.op === SUB || tmp.op === MAX || tmp.op === MIN || tmp.op === ABS || tmp.op === NEZ) {
     alu_a := tmp.a
     alu_b := tmp.b
   } .elsewhen(tmp.op === MAC || tmp.op === RED) {

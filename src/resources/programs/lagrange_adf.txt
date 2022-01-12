@@ -1,0 +1,118 @@
+//Final part of top3dcg, invoking applyDensityFilter after updating x
+
+//ApplyDensityFilter performs smoothing
+//IN: Input vector (X)
+//OUT: Output vector (XPHYS)
+func applyDensityFilter(IN, OUT) = {
+    pstart double
+    estart
+    mul.sx x0, s0, x0 //Clear x0
+    add.ix x0, x0, 1  //x0 = 1
+    eend
+    pend
+
+    //Perform computation of applyDensityFilter
+    //All elements are traversed, and every element's neighbours are loaded into x-registers
+    //Each neighbour is multiplied with its corresponding filterweight, and the sum of weighted
+    //neighbours is stored in out[e1].
+    //The value unityScale is found as the sum of filterweights * number of elements with that weight
+    //The value in out[e1] is scaled by this value
+    pstart nelemstep
+    ld.fcn x1,  IN //x1 = face neighbours
+    ld.edn1 x2, IN //x2 = edge neighbours
+    ld.edn2 x3, IN //x3 = edge neighbours
+    ld.sel x4,  IN //x4 = central element density
+    estart
+    mul.ix x1, x1, 0.5 //multiply face-neighbours with their fw
+    mul.ix x2, x2, 0.08578 //multiply edge-neighbours with their fw
+    mul.ix x3, x3, 0.08578 //multiple edge-neighbours with their fw
+    mul.ix x4, x4, 1.5 //multiply central element with fw
+
+    red.xx s1, x1, x0 //sum of face neighbours
+    red.xx s2, x2, x0 //sum of edge neighbours
+    red.xx s3, x3, x0 //sum of edge neighbours
+    red.xx s4, x4, x0 //sum of central element
+
+    add.ss s1, s1, s2 //faces + some edges
+    add.ss s1, s1, s3 //faces + remaining edges
+    add.ss s1, s1, s4 //add central element. s1 = out[e1] = sum(filterweight_i*rho[e2_i]
+
+    div.xx x1, x1, x1 //Divide x1 by itself to get 1's in all non-zero positions
+    div.xx x2, x2, x2 // --||--
+    div.xx x3, x3, x3 // --||--
+
+    mul.ix x1, x1, 0.5 //Multiply #face neighbours with fw
+    mul.ix x2, x2, 0.08578 //Multiply #edge neighbours with fw
+    mul.ix x3, x3, 0.08578 // --||--
+
+    red.xx s2, x1, x0 //sum of filterweights for face neighbours
+    red.xx s3, x2, x0 //sum of filterweights for edge neighbours
+    red.xx s4, x3, x0 //sum of filterweights for edge neighbours
+
+    add.ss s2, s2, s3  //sum faces and some edge
+    add.ss s2, s2, s4  //sum faces and remaining edges
+    add.is s2, s2, 1.5 //add fw from central element, s2=unityScale
+
+    div.ss s1, s1, s2 //s1 = out[e1]/unityScale
+    mul.sx x1, s0, x1 //zero out x1
+    add.sx x1, s1, x1 //copy s-value into x1. We can only perform st.sel with x-registers
+    eend
+    st.sel x1, OUT
+    pend
+}
+
+//Calculate change value
+//We wish to find the largest amount of change in any one of the design variables
+//We do this by finding the VREG_DEPTH largest design variables in both thread0 and thread1
+//We then compare these values to our wanted amount of change, 0.01
+//If all change values are less than 0.01, then max(0.01, change) will return 0.01 in all
+//vregs. Since we know the number of vregs, if the sum of all max()-values is less than or equal to a
+//specific value, we know that we have reached convergence
+
+//Clear vectors
+pstart double
+estart
+add.ss s14, s0, s0 //s14 = change = 0
+add.is s2, s0, 0.1 //s2 = 0.1
+mul.ss s2, s2, s2  //s2 = 0.010315 =~0.01
+mul.sv v0, s0, v0  //clear v0, change vector
+mul.sv v1, s0, v1  //clear v1
+add.iv v1, v1, 1   //v1 = 1
+mul.sx x1, s0, x1  //Clear x1
+add.ix x1, x1, 1   //x1 = 1
+eend
+pend
+
+//Calculate largest change values, set x=xnew
+pstart nelemvec
+ld.vec v2, X
+ld.vec v3, XNEW
+estart
+sub.vv v2, v2, v3 //v2 = x[i]-xnew[i]
+abs.vv v2, v2     //v2 = abs(x[i]-xnew[i])
+max.vv v0, v0, v2 //v0 = max(change, abs(x[i]-xnew[i]))
+eend
+st.vec v3, X //x[i] = xnew[i]
+pend
+
+//Compare change values
+//Only operating on stored values now
+pstart double
+estart
+max.sv v0, s2, v0   //max of change values and 0.01
+red.vv x0, v0, v1   //sum values in v-registers into x0
+//executing red.vv immediatedly followed by red.xx stalls the accelerator.
+//I don't really know why, and don't want to bother fixing it right now.
+//Inserting a nop resolves this
+add.ss s0, s0, s0
+red.xx s1, x0, x1   //sum values in x0 into s1
+add.ss s14, s1, s14 //add this thread's contribution to total change amount into s14
+eend
+pend
+
+//If value in s14 <= 0.01*2*ELEMS_PER_VSLOT, we are finished
+//Currently, ELEMS_PER_VSLOT = 8*24=192, so this becomes 0.01*2*192=0.01*384=3.84
+//The threshold value is not exactly 0.01 but 0.0103, so our threshold becomes 0.0103*384=3.96
+//For our threshold, if the sum of change values is less than 4, it see it as convergence
+
+applyDensityFilter(X, XPHYS)

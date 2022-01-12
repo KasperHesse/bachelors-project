@@ -15,6 +15,7 @@ class FixedPointALU extends Module {
   val max = Mux(io.in.a > io.in.b, io.in.a, io.in.b)
   val min = Mux(io.in.a < io.in.b, io.in.a, io.in.b)
   val abs = io.in.a.abs()
+  val nez = Mux(io.in.a === 0.S, 0.S(FIXED_WIDTH.W), double2fixed(1).S(FIXED_WIDTH.W))
   when(io.in.op === Opcode.SUB) {
     io.out.res := io.in.a - io.in.b
   } .elsewhen(io.in.op === Opcode.MAX) {
@@ -23,6 +24,8 @@ class FixedPointALU extends Module {
     io.out.res := min
   } .elsewhen(io.in.op === Opcode.ABS) {
     io.out.res := abs
+  } .elsewhen(io.in.op === Opcode.NEZ) {
+    io.out.res := nez
   }
   io.out.valid := io.in.valid
 }

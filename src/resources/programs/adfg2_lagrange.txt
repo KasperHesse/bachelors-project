@@ -1,0 +1,151 @@
+//Perform the lagrangian update after compliance and adfg
+
+// Calculates the square root of values in vector registers
+// This is meant to be called inside of an estart/eend block in the lagrange updater
+// Unrolled loop with 5 iterations
+// REG1: Input/output: In: Value to take sqrt of, out: sqrt of that value
+// REG2, REG3: Two temp registers used for calculations
+func sqrt_V_inline(REG1, REG2, REG3) = {
+    mul.sv REG2, s0, REG2 //Clear the value of reg2
+    add.vv REG2, REG2, REG1 //Copy value of REG1 (input) to REG2
+    //First iteration
+    div.vv REG3, REG1, REG2 //REG3 = S/xn
+    add.vv REG3, REG3, REG2 //REG3 = xn + S/xn
+    mul.iv REG2, REG3, 0.5  //REG2 = xnew = 1/2*(xn+S/xn)
+    //Second iteration
+    div.vv REG3, REG1, REG2 //REG3 = S/xn
+    add.vv REG3, REG3, REG2 //REG3 = xn + S/xn
+    mul.iv REG2, REG3, 0.5  //REG2 = xnew = 1/2*(xn+S/xn)
+    //Third iteration
+    div.vv REG3, REG1, REG2 //REG3 = S/xn
+    add.vv REG3, REG3, REG2 //REG3 = xn + S/xn
+    mul.iv REG2, REG3, 0.5  //REG2 = xnew = 1/2*(xn+S/xn)
+    //Fourth iteration
+    div.vv REG3, REG1, REG2 //REG3 = S/xn
+    add.vv REG3, REG3, REG2 //REG3 = xn + S/xn
+    mul.iv REG2, REG3, 0.5  //REG2 = xnew = 1/2*(xn+S/xn)
+    //Fifth iteration
+    div.vv REG3, REG1, REG2 //REG3 = S/xn
+    add.vv REG3, REG3, REG2 //REG3 = xn + S/xn
+    mul.iv REG1, REG3, 0.5  //REG2 = xnew = 1/2*(xn+S/xn)
+}
+
+//Sum values in xphys
+pstart nelemvec
+ld.vec v0, XPHYS
+estart
+mac.iv s1, v0, 1 //s1 = sum(xphys)
+eend
+pend
+
+//Calculate g and vol
+//NOTE: If grid size is changed from 6x6x6, so too must this code be changed,
+//as the value of "nelem" is coded in here.
+//Likewise for the value of volfrac
+pstart single
+estart
+add.is s3, s0, 6  //s3 = 6
+mul.is s3, s3, 6  //s3 = 36
+mul.is s3, s3, 6  //s3 = 216 = nelem
+div.ss s2, s1, s3 //s2 = sum(xphys)/nelem = vol
+add.is s13, s2, -0.2 //s13 = sum(xphys)/nelem - volfrac = g
+
+//Set up constants
+//l1, l2
+add.ss s11, s0, s0   //s11 = l1 = 0
+add.is s12, s0, 7.9  //s12 = 7.9
+mul.is s12, s12, 7.9 //s12 = 62.4
+mul.ss s12, s12, s12 //s12 = 3895
+mul.is s12, s12, 7.9 //s12 = 30770 = l2
+//move and tolerance
+add.is s10, s0, 0.2  //s10 = move = 0.2
+add.is s9, s0, 0.03162277 //s9 = 0.031..
+mul.ss s9, s9, s9 //s9 = 0.001
+mul.ss s9, s9, s9 //s9 =~ 1-e6 = tolerance
+eend
+pend
+
+LAGRANGE_START:
+//Calculate ratio between l2,l1 values, check if we're finished
+pstart single
+estart
+sub.ss s1, s12, s11 //s1 = l2-l1
+add.ss s2, s12, s11 //s2 = l2+l1
+div.ss s1, s1, s2   //s1 = (l2-l1)/(l2+l1)
+eend
+pend
+
+blt s1, s9, LAGRANGE_END //if (l2-l1)/(l2+l1) < tolerance, we're finished
+
+//Calculate lmid
+pstart single
+estart
+mul.is s8, s2, 0.5 //s8 = (l2+l1)/2 = lmid
+add.ss s7, s0, s0 //clear s7 for gt calculation afterwards
+eend
+pend
+
+//Calculate xnew values
+pstart nelemvec
+ld.vec v0, DV
+ld.vec v1, DC
+ld.vec v3, X
+estart
+mul.sv v0, s8, v0 //v0 = dv[i]*lmid
+div.vv v0, v1, v0 //v0 = dc[i]/(dv[i]*lmid)
+mul.iv v0, v0, -1 //v0 = -dc[i]/(dv[i]*lmid)
+//Get square root of value in v0
+sqrt_V_inline(v0, v1, v2)
+mul.vv v0, v0, v3   //v0 = x[i]*sqrt(..)
+add.iv v1, v3, 0.2  //v1 = x[i]+move
+add.iv v2, v3, -0.2 //v2 = x[i]-move
+min.vv v0, v0, v1   //v0 = min(x[i]+move, x[i]*sqrt(..))
+min.iv v0, v0, 1    //v0 = min(1.0, min(...))
+max.vv v0, v0, v2   //v0 = max(x[i]-move, min(...))
+max.iv v0, v0, 0    //v0 = max(0.0, max(...))
+eend
+st.vec v0, XNEW
+pend
+
+//Calculate value of gt
+pstart nelemvec
+ld.vec v0, XNEW
+ld.vec v1, X
+ld.vec v2, DV
+estart
+sub.vv v0, v0, v1 //v0 = xnew[i]-x[i]
+red.vv x0, v0, v2 //x0 = dv[i]*(xnew[i]-x[i]), summation
+mul.sx x1, s0, x1 //clear x1
+add.ix x1, x1, 1  //x1 = 1
+red.xx s1, x0, x1 //x0 = sum(dv[i]...)
+add.ss s7, s7, s1 //sum(dv[i]*(xnew[i]-x[i])=gt
+eend
+pend
+
+//Increment value of gt with value of g
+pstart single
+estart
+add.ss s1, s7, s13
+eend
+pend
+
+//Update either l1 or l2
+bge s1, s0, GT_POSITIVE //if gt >= 0, l1=lmid
+//otherwise, l2 = lmid
+pstart single
+estart
+add.ss s12, s0, s8 //s12 = s8 <> l2 = lmid
+eend
+pend
+beq s0, s0 LAGRANGE_START
+
+GT_POSITIVE:
+pstart single
+estart
+add.ss s11, s0, s8 //s11 = s8 <> l1 = lmid
+eend
+pend
+beq s0, s0, LAGRANGE_START
+
+LAGRANGE_END:
+

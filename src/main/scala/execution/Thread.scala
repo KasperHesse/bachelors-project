@@ -34,7 +34,7 @@ class ThreadIO extends Bundle {
   val mem = new IdMemIO
   /** Connections to the control module */
   val ctrl = new ThreadControlIO
-  /** Connections to writeback stage */
+  /** Connections to writeback stage, both memory writeback and execute writeback */
   val wb = Flipped(new WbIdIO)
   /** Connections to shared register file in Decode stage */
   val sRegFile = Flipped(new ScalarRegFileIO)
@@ -96,7 +96,7 @@ class Thread(id: Int) extends Module {
   /** O-type length of currently executing instruction packet */
   val instrLen = RegInit(OtypeLen.SINGLE)
   /** Iteration value associated with all V-register files. Used when processing mac.kv instructions */
-  val vRegIter = RegInit(VecInit(Seq.fill(NUM_VREG)(0.U(3.W))))
+  val vRegIter = RegInit(VecInit(Seq.fill(VREG_SLOT_WIDTH)(0.U(3.W))))
 
   // --- WIRES AND SIGNALS ---
   /** Handle to the current instruction */
@@ -518,7 +518,7 @@ class Thread(id: Int) extends Module {
         }
 
         //Must use RegNext(v_rs1) since
-        b := keVals(vRegIter(RegNext(v_rs2)))
+        b := keVals(vRegIter(RegNext(slotSelect)))
       }
     }
   }
@@ -563,7 +563,7 @@ class Thread(id: Int) extends Module {
 
   //Vreg iteration value update when loading
   when(state === sLoad && memAccess.io.edof.valid && io.mem.edof.ready && memAccess.io.readQueue.bits.mod === StypeMod.DOF) {
-    vRegIter(memAccess.io.readQueue.bits.rd.reg) := memAccess.io.readQueue.bits.iter
+    vRegIter(memAccess.io.slotSelect) := memAccess.io.readQueue.bits.iter
   }
 
   //Stall management

@@ -41,15 +41,13 @@ class IdExIO extends Bundle {
   val op = Output(Opcode())
   /** UInt version of opcode. Debug purposes only */
   val opUInt = Output(UInt(6.W))
-  /** Number of multiply-accumulates to perform before releasing the result. Only used when MAC operations are performed.
-   * Width 32 is currently a guess */
-  val macLimit = Output(UInt(32.W))
-  /** Signals to the execution unit that the incoming operation should be added to the destination queue.
-   * Mostly useful for MAC operations, where multiple operations are performed for each destination input. */
+  /** Number of multiply-accumulates to perform before releasing the result. Only used when MAC operations are performed. */
+  val macLimit = Output(UInt(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W))
+  /** Signals to the execution unit that the incoming operation is valid */
   val valid = Output(Bool())
   /** Immediate value */
   val imm = Output(SInt(FIXED_WIDTH.W))
-  /** Asserted when the immediate should be used instead of b-values */
+  /** Asserted when the immediate should be used instead of a-values */
   val useImm = Output(Bool())
 }
 

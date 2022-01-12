@@ -40,6 +40,8 @@ class ThreadMemoryAccessIO extends Bundle {
   val subvec = Output(UInt(log2Ceil(XREG_DEPTH+1).W))
   /** Valid signal for write queue */
   val wqValid = Output(Bool())
+  /** Slot select value, used to index into vregIter register in thread */
+  val slotSelect = Output(UInt(log2Ceil(VREG_SLOT_WIDTH+1).W))
 }
 
 /**
@@ -162,6 +164,7 @@ class ThreadMemoryAccess(sim: Boolean = false) extends Module {
   io.subvec := outputCnt
   io.rsrd := Mux(Sinstr.mod === DOF || Sinstr.mod === FDOF || Sinstr.mod === VEC, vecRd, Sinstr.rsrd)
   io.wqValid := queueValidFlag && io.threadState === sStore
+  io.slotSelect := slotSelect
 
   //Override ready/valid handshakes to only be valid when an S-type instruction is processing
   when(Sinstr.fmt =/= InstructionFMT.STYPE) {

@@ -8,94 +8,50 @@ import scala.io.Source
  */
 object MemoryCompare extends App {
 
-  val testName = "gmd_cgiter"
-  val hash = "745473"
-
+  val testName = "aso_gmd"
+  val hash = "948205"
+//memdump/aso_gmd/948205
   def apply(): Unit = {
     val DV = compare("DV")
+//    val DC = compare("DC")
     val INVD = compare("INVD")
     val R = compare("R")
-    val Z = compare("Z")
-    val TMP = compare("TMP")
-    val P = compare("P")
-    val Q = compare("Q")
+//    val Z = compare("Z")
+//    val P = compare("P")
+//    val Q = compare("Q")
     val U = compare("U")
-    val X = compare("X")
-    val XPHYS = compare("XPHYS")
+//    val X = compare("X")
+//    val XPHYS = compare("XPHYS")
+//    val XNEW = compare("XNEW")
 
-
-    def print(x: (Int, Double), name: String): Unit = {
-      println(f"$name: ${x._2}%.5f / ${x._1}")
+    def print(x: (Int, Double, Int, Double), name: String): Unit = {
+      println(f"$name%-6s| ${x._2}%9.5f | ${x._4}%9.5f | ${x._1}%4d | ${x._3}%4d")
     }
 
+    println("NAME  | Avg.Delta | Av.Delta2 |  cnt | Signerrors")
+    println("------+-----------+-----------+------+-----------")
     print(DV, "DV")
+//    print(DC, "DC")
     print(INVD, "INVD")
     print(R, "R")
-    print(Z, "Z")
-    print(TMP, "TMP")
-    print(P, "P")
-    print(Q, "Q")
+//    print(Z, "Z")
+//    print(P, "P")
+//    print(Q, "Q")
     print(U, "U")
-    print(X, "X")
-    print(XPHYS, "XPHYS")
+//    print(X, "X")
+//    print(XPHYS, "XPHYS")
+//    print(XNEW, "XNEW")
 
-/*
-    //Compare values of P,Q-vectors in gmd_cgiter/d7026d and gmd_cgiter/587719
-    val p1 = Source.fromFile("memdump/gmd_cgiter/d7026d/mem_P.csv")
-    val p2 = Source.fromFile("memdump/gmd_cgiter/587719/mem_P.csv")
-    val q1 = Source.fromFile("memdump/gmd_cgiter/d7026d/mem_Q.csv")
-    val q2 = Source.fromFile("memdump/gmd_cgiter/587719/mem_Q.csv")
-
-    val P1 = p1.getLines().toArray
-    val P2 = p2.getLines().toArray
-    val Q1 = q1.getLines().toArray
-    val Q2 = q2.getLines().toArray
-
-    var errCnt = 0
-    var errAvg = 0.0
-    for (i <- 1 until P1.length) {
-      val v1 = P1(i).split(',').last.toDouble
-      val v2 = P2(i).split(',').last.toDouble
-      if(math.abs(v1-v2) > 0.001) {
-        println(f"ERROR at $i. P1: $v1%.5f, P2: $v2%.5f, Delta: ${math.abs(v1-v2)}%.5f")
-        errCnt += 1
-        errAvg += math.abs(v1-v2)
-      }
-    }
-    if(errCnt > 0) {
-      errAvg = errAvg / errCnt
-      println(f"$errCnt errors found for [P]")
-      println(f"Average error: $errAvg%.5f")
-    }
-    println("Comparison finished for P\n")
-
-    errCnt = 0
-    errAvg = 0.0
-    for (i <- 1 until Q1.length) {
-      val v1 = Q1(i).split(',').last.toDouble
-      val v2 = Q2(i).split(',').last.toDouble
-      if(math.abs(v1-v2) > 0.0000001) {
-        println(f"ERROR at $i. Q1: $v1, Q2: $v2, Delta: ${math.abs(v1-v2)}")
-        errCnt += 1
-        errAvg += math.abs(v1-v2)
-      }
-    }
-    if(errCnt > 0) {
-      errAvg = errAvg / errCnt
-      println(f"$errCnt errors found for [Q]")
-      println(f"Average error: $errAvg%.7f")
-    }
-    println("Comparison finished for Q\n")
-    */
   }
 
   /**
    *
    * @param name
    * @param delta
-   * @return A tuple: (0) is number of miscompares, (1) is average miscompare delta
+   * @return A tuple: (0) is number of miscompares, (1) is average absolute miscompare delta
+   *         (2) is number of sign errors, (3) is average percentage miscompare delta
    */
-  def compare(name: String, delta: Double = 0.001): (Int, Double) = {
+  def compare(name: String, delta: Double = 0.001): (Int, Double, Int, Double) = {
 
     val file1 = Source.fromFile(f"memdump/$testName/$hash/mem_$name.csv")
     val file2 = Source.fromFile(f"memdump_C/memdump_$name.csv")
@@ -106,12 +62,22 @@ object MemoryCompare extends App {
     require(lines1.length == lines2.length, s"Files for [$name] must be of the same length. f1: ${lines1.length}, f2: ${lines2.length}")
 
     println(s"Comparing values for [$name]")
+    //Remove first element (csv header), split at commas, take last element (value) and convert to double
+    val SCALA = lines1.tail.map(_.split(",").last.toDouble)
+    val C = lines2.tail.map(_.split(",").last.toDouble)
     var errCnt = 0
     var signCnt = 0
     var errAvg = 0.0
-    for(i <- 1 until lines1.length) {
-      val scala = lines1(i).split(',').last.toDouble
-      val c = lines2(i).split(',').last.toDouble
+
+    //Calculate 2-norm difference
+    val twonormc = norm(C)
+    val twonormdiff = norm(C.zip(SCALA).map(x => x._1-x._2))
+    val errAvg2 = twonormdiff/twonormc*100
+
+    //Calculate absolute differences
+    for(i <- C.indices) {
+      val scala = SCALA(i)
+      val c = C(i)
 
       if(math.abs(scala-c) > delta) {
         println(f"ERROR at $i. Scala: $scala%.5f, C: $c%.5f, Delta: ${math.abs(scala-c)}%.5f")
@@ -120,9 +86,11 @@ object MemoryCompare extends App {
       }
       if(scala <= 0 && c > 0 || c <= 0 && scala > 0) {
         signCnt += 1
-        println(f"SIGNERR at $i")
+        println(f"SIGNERR at $i: Scala $scala%.5f, C $c%.5f")
       }
     }
+
+
     if(errCnt > 0) {
       errAvg = errAvg / errCnt
       println(f"$errCnt errors found for [$name] at delta=$delta")
@@ -134,7 +102,20 @@ object MemoryCompare extends App {
 
     file1.close()
     file2.close()
-    (errCnt, errAvg)
+    (errCnt, errAvg, signCnt, errAvg2)
+  }
+
+  /**
+   * Calculates the 2-norm of a vector
+   * @param V The vector
+   * @return THe 2-norm
+   */
+  def norm(V: Array[Double]): Double = {
+    var sum = 0.0
+    for(v <- V) {
+      sum += v*v
+    }
+    Math.sqrt(sum)
   }
 
   apply()
