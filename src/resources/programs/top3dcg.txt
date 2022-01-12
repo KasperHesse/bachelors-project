@@ -616,7 +616,7 @@ add.is s3, s0, 6  //s3 = 6
 mul.is s3, s3, 6  //s3 = 36
 mul.is s3, s3, 6  //s3 = 216 = nelem
 div.ss s2, s1, s3 //s2 = sum(xphys)/nelem = vol
-add.is s13, s2, - 0.2 //s13 = sum(xphys)/nelem - volfrac = g
+add.is s13, s2, -0.2 //s13 = sum(xphys)/nelem - volfrac = g
 
 //Set up constants
 //l1, l2
@@ -788,7 +788,7 @@ pstart single
 estart
 add.is s15, s15, 1 //loop++
 add.is s2, s0, 4   //s2 = 4 = threshold value for change and convergence
-add.is s3, s0, 5   //s3 = 5 = max number of top loops
+add.is s3, s0, 6   //s3 = 6 = max number of top loops
 //add.is s3, s0, 5   //s3 = 5
 //mul.is s3, s3, 5   //s3 = 25
 //mul.is s3, s3, 4   //s3 = 100, max number of top loops
@@ -800,7 +800,6 @@ pend
 bge s15, s3, END //if loop >= 100, go to end
 blt s14, s2, END //if change <=4, go to end
 
-//Commented out for now
 beq s0, s0, TOP3DCG //otherwise, unconditional branch back to the start of top loop
 
 END:
