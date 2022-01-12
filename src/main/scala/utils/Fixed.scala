@@ -55,7 +55,7 @@ object Fixed {
    * @return A double with the value that the fixed-point number represents
    */
   def fixed2double(value: SInt): Double = {
-    value.litValue().toDouble * math.pow(2,-FRAC_WIDTH)
+    fixed2double(value.litValue.toLong)
   }
 
   /**
@@ -64,7 +64,13 @@ object Fixed {
    * @return A double with the value that the fixed-point number represents
    */
   def fixed2double(value: Long): Double = {
-    value.toDouble * math.pow(2,-FRAC_WIDTH)
+    var v = value.toDouble * math.pow(2,-FRAC_WIDTH)
+    if(v >= math.pow(2,INT_WIDTH)) {
+      v -= math.pow(2,INT_WIDTH+1)
+    } else if (v < -math.pow(2,INT_WIDTH)) {
+      v += math.pow(2,INT_WIDTH+1)
+    }
+    v
   }
 
   /**
@@ -411,7 +417,7 @@ object Fixed {
     val high = if(neg) -1*(16-immh) else immh
     val imm: Double = high + immfrac*math.pow(2,-7)
 
-    return double2fixed(imm).S(FIXED_WIDTH.W)
+    double2fixed(imm).S(FIXED_WIDTH.W)
   }
 
   /**
