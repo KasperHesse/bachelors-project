@@ -282,7 +282,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  val iters = 5
+  val iters = 20
 
   it should "shift denominator and numerator" in {
     test(new NRDivStage1()).withAnnotations(Seq(WriteVcdAnnotation)) {c =>
@@ -322,7 +322,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  it should "perform 1/3" in {
+  it should "perform 9/25" in {
         FIXED_WIDTH = 16
         INT_WIDTH = 7
         FRAC_WIDTH = 8
@@ -333,7 +333,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       val op2 = double2fixed(25)
       dut.io.in.numer.poke(op1.S)
       dut.io.in.denom.poke(op2.S)
-      print(s"op1=${op1}(${fixed2double(op1)}, op2=${op2}(${fixed2double(op2)})\n")
+      print(s"op1=${op1}(${fixed2double(op1)}), op2=${op2}(${fixed2double(op2)})\n")
       dut.io.in.valid.poke(true.B)
       while(!dut.io.out.valid.peek.litToBoolean) {
         dut.clock.step()
@@ -343,18 +343,19 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
   }
 
-  it should "return 0 when dividing by zero" in {
-    simulationConfig()
-    test(new NRDiv()) {dut =>
-      val op1 = double2fixed(123).S
-      val op2 = 0.S
+  it should "return a large value when dividing by zero" in {
+    test(new NRDiv()).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
+      val op1 = double2fixed(10000).S
+      val op2 = double2fixed(0.125).S
+//      val op2 = 1.S
       dut.io.in.numer.poke(op1)
       dut.io.in.denom.poke(op2)
       dut.io.in.valid.poke(true.B)
       while(!dut.io.out.valid.peek.litToBoolean) {
         dut.clock.step()
       }
-      dut.io.out.res.expect(fixedDiv(op1, op2))
+      println(s"res: ${fixed2double(dut.io.out.res.peek())}, expected ${fixed2double(fixedDiv(op1,op2))}")
+      require(math.abs(fixed2double(dut.io.out.res.peek()) - fixed2double(fixedDiv(op1,op2))) < 1e-2)
     }
   }
 }

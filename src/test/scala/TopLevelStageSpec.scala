@@ -625,12 +625,12 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "run into solveStateCG and first ASO" in { //adfg/bef6db
-    testFun("adfg_aso", dumpMemory = true, timeout = 0, memInitName = "top3dcg/119828", annos=Seq(VerilatorBackendAnnotation))
+    testFun("adfg_aso", dumpMemory = true, timeout = 0, memInitName = "adfg/bef6db", annos=Seq(VerilatorBackendAnnotation))
   }
 
   //should use adfg_aso/99d6df
   it should "generate matrix diagonal and setup before cg loop" in {
-    testFun("aso_gmd", dumpMemory = true, timeout = 0, memInitName = "adfg_aso/e65a64", annos=Seq(VerilatorBackendAnnotation, WriteVcdAnnotation))
+    testFun("aso_gmd", dumpMemory = true, timeout = 0, memInitName = "adfg_aso/99d6df", annos=Seq(VerilatorBackendAnnotation))
   }
 
   //aso_gmd/03f410 has errors in invD of average size 0.0014 (132x)
@@ -651,20 +651,26 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     testFun("gcas_adfg2", dumpMemory=true, timeout=0, memInitName="cgiter_gcas/6f7234", annos=Seq(VerilatorBackendAnnotation))
   }
 
+  //gcas_adfg2/1dc068
   it should "peform lagrange update" in {
-    testFun("adfg2_lagrange", dumpMemory=true, timeout=0, memInitName = "gcas_adfg2/1dc068", annos=Seq(VerilatorBackendAnnotation))
+    testFun("adfg2_lagrange", dumpMemory=true, timeout=0, memInitName = "top3dcg/extra", annos=Seq(VerilatorBackendAnnotation))
   }
 
+  //adfg2_lagrange/839ec7
   it should "update xnew and perform applyDensityFilter" in {
-    testFun("lagrange_adf", dumpMemory=true, timeout=0, memInitName="adfg2_lagrange/839ec7", annos=Seq(VerilatorBackendAnnotation))
+    testFun("lagrange_adf", dumpMemory=true, timeout=0, memInitName="adfg2_lagrange/ebc4b9", annos=Seq(VerilatorBackendAnnotation))
   }
 
   it should "run the full program" in {
     testFun("top", dumpMemory = true, timeout=0, annos=Seq(VerilatorBackendAnnotation))
   }
 
+  it should "run the full program without jacobi preconditioner" in {
+    testFun("top_nojacobi", dumpMemory=true, timeout=0, annos=Seq(VerilatorBackendAnnotation))
+  }
+
   it should "run multiple iterations of the top3dcg loop" in {
-    testFun("top3dcg", dumpMemory=true, timeout=0, memInitName="top3dcg/119828", annos=Seq(VerilatorBackendAnnotation))
+    testFun("top3dcg", dumpMemory=true, timeout=0, memInitName="top3dcg/684cdf", annos=Seq(VerilatorBackendAnnotation))
   }
 
 //  it should "perform a matrix-vector product" in {

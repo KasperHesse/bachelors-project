@@ -6,7 +6,6 @@ import org.scalatest.{FlatSpec, Matchers}
 import utils.Fixed._
 import chiseltest.experimental.TestOptionBuilder._
 import chiseltest.internal.WriteVcdAnnotation
-import execution.{Opcode, ProcessingElement}
 import execution.Opcode._
 
 class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Matchers {
@@ -260,6 +259,16 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
 
       testStreamBehaviour(dut, Array(n), Array(d), Array(c), Array(Opcode.DIV))
 
+    }
+  }
+
+  it should "multiply two large numbers" in {
+    test(new ProcessingElement) {dut =>
+      val a = double2fixed(10000)
+      val b = double2fixed(5)
+      val c = double2fixed(50000)
+      val d = fixedMul(a,b)
+      testStreamBehaviour(dut, Array(a), Array(b), Array(c), Array(Opcode.MUL))
     }
   }
 }

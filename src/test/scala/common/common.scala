@@ -589,8 +589,8 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       edof
     }
 
-    def openFile(name: String, prefix: String): BufferedWriter = {
-      new BufferedWriter(new FileWriter(f"memdump/$testName/$currentTime/${prefix}_$name.csv"))
+    def openFile(name: String, suffix: String) = {
+      new BufferedWriter(new FileWriter(f"memdump/$testName/$currentTime/${name}_$suffix.csv"))
     }
 
     def writeElemHeader(bw: BufferedWriter): Unit = {
@@ -633,11 +633,11 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
 
 
     def dumpNelem(): Unit = {
-      val X = openFile("X", "mem")
-      val XPHYS = openFile("XPHYS", "mem")
-      val XNEW = openFile("XNEW", "mem")
-      val DC = openFile("DC", "mem")
-      val DV = openFile("DV", "mem")
+      val X = openFile("mem", "X")
+      val XPHYS = openFile("mem", "XPHYS")
+      val XNEW = openFile("mem", "XNEW")
+      val DC = openFile("mem", "DC")
+      val DV = openFile("mem", "DV")
       Seq(X, XPHYS, XNEW, DC, DV).foreach(writeElemHeader)
 
       for(i <- 0 until NELX) {
@@ -655,14 +655,14 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     }
 
     def dumpNdof(): Unit = {
-      val F = openFile("F", "mem")
-      val U = openFile("U", "mem")
-      val R = openFile("R", "mem")
-      val Z = openFile("Z", "mem")
-      val P = openFile("P", "mem")
-      val Q = openFile("Q", "mem")
-      val INVD = openFile("invD", "mem")
-      val TMP = openFile("TMP", "mem")
+      val F = openFile("mem", "F")
+      val U = openFile("mem", "U")
+      val R = openFile("mem", "R")
+      val Z = openFile("mem", "Z")
+      val P = openFile("mem", "P")
+      val Q = openFile("mem", "Q")
+      val INVD = openFile("mem", "invD")
+      val TMP = openFile("mem", "TMP")
       Seq(F, U, R, Z, P, Q, INVD, TMP).foreach(writeEdofHeader)
 
       //Each array has 24*NELEM entries
@@ -735,8 +735,8 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
 
     def dumpRegisters(): Unit = {
       //Dump vregs
-      val vreg0 = openFile("0", "vreg")
-      val vreg1 = openFile("1", "vreg")
+      val vreg0 = openFile("vreg", "0")
+      val vreg1 = openFile("vreg", "1")
       writeRegisterHeader(VREG_DEPTH, vreg0)
       writeRegisterHeader(VREG_DEPTH, vreg1)
       for(i <- 0 until NUM_VREG) {
@@ -756,8 +756,8 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       vreg1.close()
 
       //Dump xregs
-      val xreg0 = openFile("0", "xreg")
-      val xreg1 = openFile("1", "xreg")
+      val xreg0 = openFile("xreg", "0")
+      val xreg1 = openFile("xreg", "1")
       writeRegisterHeader(XREG_DEPTH, xreg0)
       writeRegisterHeader(XREG_DEPTH, xreg1)
       for(i <- 0 until NUM_XREG) {
@@ -777,7 +777,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       xreg1.close()
 
       //Dump sreg
-      val sreg = openFile("0", "sreg")
+      val sreg = openFile("sreg", "0")
       writeRegisterHeader(NUM_SREG, sreg)
       sreg.write("0")
       for(i <- 0 until NUM_SREG) {
