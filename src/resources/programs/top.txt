@@ -395,7 +395,7 @@ func sqrt_V_inline(REG1, REG2, REG3) = {
 //s11 : l1
 //s10 : move
 //s9  : tol
-//s8  : lmid
+//s7  : lmid (not using s8 to preserve cgIter in register dumps after simulation)
 
 
 //START CODE
@@ -496,7 +496,7 @@ mac.vv s13, v0, v0
 eend
 pend
 
-//Calculate the square root of sum(F)
+//Calculate the square root of sum(F) to get bnorm
 sqrt_S_unrolled(s13, s1, s2, s3)
 
 //Setup scalar values for CG loop
@@ -666,7 +666,7 @@ add.is s3, s0, 6  //s3 = 6
 mul.is s3, s3, 6  //s3 = 36
 mul.is s3, s3, 6  //s3 = 216 = nelem
 div.ss s2, s1, s3 //s2 = sum(xphys)/nelem = vol
-add.is s13, s2, -0.2 //s13 = sum(xphys)/nelem - volfrac = g
+add.is s13, s2, - 0.2 //s13 = sum(xphys)/nelem - volfrac = g
 
 //Set up constants
 //l1, l2
@@ -700,8 +700,8 @@ blt s1, s9, LAGRANGE_END //if (l2-l1)/(l2+l1) < tolerance, we're finished
 //Calculate lmid
 pstart single
 estart
-mul.is s8, s2, 0.5 //s8 = (l2+l1)/2 = lmid
-add.ss s7, s0, s0 //clear s7 for gt calculation afterwards
+mul.is s7, s2, 0.5 //s7 = (l2+l1)/2 = lmid
+add.ss s6, s0, s0 //clear s6 for gt calculation afterwards
 eend
 pend
 
@@ -711,7 +711,7 @@ ld.vec v0, DV
 ld.vec v1, DC
 ld.vec v3, X
 estart
-mul.sv v0, s8, v0 //v0 = dv[i]*lmid
+mul.sv v0, s7, v0 //v0 = dv[i]*lmid
 div.vv v0, v1, v0 //v0 = dc[i]/(dv[i]*lmid)
 mul.iv v0, v0, -1 //v0 = -dc[i]/(dv[i]*lmid)
 //Get square root of value in v0
@@ -739,14 +739,14 @@ red.vv x0, v0, v2 //x0 = dv[i]*(xnew[i]-x[i]), summation
 mul.sx x1, s0, x1 //clear x1
 add.ix x1, x1, 1  //x1 = 1
 red.xx s1, x0, x1 //x0 = sum(dv[i]...)
-add.ss s7, s7, s1 //sum(dv[i]*(xnew[i]-x[i])=gt
+add.ss s6, s6, s1 //s6 = sum(dv[i]*(xnew[i]-x[i])=gt
 eend
 pend
 
 //Increment value of gt with value of g
 pstart single
 estart
-add.ss s1, s7, s13 //s1 = gt + g
+add.ss s1, s6, s13 //s1 = gt + g
 eend
 pend
 
@@ -755,7 +755,7 @@ bge s1, s0, GT_POSITIVE //if gt >= 0, l1=lmid
 //otherwise, l2 = lmid
 pstart single
 estart
-add.ss s12, s0, s8 //s12 = s8 <> l2 = lmid
+add.ss s12, s0, s7 //s12 = s7 (l2 = lmid)
 eend
 pend
 beq s0, s0 LAGRANGE_START //Branch back to start, check if loop is finished there
@@ -763,7 +763,7 @@ beq s0, s0 LAGRANGE_START //Branch back to start, check if loop is finished ther
 GT_POSITIVE:
 pstart single
 estart
-add.ss s11, s0, s8 //s11 = s8 <> l1 = lmid
+add.ss s11, s0, s7 //s11 = s7 (l1 = lmid)
 eend
 pend
 beq s0, s0, LAGRANGE_START //Branch back to start, check if loop is finished there
@@ -838,10 +838,9 @@ pstart single
 estart
 add.is s15, s15, 1 //loop++
 add.is s2, s0, 4   //s2 = 4 = threshold value for change and convergence
-add.is s3, s0, 2
-//add.is s3, s0, 5   //s3 = 5
-//mul.is s3, s3, 5   //s3 = 25
-//mul.is s3, s3, 4   //s3 = 100, max number of top loops
+add.is s3, s0, 5   //s3 = 5
+mul.is s3, s3, 5   //s3 = 25
+mul.is s3, s3, 4   //s3 = 100, max number of top loops
 eend
 pend
 
@@ -850,7 +849,6 @@ pend
 bge s15, s3, END //if loop >= 100, go to end
 blt s14, s2, END //if change <=4, go to end
 
-//Commented out for now
 beq s0, s0, TOP3DCG //otherwise, unconditional branch back to the start of top loop
 
 END:
