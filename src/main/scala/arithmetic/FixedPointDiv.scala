@@ -105,26 +105,23 @@ class NRDivStage1 extends Module {
   val numer = Wire(SInt(FIXED_WIDTH.W))
   val denom = Wire(SInt(FIXED_WIDTH.W))
 
-  //When dividing by zero, we override the result and force it to be zero
+  //When dividing by zero, we instead set the denominator to a very small value
   when(in.denom === 0.S) {
-    numer := 0.S
-    denom := double2fixed(1).S
+    denom := 1.S
   } .otherwise {
-    numer := in.numer
     denom := in.denom
   }
+  numer := in.numer
 
-  val DIFF_WIDTH = log2Ceil(FIXED_WIDTH)+1 //Since it's fixed-point, we need an additional bit to ensure proper handling
+  //Bits required to express the difference between INT_WIDTH+1 and number of leading zeros
+  //Must be log2ceil(FW)+2 since it may be a negative value, up to (-64+INT_WIDTH) large
+  val DIFF_WIDTH = log2Ceil(FIXED_WIDTH)+2
 
   //Negative flag if denom is negative
   val neg = denom(FIXED_WIDTH-1)
 
-  //Depending on test configuration, we must left-shift input by some fixed amount
-  if(FIXED_WIDTH != 64) {
-    lzc.io.in := Mux(neg, ((~denom).asSInt() + 1.S).asUInt(), denom.asUInt()) << (64 - FIXED_WIDTH)
-  } else {
-    lzc.io.in := Mux(neg, ((~denom).asSInt() + 1.S).asUInt(), denom.asUInt())
-  }
+  //LZC expect 64-bit values. We'll left-shift value up to look like a 64-bit value such that the output is usable
+  lzc.io.in := Mux(neg, ((~denom).asSInt() + 1.S).asUInt(), denom.asUInt()) << (64 - FIXED_WIDTH)
 
   //Registers for middle of stage
   val denomReg = RegNext(denom)
@@ -134,26 +131,44 @@ class NRDivStage1 extends Module {
   val validReg = RegNext(in.valid)
 
 
+  /** Difference between INT_WIDTH+1 and cntReg */
   val diff = Wire(SInt(DIFF_WIDTH.W))
   /** Number of bits that denom must be shifted to be in the range [0.5;1] */
   val diffAbs = Wire(UInt(DIFF_WIDTH.W))
-//  diff := ((INT_WIDTH+1).U - lzc.io.cnt).asSInt()
-  diff := ((INT_WIDTH+1).U - cntReg).asSInt()
+  diff := ((INT_WIDTH+1).U(DIFF_WIDTH.W) - cntReg).asSInt()
   diffAbs := diff.abs.asUInt
 
-  val shiftDir = diff(DIFF_WIDTH-1) //If true, shift left by diffAbs, else shift right by diff
+  //Shift direction is given by MSB in diff. If set, diff is negative and we must leftshift
+  //If not set, diff is positive and we must rightshift
+  val shiftDir = diff(DIFF_WIDTH-1)
 
   //Must preserve the sign of numerator by keeping MSB constant and shifting all other bits
+  //We first shift all bits by the required amount, then re-set the MSB afterwards
   val numerLeftShiftedTemp: Bits = numerReg << diffAbs
   val numerLeftShifted: SInt = Cat(numerReg(FIXED_WIDTH - 1), numerLeftShiftedTemp(FIXED_WIDTH-2,0)).asSInt
-  io.out.numer := Mux(shiftDir, numerLeftShifted, numerReg >> diff.asUInt)
 
-  //In the next steps, denom must be positive. We'll invert it here and re-invert in stage 4 if necessary
-  val denomTemp = Mux(shiftDir, denomReg << diffAbs, denomReg >> diff.asUInt)
-  io.out.denom := Mux(negReg, (~denomTemp).asSInt() + 1.S, denomTemp)
-//  io.out.neg := neg
+
+  //When left-shifting numerator, we have to take care to check if any high bits are shifted out.
+  //If numerator is positive and any 1's are shifted out, we've over-shifted. If this is the case,
+  //we force the inputs to be numer=MAX and denom=1
+  //Likewise, if numer is negative and any 0's are shifted out, we set numer=-MAX and denom=1
+  //We right shift the numerator to view some of the bits
+  //if eg. left-shift amount is 5, we wish to inspect the 6 MSB. This is found by shifting right with (FIXED_WIDTH-1)-diffAbs
+
+  val shiftedMSB = (numerReg >> (FIXED_WIDTH-1).U(DIFF_WIDTH.W)-diffAbs).asUInt()
+  when(numerReg(FIXED_WIDTH-1) === 0.U && shiftDir && shiftedMSB =/= 0.U) { //numer is positive, we've left-shifted and some 1's were shifted out
+    io.out.numer := ((1L << FIXED_WIDTH-1) - 1).S(FIXED_WIDTH.W)
+    io.out.denom := double2fixed(1).S(FIXED_WIDTH.W)
+  } .elsewhen(numerReg(FIXED_WIDTH-1) === 1.U && shiftDir && (~shiftedMSB).asUInt =/= 0.U) { //numer is negative, we've left-shifted and some 0's were shifted out
+    io.out.numer := (-1*(1L << FIXED_WIDTH-1)).S(FIXED_WIDTH.W)
+    io.out.denom := double2fixed(1).S(FIXED_WIDTH.W)
+  } .otherwise {
+    //In the next steps, denom must be positive. We'll invert it here and re-invert in stage 4 if necessary
+    val denomTemp = Mux(shiftDir, denomReg << diffAbs, denomReg >> diff.asUInt)
+    io.out.denom := Mux(negReg, (~denomTemp).asSInt() + 1.S, denomTemp)
+    io.out.numer := Mux(shiftDir, numerLeftShifted, numerReg >> diff.asUInt)
+  }
   io.out.neg := negReg
-//  io.out.valid := in.valid
   io.out.valid := validReg
 }
 
