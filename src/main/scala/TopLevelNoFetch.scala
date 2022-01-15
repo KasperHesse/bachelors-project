@@ -2,7 +2,7 @@
 import chisel3._
 import memory.{MemWbIO, MemoryStage}
 import execution._
-import utils.{TimingOutput, TimingWrapper}
+import utils.TimingWrapper
 
 /**
  * The top level module for the topological optimizer WITHOUT a fetch stage.

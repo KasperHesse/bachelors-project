@@ -1,4 +1,5 @@
 import os
+import math
 """Generates rotated/transformed versions of the KE matrix for all 8 iteration values.
 These rotations of the KE matrix are required to properly execute matrix-vector products, since the coordinate transform
 applied to DOFs requires a likewise coordinate transform to the KE matrix to still generate correct outputs"""
@@ -92,3 +93,18 @@ for iter in range(8):
         f.write(",")
       else:
         f.write("\n")
+
+
+# Verify that KE0/7, KE1/6, KE2/5 and KE3/4 are the same
+for iter in range(8):
+  i1 = iter
+  i2 = 7 - iter
+  print(f"ITER: {iter}")
+  for r in range(24):
+    for c in range(24):
+      v1 = kenew_new[i1][r][c]
+      v2 = kenew_new[i2][r][c]
+      if not math.isclose(v1, v2):
+        print(f"ERR: r={r},c={c}, v1={v1}, v2={v2}")
+        exit(0)
+

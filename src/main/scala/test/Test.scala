@@ -2,6 +2,7 @@ package test
 
 import chisel3._
 import chisel3.util._
+import execution.KEMatrix.getKEslices
 import utils.Assembler
 import utils.Fixed._
 import utils.Config._
@@ -169,15 +170,20 @@ object Test extends App {
   def p(s: String): Unit = {
   println(fixed2double(string2fixed(s)))
 }
-  p("3ffeefb57a9e20")
-  p("3fff77dabd4f10")
-  p("000000000026ab")
-  P(fixedSqrt(double2fixed(3.21321e-8)))
-  P(fixedSqrt(double2fixed(1.63184e-8)))
-  P(fixedSqrt(double2fixed(6.44208e-9)))
-  P(fixedSqrt(double2fixed(2.33914e-9)))
-  P(fixedSqrt(double2fixed(7.27576e-10)))
-  P(fixedSqrt(double2fixed(3.71982e-10)))
-  P(fixedDiv(fixedSqrt(double2fixed(3.71982e-10)).S(FIXED_WIDTH.W), double2fixed(2.64575).S(FIXED_WIDTH.W)).litValue.toLong)
+
+  p("001bf6a9e4adc0")
+  p("00000002d2d2d3")
+  p("000000b3453732")
+  p("000000f4903675")
+  P(fixedDiv(double2fixed(5),1))
+  p("00002000000000")
+
+  val f = fixed2double(30.S)
+  val g = fixed2double((1L << 54) -1)
+  print(f"$f   $g")
+
+  val x = getKEslices(0)
+  print(x.mkString("Array(", ", ", ")"))
+
 
 }

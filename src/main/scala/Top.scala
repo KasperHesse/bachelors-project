@@ -29,8 +29,8 @@ object Top extends App {
 //      clkFreq=50e6.toInt)
 //    )))
 
-  (new chisel3.stage.ChiselStage).execute(
-    Array("-X", "verilog", "-td", "target/gen"), Seq(ChiselGeneratorAnnotation(() => new UartTransmitter()))
-  )
+//  (new chisel3.stage.ChiselStage).execute(
+//    Array("-X", "verilog", "-td", "target/gen"), Seq(ChiselGeneratorAnnotation(() => new UartTransmitter()))
+//  )
 //  -X verilog outputs verilog, -td target/gen sets target directory
 }
