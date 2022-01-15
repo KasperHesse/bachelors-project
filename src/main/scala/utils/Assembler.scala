@@ -57,20 +57,20 @@ object Assembler {
   /**
    * Initializes a memory file
    * @param memfile Relative path to the memory file to initialize. Existing contents are overwritten, a new file is created if none exists
-   * @param instrs Encoded instruction to write into that file
+   * @param data The data to write into that file
    * @param len The number of figures to print out for each line (if eg value=8 and len=4, it will print 0008)
    */
-  def writeMemInitFile(memfile: String, instrs: Array[Long], len: Int = 8): Unit = {
+  def writeMemInitFile(memfile: String, data: Array[Long], len: Int = 16): Unit = {
     val dir = new File(new File(memfile).getParent)
     if(!dir.exists) {
       dir.mkdirs()
     }
     val writer = new BufferedWriter(new FileWriter(memfile))
-    for(instr <- instrs) {
+    for(instr <- data) {
       writer.write(("0000000000000000" + instr.toHexString).takeRight(len) + "\n")
     }
     writer.close()
-    println(s"\tWrote ${instrs.length} lines to $memfile")
+    println(s"\tWrote ${data.length} lines to $memfile")
   }
 
   /**
@@ -295,8 +295,8 @@ object Assembler {
       "nelemvec" -> NELEMVEC,
       "nelemdof" -> NELEMDOF,
       "nelemstep" -> NELEMSTEP,
-      "clear" -> NDOF, //Clear, run are only used for tstart instructions
-      "run" -> SINGLE)
+      "clear" -> CLEAR, //Clear, run are only used for tstart instructions
+      "run" -> RUN)
       if(map.contains(str)) map(str) else throw new IllegalArgumentException(s"Unable to parse instruction length $str")
     }
     //Parse mod and start/end values
@@ -815,6 +815,10 @@ object LitVals {
   val NELEMVEC = 0x4
   val NELEMDOF = 0x5
   val NELEMSTEP = 0x6
+
+  //O-type timer code
+  val CLEAR = 0x0
+  val RUN = 0x2
 
   //O-type increment type
   val LINEAR = 0x0

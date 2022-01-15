@@ -213,7 +213,7 @@ class Decode extends Module {
         state := sBranch
       }
       when(Oinst.fmt === InstructionFMT.OTYPE && Oinst.mod === TIME) {
-        timerEnable := (Oinst.se === OtypeSE.START) //Should probably just be := Oinst.se, but this allows us to change encoding at a later point in time
+        timerEnable := (Oinst.se === OtypeSE.START)
         timerClear := Oinst.len === OtypeLen.NDOF && Oinst.se === OtypeSE.START //Arbitrary choice
       }
     }

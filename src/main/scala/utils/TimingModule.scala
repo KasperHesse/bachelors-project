@@ -3,14 +3,15 @@ package utils
 import chisel3._
 import chisel3.util.{RegEnable, log2Ceil}
 import Config.SIMULATION
+import execution.TimingWrapperIO
 import execution.IdTimingIO
 
 /**
- * A module used to keep track of time.
+ * A module used to keep track of execution time.
  */
 class TimingModule(clkFreq: Int) extends Module {
   val io = IO(new Bundle {
-    /** Enable/disable signal. If enabled, timing is activated. If disabled, times are kept constant  */
+    /** Enable/disable signal. If enabled, timing is activated. If disabled, times values are kept constant  */
     val en = Input(Bool())
     /** Clear signal. When toggled, all registers are reset */
     val clr = Input(Bool())
@@ -24,6 +25,7 @@ class TimingModule(clkFreq: Int) extends Module {
     val blink = Output(Bool())
   })
 
+  //The LED should blink with a frequency of 1Hz
   val blinkCntReg = RegInit(0.U(log2Ceil(clkFreq+1).W))
   val blinkReg = RegInit(false.B)
   val blinkTick = blinkCntReg === clkFreq.U
@@ -31,6 +33,7 @@ class TimingModule(clkFreq: Int) extends Module {
   blinkReg := Mux(blinkTick, !blinkReg, blinkReg)
 
 
+  //Registers for counting ms, seconds and minutes
   val cntReg = RegInit(0.U(log2Ceil(clkFreq/1000+1).W))
   val msReg = RegInit(0.U(log2Ceil(1000).W))
   val sReg = RegInit(0.U(log2Ceil(60).W))
@@ -54,40 +57,10 @@ class TimingModule(clkFreq: Int) extends Module {
     mReg := 0.U
   }
 
-
   io.ms := msReg
   io.s := sReg
   io.m := mReg
   io.blink := blinkReg
-}
-
-/**
- * Output ports for the timing module to board and HSMC pins
- * @param clkFreq Clock frequency being used in the design
- */
-class TimingOutput(val clkFreq: Int) extends Bundle {
-  //log2Ceil(240) is an arbitrary limit
-  /** Milli-second value */
-  val ms = Output(UInt(log2Ceil(1000).W))
-  /** Seconds value */
-  val s = Output(UInt(log2Ceil(60).W))
-  /** Minutes value */
-  val m = Output(UInt(8.W))
-  /** Blinking 'alive' led */
-//  val blink = Output(Bool())
-  /** Ground signal for the millisecond values */
-  val msGround = Output(UInt(log2Ceil(1000).W))
-  /** Ground signal for the seconds values */
-  val sGround = Output(UInt(log2Ceil(60).W))
-}
-
-/**
- * I/O ports for [[TimingWrapper]]
- * @param clkFreq
- */
-class TimingWrapperIO(val clkFreq: Int) extends Bundle{
-  val id = Input(new IdTimingIO)
-  val out = new TimingOutput(clkFreq)
 }
 
 /**
@@ -105,8 +78,8 @@ class TimingWrapper(clkFreq: Int) extends Module {
   io.out.ms := timing.io.ms
   io.out.s := timing.io.s
   io.out.m := timing.io.m
-//  io.out.blink := timing.io.blink
   io.out.sGround := 0.U
   io.out.msGround := 0.U
+  io.out.blink := timing.io.blink
 
 }

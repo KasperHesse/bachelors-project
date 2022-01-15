@@ -566,8 +566,11 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
         //NOTE: Does not take into account branch instructions right now
         val instr = dut.io.idctrl.instr.peek()
         val fmt = InstructionFMT(instr(7,6).litValue.toInt)
-        if(fmt.litValue == InstructionFMT.BTYPE.litValue()) {
+        if(fmt.litValue == InstructionFMT.BTYPE.litValue()) { //Take branch
           verifyBranchOutcome(dut.io.idctrl, dut.clock, BtypeInstruction(instr), sc.sReg)
+        } else if (fmt.litValue == InstructionFMT.OTYPE.litValue() && OtypeInstruction(instr).mod.litValue === OtypeMod.TIME.litValue) {
+          //Ignore time instructions in simulator, just step past
+          dut.clock.step()
         } else {
           fillInstructionBuffer(dut.io.idctrl, dut.clock, sc.iBuffer)
           println("#################################\nStarting instruction packet")
@@ -585,11 +588,10 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
           while(dut.io.idctrl.stateUint.peek.litValue() != DecodeState.sIdle.litValue()) {
             dut.clock.step()
           }
-          //Get console input, ask if we should dump contents or run the next N packets?
         }
       }
       println(f"\n\nSimulation finished")
-      if(dumpMemory) dumpMemoryContents(filename, sc)
+      if(dumpMemory) dumpMemoryContents(filename, sc, dut.io.timing)
 
     }
   }
@@ -651,14 +653,12 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     testFun("gcas_adfg2", dumpMemory=true, timeout=0, memInitName="cgiter_gcas/6f7234", annos=Seq(VerilatorBackendAnnotation))
   }
 
-  //gcas_adfg2/1dc068
   it should "peform lagrange update" in {
-    testFun("adfg2_lagrange", dumpMemory=true, timeout=0, memInitName = "top3dcg/extra", annos=Seq(VerilatorBackendAnnotation))
+    testFun("adfg2_lagrange", dumpMemory=true, timeout=0, memInitName = "gcas_adfg2/1dc068", annos=Seq(VerilatorBackendAnnotation))
   }
 
-  //adfg2_lagrange/839ec7
   it should "update xnew and perform applyDensityFilter" in {
-    testFun("lagrange_adf", dumpMemory=true, timeout=0, memInitName="adfg2_lagrange/ebc4b9", annos=Seq(VerilatorBackendAnnotation))
+    testFun("lagrange_adf", dumpMemory=true, timeout=0, memInitName="adfg2_lagrange/839ec7", annos=Seq(VerilatorBackendAnnotation))
   }
 
   it should "run the full program" in {
@@ -670,14 +670,6 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "run multiple iterations of the top3dcg loop" in {
-    testFun("top3dcg", dumpMemory=true, timeout=0, memInitName="top3dcg/684cdf", annos=Seq(VerilatorBackendAnnotation))
+    testFun("top3dcg", dumpMemory=true, timeout=0, memInitName="top3dcg/1549e1", annos=Seq(VerilatorBackendAnnotation))
   }
-
-//  it should "perform a matrix-vector product" in {
-//    testFun("matrixvectorproduct", dumpMemory=true, timeout=20000, memDumpName="matrixvectorproduct/init", annos=Seq(VerilatorBackendAnnotation))
-//  }
-//
-//  it should "calculate norm and relres" in {
-//    testFun("norm", dumpMemory=true, timeout=0, memDumpName="gmd_cgiter/1a34ef", annos=Seq(VerilatorBackendAnnotation, WriteVcdAnnotation))
-//  }
 }

@@ -170,9 +170,9 @@ pstart single
 estart
 div.ss s1, s1, s13 //s1 = norm(r)/bnorm = relres
 add.is s8, s8, 1 //cgIter++
-add.is s2, s0, 5 //Number of iteration to perform while testing
-mul.is s2, s2, 4 //num iters = 20
-mul.is s2, s2, 3 //num iters = 60
+add.is s2, s0, 1 //Number of iteration to perform while testing
+//mul.is s2, s2, 4 //num iters = 20
+//mul.is s2, s2, 3 //num iters = 60
 eend
 pend
 

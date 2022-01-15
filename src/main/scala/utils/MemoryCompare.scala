@@ -8,39 +8,38 @@ import scala.io.Source
  */
 object MemoryCompare extends App {
 
-  val testName = "aso_gmd"
-  val hash = "948205"
-//memdump/aso_gmd/948205
+  val testName = "gmd_cgiter"
+  val hash = "3ffc1a"
   def apply(): Unit = {
     val DV = compare("DV")
-//    val DC = compare("DC")
+    val DC = compare("DC")
     val INVD = compare("INVD")
     val R = compare("R")
-//    val Z = compare("Z")
-//    val P = compare("P")
-//    val Q = compare("Q")
+    val Z = compare("Z")
+    val P = compare("P")
+    val Q = compare("Q")
     val U = compare("U")
-//    val X = compare("X")
-//    val XPHYS = compare("XPHYS")
-//    val XNEW = compare("XNEW")
+    val X = compare("X")
+    val XPHYS = compare("XPHYS")
+    val XNEW = compare("XNEW")
 
     def print(x: (Int, Double, Int, Double), name: String): Unit = {
-      println(f"$name%-6s| ${x._2}%9.5f | ${x._4}%9.5f | ${x._1}%4d | ${x._3}%4d")
+      println(f"$name%-6s| ${x._2}%14.8f | ${x._4}%9.5f | ${x._1}%4d | ${x._3}%4d")
     }
 
-    println("NAME  | Avg.Delta | Av.Delta2 |  cnt | Signerrors")
-    println("------+-----------+-----------+------+-----------")
+    println("NAME  | Avg. Delta     | Av.Delta2 |  cnt | Signerrors")
+    println("------+----------------+-----------+------+-----------")
     print(DV, "DV")
-//    print(DC, "DC")
+    print(DC, "DC")
     print(INVD, "INVD")
     print(R, "R")
-//    print(Z, "Z")
-//    print(P, "P")
-//    print(Q, "Q")
+    print(Z, "Z")
+    print(P, "P")
+    print(Q, "Q")
     print(U, "U")
-//    print(X, "X")
-//    print(XPHYS, "XPHYS")
-//    print(XNEW, "XNEW")
+    print(X, "X")
+    print(XPHYS, "XPHYS")
+    print(XNEW, "XNEW")
 
   }
 
@@ -51,7 +50,7 @@ object MemoryCompare extends App {
    * @return A tuple: (0) is number of miscompares, (1) is average absolute miscompare delta
    *         (2) is number of sign errors, (3) is average percentage miscompare delta
    */
-  def compare(name: String, delta: Double = 0.001): (Int, Double, Int, Double) = {
+  def compare(name: String, delta: Double = 0.0001): (Int, Double, Int, Double) = {
 
     val file1 = Source.fromFile(f"memdump/$testName/$hash/mem_$name.csv")
     val file2 = Source.fromFile(f"memdump_C/memdump_$name.csv")
@@ -80,7 +79,7 @@ object MemoryCompare extends App {
       val c = C(i)
 
       if(math.abs(scala-c) > delta) {
-        println(f"ERROR at $i. Scala: $scala%.5f, C: $c%.5f, Delta: ${math.abs(scala-c)}%.5f")
+        println(f"ERROR at $i. Scala: $scala%.8f, C: $c%.8f, Delta: ${math.abs(scala-c)}%.5f")
         errCnt += 1
         errAvg += math.abs(scala-c)
       }

@@ -197,7 +197,6 @@ class NRDivStage2 extends Module {
   val THIRTYTWOOVERSEVENTEEN = double2fixed(32.0/17.0).S(FIXED_WIDTH.W)
 
   val mul = Module(FixedPointMul(MulTypes.MULTICYCLE))
-//  val sub = Module(new FixedPointALU)
 
   mul.io.in.a := in.denom
   mul.io.in.b := THIRTYTWOOVERSEVENTEEN
@@ -208,17 +207,6 @@ class NRDivStage2 extends Module {
   io.out.denom := RegNext(in.denom)
   io.out.neg := RegNext(in.neg)
   io.out.valid := mul.io.out.valid
-
-//  sub.io.in.a := FORTYEIGHTOVERSEVENTEEN
-//  sub.io.in.b := mul.io.out.res
-//  sub.io.in.op := Opcode.SUB
-//  sub.io.in.valid := mul.io.out.valid
-
-//  io.out.X := sub.io.out.res
-//  io.out.numer := in.numer
-//  io.out.denom := in.denom
-//  io.out.neg := in.neg
-//  io.out.valid := sub.io.out.valid
 }
 
 class Stage3IO extends Bundle {
@@ -289,58 +277,6 @@ class NRDivStage3 extends Module {
   //Dequeue data
   queue2.io.deq.ready := step2Result.valid
 
-
-  //
-////  val asu1 = Module(new FixedPointALU)
-//  val asu2 = Module(new FixedPointALU)
-//
-//  //Stage 3.1 - Calculate D'*X
-//  mul1.io.in.a := in.X
-//  mul1.io.in.b := in.denom
-//  mul1.io.in.valid := in.valid
-//
-//  val step1 = Wire(new Stage3InternalIO)
-//  step1.X := in.X
-//  step1.numer := in.numer
-//  step1.denom := in.denom
-//  step1.neg := in.neg
-//  step1.res := mul1.io.out.res //D' * X
-//  step1.valid := mul1.io.out.valid
-//  val step1Reg = RegNext(step1)
-//
-//  //Stage 3.2 - Calculate X*(1-D'*x)
-////  asu1.io.in.op := Opcode.SUB
-////  asu1.io.in.a := double2fixed(1).S(FIXED_WIDTH.W)
-////  asu1.io.in.b := step1Reg.res
-////  asu1.io.in.valid := step1Reg.valid
-////
-////  mul2.io.in.a := asu1.io.out.res
-////  mul2.io.in.b := step1Reg.X
-////  mul2.io.in.valid := asu1.io.out.valid
-//  mul2.io.in.a := (double2fixed(1).S(FIXED_WIDTH.W) - step1Reg.res)
-//  mul2.io.in.b := step1Reg.X
-//  mul2.io.in.valid := step1Reg.valid
-//
-//  val step2 = Wire(new Stage3InternalIO)
-//  step2.X := step1Reg.X
-//  step2.numer := step1Reg.numer
-//  step2.denom := step1Reg.denom
-//  step2.neg := step1Reg.neg
-//  step2.res := mul2.io.out.res //X*(1-D' * X)
-//  step2.valid := mul2.io.out.valid
-//  val step2Reg = RegNext(step2)
-//
-//  //Stage 3.3 - Calculate 1+X*(1-D'*x)
-//  asu2.io.in.a := step2Reg.X
-//  asu2.io.in.b := step2Reg.res
-//  asu2.io.in.op := Opcode.ADD
-//  asu2.io.in.valid := step2Reg.valid
-//
-//  io.out.X := asu2.io.out.res
-//  io.out.denom := step2Reg.denom
-//  io.out.numer := step2Reg.numer
-//  io.out.neg := step2Reg.neg
-//  io.out.valid := asu2.io.out.valid
 }
 
 class Stage4IO extends Bundle {
@@ -400,7 +336,7 @@ object FixedPointDiv {
 
   def apply(v: DivisorType, NRstage3reps: Int): FixedPointDiv = {
     v match {
-      case NEWTONRAPHSON => new NRDiv
+      case NEWTONRAPHSON => new NRDiv(NRstage3reps)
       case _ => throw new IllegalArgumentException("Can only create Newton-Raphson divisors with this apply()")
     }
   }

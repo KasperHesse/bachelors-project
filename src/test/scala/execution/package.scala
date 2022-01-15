@@ -1,7 +1,7 @@
 import java.io.{BufferedWriter, FileWriter}
 import chisel3._
 import chiseltest._
-import execution.KEWrapper
+import execution.KEMatrix
 import utils.{Assembler, Config}
 import utils.Config._
 import utils.Fixed._

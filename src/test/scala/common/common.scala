@@ -316,8 +316,8 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     val rdOffset = rd.litValue.toInt % VREG_SLOT_WIDTH
 
     val KE = sc match {
-      case None => KEWrapper.getKEMatrix(0)
-      case Some(x) => KEWrapper.getKEMatrix(x.vregIter(x.execThread)(rdOffset))
+      case None => KEMatrix.getKEMatrix(0)
+      case Some(x) => KEMatrix.getKEMatrix(x.vregIter(x.execThread)(rdOffset))
     }
     //Zero out results
     for(i <- 0 until VREG_DEPTH) {
@@ -512,8 +512,9 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * Dumps the contents of all memory and registers to csv files for postprocessing
    * @param testName The name of the test being run. Used to prepend an identifier to memory dumps
    * @param sc The simulation context for the simulation being processed
+   * @param timing Timing output signals from the DUT
    */
-  def dumpMemoryContents(testName: String, sc: SimulationContext): Unit = {
+  def dumpMemoryContents(testName: String, sc: SimulationContext, timing: TimingOutput): Unit = {
     import java.io.{BufferedWriter, FileWriter}
     import execution.StypeBaseAddress
 
@@ -787,9 +788,17 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       sreg.close()
     }
 
+    def dumpTiming(): Unit = {
+      val time = openFile("timing", "0")
+      time.write(f"ms: ${timing.ms.peek().litValue.toInt}\n")
+      time.write(f" s: ${timing.s.peek().litValue.toInt}\n")
+      time.write(f" m: ${timing.m.peek().litValue().toInt}\n")
+      time.close()
+    }
 
 
-    // Actual dumping happens here
+
+    //Actual dumping happens here
     //Ensure memdump directory exists
     val dir = new File(s"memdump/$testName/$currentTime")
     if(!dir.exists) {
@@ -798,6 +807,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     dumpNelem()
     dumpNdof()
     dumpRegisters()
+    dumpTiming()
 
     println(s"Succesfully dumped memory and register contents to memdump/$testName/$currentTime")
   }

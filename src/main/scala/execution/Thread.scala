@@ -66,10 +66,8 @@ class Thread(id: Int) extends Module {
     vRegFile.initMemory()
     xRegFile.initMemory()
   }
-  /** Wrapper for KE-matrix, holding all KE-values */
-  val KE = for(i <- 0 until 8) yield {
-    Module(new KEWrapper(NUM_PROCELEM, sync=true, iter=i))
-  }
+  /** Module containing all transformed versions of the KE matrix */
+  val KE = Module(new KEMatrix(sync = true))
   /** Immediate generator */
   val immGen = Module(new ImmediateGenerator)
   /** Module handling all memory access related stuff */
@@ -89,14 +87,13 @@ class Thread(id: Int) extends Module {
   /** State register */
   val state = RegInit(sIdle)
   /** Number of multiply-accumulate cycles to perform before a result is generated in MAC and RED instructions */
-//  val macLimit = RegInit(0.U(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W))
   val macLimit = WireDefault(0.U(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W))
   /** Maximum memory index that should be accessed when performing ld.vec and st.vec */
   val maxIndex = RegInit(0.U(log2Ceil(NDOFSIZE+1).W))
   /** O-type length of currently executing instruction packet */
   val instrLen = RegInit(OtypeLen.SINGLE)
   /** Iteration value associated with all V-register files. Used when processing mac.kv instructions */
-  val vRegIter = RegInit(VecInit(Seq.fill(VREG_SLOT_WIDTH)(0.U(3.W))))
+  val vRegIter = RegInit(VecInit(Seq.fill(VREG_SLOT_WIDTH)(0.U(2.W))))
 
   // --- WIRES AND SIGNALS ---
   /** Handle to the current instruction */
@@ -115,15 +112,6 @@ class Thread(id: Int) extends Module {
     0.U,
     0.U
   ))
-
-  /** Vector that allows us to read KE-values from all 8 iteration-transformed KE-matrices */
-  //This is necessary since we can't index into the Seq[Module..] using a UInt, so we must create a Vec of outputs
-  val keVals: Vec[Vec[SInt]] = Wire(Vec(8, Vec(8, SInt(FIXED_WIDTH.W))))
-  for(i <- KE.indices) {
-    for(j <- KE(i).io.keVals.indices) {
-      keVals(i)(j) := KE(i).io.keVals(j)
-    }
-  }
 
   val Rinst = currentInstr.asTypeOf(new RtypeInstruction)
   val Oinst = currentInstr.asTypeOf(new OtypeInstruction)
@@ -207,12 +195,11 @@ class Thread(id: Int) extends Module {
   io.sRegFile.rs1 := Rinst.rs1
   io.sRegFile.rs2 := Rinst.rs2
 
-  //Connect X,Y,col inputs to all KE matrices
-  KE.foreach(ke => {
-    ke.io.keX := X
-    ke.io.keY := Y
-    ke.io.keCol := col
-  })
+  //Connect X, Y, col, iter inputs to KE matrix
+  KE.io.keX := X
+  KE.io.keY := Y
+  KE.io.keCol := col
+  KE.io.keIter := vRegIter(slotSelect)
 
   //Immediate generator
   immGen.io.instr := Rinst
@@ -516,9 +503,7 @@ class Thread(id: Int) extends Module {
         for (i <- 0 until NUM_PROCELEM) {
           a(i) := a_subvec(RegNext(X))(RegNext(col))
         }
-
-        //Must use RegNext(v_rs1) since
-        b := keVals(vRegIter(RegNext(slotSelect)))
+        b := KE.io.keVals
       }
     }
   }
@@ -561,9 +546,15 @@ class Thread(id: Int) extends Module {
     }
   }
 
-  //Vreg iteration value update when loading
+  //Vreg iteration value update when loading DOFs
   when(state === sLoad && memAccess.io.edof.valid && io.mem.edof.ready && memAccess.io.readQueue.bits.mod === StypeMod.DOF) {
-    vRegIter(memAccess.io.slotSelect) := memAccess.io.readQueue.bits.iter
+    //KE0,KE7 / KE1,KE6 / KE2,KE5 and KE3,KE4 have the contents, so we only need 4 KE matrices for proper functionality.
+    //Using a simple LUT to map all iteration values to values in range [0:3]
+    val itermap = Wire(Vec(8, UInt(2.W)))
+    for(i <- 0 until 8) {
+      itermap(i) := {if (i < 4) i.U(2.W) else (7-i).U(2.W)}
+    }
+    vRegIter(memAccess.io.slotSelect) := itermap(memAccess.io.readQueue.bits.iter)
   }
 
   //Stall management

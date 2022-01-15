@@ -399,6 +399,9 @@ func sqrt_V_inline(REG1, REG2, REG3) = {
 
 
 //START CODE
+
+tstart clear //start timing module
+
 //Populate design space
 //Get a very close approximation to 0.2 to use as volfrac
 pstart single
@@ -852,3 +855,7 @@ blt s14, s2, END //if change <=4, go to end
 beq s0, s0, TOP3DCG //otherwise, unconditional branch back to the start of top loop
 
 END:
+tend //Stop timing module
+
+HALT:
+beq s0, s0, HALT //infinite loop

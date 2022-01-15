@@ -2,7 +2,7 @@ package stages
 
 import chisel3._
 import execution._
-import utils.{TimingOutput, TimingWrapper}
+import utils.TimingWrapper
 
 /**
  * A module which encompasses the Decode stage and timing module. Used for testing tstart/tend instructions

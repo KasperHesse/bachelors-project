@@ -65,7 +65,7 @@ func applyDensityFilterGradient(VEC) = {
 //This is where all the setup in top3dcg is performed
 //populate design space
 //Volfrac = 0.2
-//tstart clear
+tstart clear //start timing module, resetting the contents of the registers
 
 pstart single // Setup value of volfrac = 0.2
 estart
@@ -101,3 +101,5 @@ st.vec v1, DV
 pend
 
 applyDensityFilterGradient(DV)
+
+tend

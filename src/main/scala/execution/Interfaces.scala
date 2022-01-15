@@ -52,6 +52,22 @@ class IdExIO extends Bundle {
 }
 
 /**
+ * I/O ports for the KE module
+ */
+class KEIO extends Bundle {
+  /** Input: X-coordinate of the submatrix to be processed */
+  val keX = Input(UInt(log2Ceil(KE_SIZE/NUM_PROCELEM).W))
+  /** Input: Y-coordinate of the submatrix to be processed */
+  val keY = Input(UInt(log2Ceil(KE_SIZE/NUM_PROCELEM).W))
+  /** Input: The column of the submatrix to be extracted */
+  val keCol = Input(UInt(log2Ceil(NUM_PROCELEM).W))
+  /** Which KE iteration value to use for the submatrix being extracted */
+  val keIter = Input(UInt(2.W))
+  /** Output: one column of a submatrix, as specified by the input variables */
+  val keVals = Output(Vec(NUM_PROCELEM, SInt(FIXED_WIDTH.W)))
+}
+
+/**
  * Interface between the instruction decode stage and memory stage.
  * Instantiate as-is in decode stage and use FLipped() in memory module
  */
@@ -252,6 +268,25 @@ object RegisterFileType extends ChiselEnum {
 }
 
 /**
+ * Output ports for the timing module to board and HSMC pins
+ * @param clkFreq Clock frequency being used in the design
+ */
+class TimingOutput(val clkFreq: Int) extends Bundle {
+  /** Milli-second value */
+  val ms = Output(UInt(log2Ceil(1000).W))
+  /** Seconds value */
+  val s = Output(UInt(log2Ceil(60).W))
+  /** Minutes value */
+  val m = Output(UInt(8.W))
+  /** Blinking 'alive' led */
+  val blink = Output(Bool())
+  /** Ground signal for the millisecond values */
+  val msGround = Output(UInt(log2Ceil(1000).W))
+  /** Ground signal for the seconds values */
+  val sGround = Output(UInt(log2Ceil(60).W))
+}
+
+/**
  * I/O bundle between [[Decode]] and [[utils.TimingModule]].
  * Instantiate as-is in Decode stage, use Flipped() in timing module
  */
@@ -262,3 +297,11 @@ class IdTimingIO extends Bundle {
   val clr = Output(Bool())
 }
 
+/**
+ * I/O ports for [[utils.TimingWrapper]]
+ * @param clkFreq Clock frequency being used in the design
+ */
+class TimingWrapperIO(val clkFreq: Int) extends Bundle{
+  val id = Input(new IdTimingIO)
+  val out = new TimingOutput(clkFreq)
+}

@@ -2,7 +2,7 @@
 import chisel3._
 import memory.{MemWbIO, MemoryStage}
 import execution._
-import utils.{TimingOutput, TimingWrapper}
+import utils.TimingWrapper
 
 /**
  * The top level module for the topological optimizer
@@ -12,7 +12,7 @@ import utils.{TimingOutput, TimingWrapper}
  * @param memInitFileLocation Location of memory initialization files. This is the relative path. Each memory bank initialization file must be named
  *                            'membank_x.txt', where x is in the range [0;NUM_MEMORY_BANKS[. If eg 'resources/meminit' is given as parameter, the first file should be named 'resources/meminit/membank_0.txt'
  */
-class TopLevel(IMsize: Int, IMinitFileLocation: String, wordsPerBank: Int, memInitFileLocation: String, clkFreq: Int = 100e6.toInt) extends Module {
+class TopLevel(IMsize: Int, IMinitFileLocation: String, wordsPerBank: Int, memInitFileLocation: String, clkFreq: Int = 50e6.toInt) extends Module {
   val io = IO(new Bundle {
     val exout = Output(new ExWbIO)
     val idex = Output(new IdExIO)
