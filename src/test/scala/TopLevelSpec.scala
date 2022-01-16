@@ -20,7 +20,7 @@ class TopLevelSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     INT_WIDTH = 10
     FRAC_WIDTH = 15
     SynthesisMemInit("src/resources/meminit")
-    test(new TopLevel(IMsize=128, IMinitFileLocation = f"resources/$filename.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")) {dut =>
+    test(new TopLevelSim(IMsize=128, IMinitFileLocation = f"resources/$filename.hex.txt", wordsPerBank=1671, memInitFileLocation="src/resources/meminit")) { dut =>
       dut.clock.setTimeout(cycles+1)
       dut.clock.step(cycles)
     }

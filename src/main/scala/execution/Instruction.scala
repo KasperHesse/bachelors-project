@@ -175,6 +175,7 @@ object StypeInstruction {
   val MOD_OFFSET = 8
   val LS_OFFSET = 12
   val RSRD_OFFSET =  13
+
   /** Converts an S-type instruction to it's UInt representation */
   def apply(v: StypeInstruction): UInt = {
     var s = 0
@@ -227,6 +228,7 @@ object StypeInstruction {
       case 10 => Q
       case 11 => INVD
       case 12 => TMP
+      case 13 => UART
       case _ => throw new IllegalArgumentException(s"Unable to decode S-type base address (got $baseAddrVal)")
     }
 
@@ -506,6 +508,7 @@ object StypeBaseAddress extends ChiselEnum {
   val Q = Value(10.U)
   val INVD = Value(11.U)
   val TMP = Value(12.U)
+  val UART = Value(13.U)
   val WIDTH = Value("b111111".U)
 }
 

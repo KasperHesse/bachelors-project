@@ -8,8 +8,8 @@ import scala.io.Source
  */
 object MemoryCompare extends App {
 
-  val testName = "gmd_cgiter"
-  val hash = "3ffc1a"
+  val testName = "adfg"
+  val hash = "bef6db"
   def apply(): Unit = {
     val DV = compare("DV")
     val DC = compare("DC")

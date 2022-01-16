@@ -11,7 +11,7 @@ class TopLevelTestWrapper(IMsize: Int, IMinitFileLocation: String, wordsPerBank:
 //    val idmem = new IdMemIO
 //    val memid = new WbIdIO
 //  })
-  val top = Module(new TopLevel(IMsize, IMinitFileLocation, wordsPerBank, memInitFileLocation))
+  val top = Module(new TopLevelSim(IMsize, IMinitFileLocation, wordsPerBank, memInitFileLocation))
   val idex = IO(Output(top.decode.io.ex))
   val idctrl = IO(Output(top.decode.io.ctrl))
 

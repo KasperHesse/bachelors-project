@@ -1,0 +1,17 @@
+//A simple program to test the UART's data transmission
+tstart clear
+
+pstart nelemvec
+estart
+mul.sv v0, s0, v0
+mul.sv v1, s0, v1
+add.iv v0, v0, 3.4
+add.iv v1, v1, -2.8
+mul.iv v1, v1, 7
+mul.iv v1, v1, 7
+eend
+st.vec v0, UART
+st.vec v1, UART
+pend
+
+tend

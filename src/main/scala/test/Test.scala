@@ -182,8 +182,9 @@ object Test extends App {
   val g = fixed2double((1L << 54) -1)
   print(f"$f   $g")
 
-  val x = getKEslices(0)
-  print(x.mkString("Array(", ", ", ")"))
+  val x  = 0x005c8fc2f5c800L
+  println(fixed2double(x))
+
 
 
 }

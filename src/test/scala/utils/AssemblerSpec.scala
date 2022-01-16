@@ -525,6 +525,37 @@ class AssemblerSpec extends FlatSpec with Matchers {
     }
   }
 
+
+  it should "generate a st.vec instruction to the UART" in {
+    import execution.StypeMod._
+    import execution.StypeBaseAddress._
+    import execution.StypeLoadStore._
+
+    val line = "st.vec v1, uart"
+    val instr = StypeInstruction(1, VEC, UART, STORE)
+
+    val parsed = Assembler.parseStype(Assembler.splitInstruction(line))
+    assert(parsed == instr.toUInt().litValue.toInt)
+  }
+
+  it should "disallow store operations to the UART with other modifiers than .vec" in {
+    val line = "st.dof v2, uart"
+    try {
+      Assembler.parseStype(Assembler.splitInstruction(line))
+    } catch {
+      case e: IllegalArgumentException => if(e.getMessage.toLowerCase.contains("can only access")) assert(true) else assert(false)
+    }
+  }
+
+  it should "disallow load operation from the UART" in {
+    val line = "ld.vec v0, uart"
+    try {
+      Assembler.parseStype(Assembler.splitInstruction(line))
+    } catch {
+      case e: IllegalArgumentException => if(e.getMessage.toLowerCase.contains("can only access")) assert(true) else assert(false)
+    }
+  }
+
   it should "only allow dof/fdof operations to NDOF long vectors" in {
     Assembler.instructionLength = LitVals.NELEMDOF
     val prefix = "st.dof v0, "
@@ -675,6 +706,7 @@ class AssemblerSpec extends FlatSpec with Matchers {
     val p2 = Assembler.assemble(expected)
     (p1, p2).zipped.foreach((x,y) => assert(x == y))
   }
+
 
   it should "test out" in {
     val OType = "(?i)((?:pstart|estart|eend|pend|tstart|tend).*)".r

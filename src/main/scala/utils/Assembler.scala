@@ -322,7 +322,8 @@ object Assembler {
    * @return An integer represnting that modifier
    */
   def sMod(mod: String): Int = {
-    val map = mutable.Map("vec" -> VEC,
+    val map = mutable.Map(
+      "vec" -> VEC,
       "dof" -> DOF,
       "fdof" -> FDOF,
       "fcn" -> FCN,
@@ -340,19 +341,21 @@ object Assembler {
   }
 
   def sBaseAddr(baseAddr: String): Int = {
-    val map = mutable.Map("x" -> X,
-    "xphys" -> XPHYS,
-    "xnew" -> XNEW,
-    "dc" -> DC,
-    "dv" -> DV,
-    "f" -> F,
-    "u" -> U,
-    "r" -> R,
-    "z" -> Z,
-    "p" -> P,
-    "q" -> Q,
-    "invd" -> INVD,
-    "tmp" -> TMP)
+    val map = mutable.Map(
+      "x" -> X,
+      "xphys" -> XPHYS,
+      "xnew" -> XNEW,
+      "dc" -> DC,
+      "dv" -> DV,
+      "f" -> F,
+      "u" -> U,
+      "r" -> R,
+      "z" -> Z,
+      "p" -> P,
+      "q" -> Q,
+      "invd" -> INVD,
+      "tmp" -> TMP,
+      "uart" -> UART)
     if(map.contains(baseAddr)) map(baseAddr) else throw new IllegalArgumentException(s"Unable to recognize Stype base address $baseAddr")
   }
 
@@ -387,8 +390,10 @@ object Assembler {
       throw new IllegalArgumentException(s"Cannot perform $modString operations when increment type is 'nelemstep'")
     } else if (this.instructionLength == NELEMDOF && !mutable.Seq(DOF, ELEM, FDOF).contains(mod)) {
       throw new IllegalArgumentException(s"Cannot perform $modString operations when increment type is 'nelemdof'")
-    } else if (mutable.Seq(NELEMVEC, NDOF).contains(this.instructionLength) && mod != VEC) {
+    } else if (mod == VEC && !mutable.Seq(NELEMVEC, NDOF).contains(this.instructionLength)) {
       throw new IllegalArgumentException(s"Can only perform ld.vec and st.vec operations when increment type is 'nelemvec' or 'ndof'")
+    } else if (baseAddr == UART && mod != VEC && baseAddr != UART) {
+      throw new IllegalArgumentException(s"Can only access the uart with st.vec operations. Operation was ${tokens(0)}")
     }
 
     val fmt = STYPE
@@ -798,6 +803,7 @@ object LitVals {
   val Q = 10
   val INVD = 11
   val TMP = 12
+  val UART = 13
 
   //O-type modifier
   val PACKET = 0x1

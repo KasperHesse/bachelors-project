@@ -2,8 +2,10 @@ package utils
 
 import chisel3._
 import chisel3.util._
-import Fixed.FIXED_WIDTH
-import utils.Config.leastMultiple
+import Fixed.{FIXED_WIDTH, double2fixed}
+import execution.{StypeBaseAddress, StypeMod}
+import memory.UartTransmitter
+import utils.Config.{NUM_MEMORY_BANKS, leastMultiple}
 
 /**
  * A module for testing how to use the UART module
@@ -14,27 +16,30 @@ class UseUart extends Module {
     val txd = Output(Bits(1.W))
   })
 
-  val uart = Module(new BufferedTx(20, 5))
-  val data = RegInit(VecInit(Seq("hf1234".U(20.W).asSInt, "h15678".U(20.W).asSInt, "h29abc".U(20.W).asSInt, "h3def0".U(20.W).asSInt)))
+  val uart = Module(new UartTransmitter())
 
-  val bytesPerWord: Int = (20.toDouble / 8).ceil.toInt
-  val byteCnt = RegInit((bytesPerWord-1).U)
+  val cnt = RegInit(0.U(4.W))
 
-  val dataCnt = RegInit(0.U(2.W))
+  uart.io.id.valid := cnt === 2.U
+  uart.io.wrData.valid := cnt === 3.U
 
-  //Always output 8 LSB of current data word
-  uart.io.channel.data := data(dataCnt)(7,0)
-  //Output is always valid
-  uart.io.channel.valid := true.B
+  cnt := Mux(cnt =/= 15.U, cnt + 1.U, cnt)
 
-  when(uart.io.channel.ready) {
-    data(dataCnt) := data(dataCnt) >> 8
-    //Reduce number of bytes that must be transmitted in this data word
-    byteCnt := Mux(byteCnt === 0.U, (bytesPerWord-1).U, byteCnt - 1.U)
-
-    //Word to transmit only changes when bytecnt is 0 and uart is ready for next byte
-    dataCnt := Mux(byteCnt === 0.U, dataCnt + 1.U, dataCnt)
+  uart.io.id.bits.baseAddr := StypeBaseAddress.UART
+  for(i <- 0 until NUM_MEMORY_BANKS) {
+    uart.io.id.bits.indices(i) := (i).U
+    uart.io.id.bits.validIndices(i) := true.B
+  }
+  val wd = Seq[Double](1, 3.14, -1, 13.37, -13.37, 0.2, -2048, 28)
+  for(i <- 0 until 8) {
+    uart.io.wrData.bits.wrData(i) := double2fixed(wd(i)).S(FIXED_WIDTH.W)
   }
 
+//  for(i <- 0 to 3) {
+//    uart.io.wrData.bits.wrData(2*i) := (i+1).S(FIXED_WIDTH.W)
+//    uart.io.wrData.bits.wrData(2*i+1) := 0x123456789abcdL.S(FIXED_WIDTH.W)
+//  }
+  uart.io.wrData.bits.mod := StypeMod.VEC
+  uart.io.wrData.bits.iter := 0.U
   io.txd := uart.io.txd
 }

@@ -74,15 +74,18 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * @param wrData The data to be written
    */
   def storeData(indices: Seq[Int], clock: Clock, baseAddr: StypeBaseAddress.Type, sc: SimulationContext, wrData: Seq[SInt]): Unit = {
-    val maxProg = maxProgress(sc.iBuffer)
-    val baseAddrDec = AddressDecode.mapping(baseAddr.litValue.toInt)
-    val addresses = indices.map(_ + baseAddrDec)
+    //If storing to uart, just ignore it
+    if(baseAddr.litValue != StypeBaseAddress.UART.litValue) {
+      val maxProg = maxProgress(sc.iBuffer)
+      val baseAddrDec = AddressDecode.mapping(baseAddr.litValue.toInt)
+      val addresses = indices.map(_ + baseAddrDec)
 
-    for(i <- addresses.indices) {
-      if((0 until maxProg) contains indices(i)) { //Only perform store operations on valid indices
-        val bank = addresses(i) % NUM_MEMORY_BANKS
-        val index = addresses(i) >> log2Ceil(NUM_MEMORY_BANKS)
-        sc.mem(bank)(index) = wrData(i)
+      for(i <- addresses.indices) {
+        if((0 until maxProg) contains indices(i)) { //Only perform store operations on valid indices
+          val bank = addresses(i) % NUM_MEMORY_BANKS
+          val index = addresses(i) >> log2Ceil(NUM_MEMORY_BANKS)
+          sc.mem(bank)(index) = wrData(i)
+        }
       }
     }
     clock.step()
@@ -455,7 +458,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
 
-  def performExecution(dut: TopLevel, sc: SimulationContext): Unit = {
+  def performExecution(dut: TopLevelSim, sc: SimulationContext): Unit = {
     sc.packetSetup()
 
     def perform(id: Int): Unit = {
@@ -526,7 +529,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
               annos: AnnotationSeq = Seq(),
               dumpMemory: Boolean = false,
               memInitName: String = "",
-              memInitFileLocation: String = "src/resources/meminit"): Unit = {
+              memInitFileLocation: String = "src/resources/meminit_sim"): Unit = {
 
     val source = Source.fromFile(f"src/resources/programs/$filename.txt")
     Assembler.writeMemInitFile(f"src/resources/programs/$filename.hex.txt", Assembler.assemble(source))
@@ -551,7 +554,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val sc = new SimulationContext
 
 
-    test(new TopLevel(IMsize = 1024,
+    test(new TopLevelSim(IMsize = 1024,
       IMinitFileLocation = s"src/resources/programs/$filename.hex.txt",
       wordsPerBank,
       memInitFileLocation = memInitFileLocation)).withAnnotations(annos) {dut =>
@@ -671,5 +674,9 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
   it should "run multiple iterations of the top3dcg loop" in {
     testFun("top3dcg", dumpMemory=true, timeout=0, memInitName="top3dcg/1549e1", annos=Seq(VerilatorBackendAnnotation))
+  }
+
+  it should "transmit data via the uart" in {
+    testFun("uart", dumpMemory=true, timeout=1000, annos=Seq(WriteVcdAnnotation))
   }
 }

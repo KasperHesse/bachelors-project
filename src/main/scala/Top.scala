@@ -5,7 +5,7 @@ import memory._
 import execution._
 import stages.DecodeTiming
 import test._
-import utils.{Assembler, SynthesisMemInit}
+import utils.{Assembler, SynthesisMemInit, UseUart}
 
 import scala.io.Source
 
@@ -18,14 +18,16 @@ object Top extends App {
   Assembler.writeMemInitFile("src/resources/programs/top.hex.txt", Assembler.assemble(source), 8)
   source.close()
 
-  utils.Config.INLINE = true
-  (new chisel3.stage.ChiselStage).execute(
-    Array("-X", "verilog", "-td", "target/gen"),
-    Seq(ChiselGeneratorAnnotation(() => new TopLevel(
-      IMsize=1024,
-      IMinitFileLocation = "src/resources/programs/top.hex.txt",
-      wordsPerBank,
-      memInitFileLocation = "src/resources/meminit_synth",
-      clkFreq=50e6.toInt)
-    )))
+//  utils.Config.INLINE = true
+//  (new chisel3.stage.ChiselStage).execute(
+//    Array("-X", "verilog", "-td", "target/gen"),
+//    Seq(ChiselGeneratorAnnotation(() => new TopLevelSim(
+//      IMsize=1024,
+//      IMinitFileLocation = "src/resources/programs/top.hex.txt",
+//      wordsPerBank,
+//      memInitFileLocation = "src/resources/meminit_synth",
+//      clkFreq=50e6.toInt)
+//    )))
+
+  (new chisel3.stage.ChiselStage).execute(Array("-X", "verilog", "-td", "target/gen"), Seq(ChiselGeneratorAnnotation(() => new UseUart())))
 }

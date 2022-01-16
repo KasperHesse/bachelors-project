@@ -248,7 +248,7 @@ class Thread(id: Int) extends Module {
   io.mem.writeQueue.bits.wrData := wrData
   io.mem.writeQueue.bits.mod := RegNext(Sinst.mod) //Must delay by one clock cycle since register file reads are delayed
   io.mem.writeQueue.bits.iter := RegNext(memAccess.io.wqIter)
-  io.mem.writeQueue.valid := RegNext(memAccess.io.wqValid) //Using the same valid signal for both
+  io.mem.writeQueue.valid := RegNext(memAccess.io.wqValid)
 
   //Other thread
   io.threadOut.state := state
