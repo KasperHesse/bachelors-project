@@ -8,20 +8,20 @@ import scala.io.Source
  */
 object MemoryCompare extends App {
 
-  val testName = "adfg"
-  val hash = "bef6db"
+  val testName = "simulator"
+  val hash = "1"
   def apply(): Unit = {
-    val DV = compare("DV")
-    val DC = compare("DC")
-    val INVD = compare("INVD")
-    val R = compare("R")
-    val Z = compare("Z")
-    val P = compare("P")
-    val Q = compare("Q")
-    val U = compare("U")
-    val X = compare("X")
+//    val DV = compare("DV")
+//    val DC = compare("DC")
+//    val INVD = compare("INVD")
+//    val R = compare("R")
+//    val Z = compare("Z")
+//    val P = compare("P")
+//    val Q = compare("Q")
+//    val U = compare("U")
+//    val X = compare("X")
     val XPHYS = compare("XPHYS")
-    val XNEW = compare("XNEW")
+//    val XNEW = compare("XNEW")
 
     def print(x: (Int, Double, Int, Double), name: String): Unit = {
       println(f"$name%-6s| ${x._2}%14.8f | ${x._4}%9.5f | ${x._1}%4d | ${x._3}%4d")
@@ -29,17 +29,17 @@ object MemoryCompare extends App {
 
     println("NAME  | Avg. Delta     | Av.Delta2 |  cnt | Signerrors")
     println("------+----------------+-----------+------+-----------")
-    print(DV, "DV")
-    print(DC, "DC")
-    print(INVD, "INVD")
-    print(R, "R")
-    print(Z, "Z")
-    print(P, "P")
-    print(Q, "Q")
-    print(U, "U")
-    print(X, "X")
+//    print(DV, "DV")
+//    print(DC, "DC")
+//    print(INVD, "INVD")
+//    print(R, "R")
+//    print(Z, "Z")
+//    print(P, "P")
+//    print(Q, "Q")
+//    print(U, "U")
+//    print(X, "X")
     print(XPHYS, "XPHYS")
-    print(XNEW, "XNEW")
+//    print(XNEW, "XNEW")
 
   }
 

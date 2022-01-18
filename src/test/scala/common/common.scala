@@ -522,11 +522,11 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       override def toString: String = f"$i,$j,$k,$scala,$c,$value%.10f"
     }
 
-    val currentTime = System.currentTimeMillis().toHexString.reverse.substring(0,6)
-
     def elementIndexCStyle(i: Int, j: Int, k: Int): Int = {
       i * NELY * NELZ + k * NELY + j
     }
+
+    val currentTime = System.currentTimeMillis().toHexString.reverse.substring(0,6)
 
     def getEdofCStyle(i: Int, j: Int, k: Int): Array[Int] = {
       val edof = Array.ofDim[Int](24)

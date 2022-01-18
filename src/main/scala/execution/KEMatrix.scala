@@ -8,7 +8,12 @@ import chisel3.util.experimental.{loadMemoryFromFile, loadMemoryFromFileInline}
 
 import scala.io.Source
 
-class KEMatrix(val sync: Boolean = true) extends Module {
+/**
+ * Module containing the KE-matrix, coordinate transformed to work with all iteration values
+ * @param sync Whether to use synchronous-read (true) or async-read (false) memories. Defaults to true
+ * @param memInitFileLocation Base location for the files containing the KE-matrix initialization values
+ */
+class KEMatrix(val sync: Boolean = true, memInitFileLocation: String = "src/resources/ke") extends Module {
   val io = IO(new KEIO)
 
   /** Number of slices for each KE matrix */
@@ -28,9 +33,9 @@ class KEMatrix(val sync: Boolean = true) extends Module {
   //Load sliced KE files as memory initialization values
   for(i <- 0 until NUM_PROCELEM) {
     if(INLINE) {
-      loadMemoryFromFileInline(mem(i), s"src/resources/ke/ke_$i.txt")
+      loadMemoryFromFileInline(mem(i), s"$memInitFileLocation/ke_$i.txt")
     } else {
-      loadMemoryFromFile(mem(i), s"src/resources/ke/ke_$i.txt")
+      loadMemoryFromFile(mem(i), s"$memInitFileLocation/ke_$i.txt")
     }
   }
 

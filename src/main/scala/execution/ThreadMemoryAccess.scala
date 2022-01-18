@@ -73,7 +73,7 @@ class ThreadMemoryAccess(sim: Boolean = false) extends Module {
   val vecRd = WireDefault(0.U(log2Ceil(NUM_VREG+1).W))
   /** Vector register slot when processing DOF or VEC instructions */
   val slotSelect = RegInit(0.U(log2Ceil(VREG_SLOT_WIDTH+1).W))
-  /** The number of read queue bundles that have been transmitted for the current instruction */
+  /** The number of read/write queue bundles that have been transmitted for the current instruction */
   val outputCnt = RegInit(0.U(log2Ceil(NUM_XREG+1).W))
   /** Pulled high  */
   val finalCycle = WireDefault(false.B)
@@ -107,8 +107,8 @@ class ThreadMemoryAccess(sim: Boolean = false) extends Module {
     //Increment outputcnt every time a vec output is made.
     val ocTick = outputCnt === ((VREG_DEPTH/NUM_MEMORY_BANKS)-1).U
     val SStick = slotSelect === (VREG_SLOT_WIDTH-1).U
-    outputCnt := Mux(vec.io.vec.valid, Mux(ocTick, 0.U, outputCnt + 1.U), outputCnt)
-    slotSelect := Mux(ocTick, Mux(SStick, 0.U, slotSelect + 1.U), slotSelect)
+    outputCnt := Mux(vec.io.vec.valid && io.vec.ready, Mux(ocTick, 0.U, outputCnt + 1.U), outputCnt)
+    slotSelect := Mux(ocTick && vec.io.vec.valid && io.vec.ready, Mux(SStick, 0.U, slotSelect + 1.U), slotSelect)
     queueValidFlag := vec.io.vec.valid && io.vec.ready
     finalCycle := ocTick && SStick & vec.io.vec.valid && io.vec.ready
 

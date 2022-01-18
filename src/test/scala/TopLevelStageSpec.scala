@@ -560,7 +560,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
       memInitFileLocation = memInitFileLocation)).withAnnotations(annos) {dut =>
 
       //Initial setup of SC and clock timeout
-      sc.initialize(dut.decode, "src/resources/meminit")
+      sc.initialize(dut.decode, "src/resources/meminit_sim")
       dut.clock.setTimeout(timeout)
       dut.clock.step() //1 cycle to get first instruction into decode stage
       assert(dut.io.idctrl.instr.peek.litValue != 0, "Peeked instruction with value 0, did not init memory correctly")
@@ -677,6 +677,6 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
   }
 
   it should "transmit data via the uart" in {
-    testFun("uart", dumpMemory=true, timeout=1000, annos=Seq(WriteVcdAnnotation))
+    testFun("uart", dumpMemory=true, timeout=5000, memInitName="top3dcg/1549e1", annos=Seq(WriteVcdAnnotation, VerilatorBackendAnnotation))
   }
 }

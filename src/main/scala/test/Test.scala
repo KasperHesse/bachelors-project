@@ -8,6 +8,7 @@ import utils.Fixed._
 import utils.Config._
 
 import java.io.File
+import scala.io._
 
 class Test extends Module {
   val io = IO(new Bundle {
@@ -178,12 +179,8 @@ object Test extends App {
   P(fixedDiv(double2fixed(5),1))
   p("00002000000000")
 
-  val f = fixed2double(30.S)
-  val g = fixed2double((1L << 54) -1)
-  print(f"$f   $g")
+  P(imm2fixed(3.97))
 
-  val x  = 0x005c8fc2f5c800L
-  println(fixed2double(x))
 
 
 

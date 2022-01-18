@@ -840,22 +840,43 @@ applyDensityFilter(X, XPHYS)
 pstart single
 estart
 add.is s15, s15, 1 //loop++
-add.is s2, s0, 4   //s2 = 4 = threshold value for change and convergence
-add.is s3, s0, 5   //s3 = 5
-mul.is s3, s3, 5   //s3 = 25
-mul.is s3, s3, 4   //s3 = 100, max number of top loops
+add.is s2, s0, 3.97 //s2 = 3.97 = threshold value for change and convergence
+add.is s3, s0, 5    //s3 = 5
+mul.is s3, s3, 5    //s3 = 25
+mul.is s3, s3, 4    //s3 = 100, max number of top loops
 eend
 pend
 
 //Continue looping while change > 4 && loop < 100
 //If either change <=4 or loop >= 100, we exit
 bge s15, s3, END //if loop >= 100, go to end
-blt s14, s2, END //if change <=4, go to end
+blt s14, s2, END //if change <=3.97, go to end
 
 beq s0, s0, TOP3DCG //otherwise, unconditional branch back to the start of top loop
 
 END:
 tend //Stop timing module
+
+//Transmit XPHYS data over UART
+pstart nelemvec
+ld.vec v0, XPHYS
+estart
+eend
+st.vec v0, UART
+pend
+
+//Transmit final value of loop, cgiter and change over uart
+pstart nelemvec
+estart
+mul.sv v0, s0, v0 //clear v0
+add.sv v2, s15, v0 //v2 = s15 = loop
+add.sv v1, s14, v0 //v1 = s14 = change
+add.sv v0, s8, v0 //v0 = s8 = cgIter
+eend
+st.vec v0, UART
+st.vec v1, UART
+st.vec v2, UART
+pend
 
 HALT:
 beq s0, s0, HALT //infinite loop
