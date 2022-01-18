@@ -13,6 +13,7 @@ target
 quartus
 project/target
 src/resources/meminit
+src/resources/meminit_default
 src/resources/meminit_sim
 src/resources/meminit_synth
 /resources
