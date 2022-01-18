@@ -20,15 +20,15 @@ class UseUart extends Module {
 
   val cnt = RegInit(0.U(4.W))
 
-  uart.io.id.valid := cnt === 2.U
+  uart.io.vec.valid := cnt === 2.U
   uart.io.wrData.valid := cnt === 3.U
 
   cnt := Mux(cnt =/= 15.U, cnt + 1.U, cnt)
 
-  uart.io.id.bits.baseAddr := StypeBaseAddress.UART
+  uart.io.vec.bits.baseAddr := StypeBaseAddress.UART
   for(i <- 0 until NUM_MEMORY_BANKS) {
-    uart.io.id.bits.indices(i) := (i).U
-    uart.io.id.bits.validIndices(i) := true.B
+    uart.io.vec.bits.indices(i) := (i).U
+    uart.io.vec.bits.validIndices(i) := true.B
   }
   val wd = Seq[Double](1, 3.14, -1, 13.37, -13.37, 0.2, -2048, 28)
   for(i <- 0 until 8) {

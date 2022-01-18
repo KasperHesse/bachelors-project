@@ -23,12 +23,12 @@ object MemoryCompare extends App {
     val XPHYS = compare("XPHYS")
 //    val XNEW = compare("XNEW")
 
-    def print(x: (Int, Double, Int, Double), name: String): Unit = {
-      println(f"$name%-6s| ${x._2}%14.8f | ${x._4}%9.5f | ${x._1}%4d | ${x._3}%4d")
+    def print(x: (Int, Double, Int, Double, Double), name: String): Unit = {
+      println(f"$name%-6s| ${x._2}%14.8f | ${x._4}%9.5f | ${x._5}%10.5f | ${x._1}%4d | ${x._3}%4d")
     }
 
-    println("NAME  | Avg. Delta     | Av.Delta2 |  cnt | Signerrors")
-    println("------+----------------+-----------+------+-----------")
+    println("NAME  | Avg. Delta     | L2 Norm   | L.inf.norm | cnt | Signerrors")
+    println("------+----------------+-----------+------------+-----+-----------")
 //    print(DV, "DV")
 //    print(DC, "DC")
 //    print(INVD, "INVD")
@@ -48,9 +48,9 @@ object MemoryCompare extends App {
    * @param name
    * @param delta
    * @return A tuple: (0) is number of miscompares, (1) is average absolute miscompare delta
-   *         (2) is number of sign errors, (3) is average percentage miscompare delta
+   *         (2) is number of sign errors, (3) is L2 norm, (4) is L-inf norm
    */
-  def compare(name: String, delta: Double = 0.0001): (Int, Double, Int, Double) = {
+  def compare(name: String, delta: Double = 0.0001): (Int, Double, Int, Double, Double) = {
 
     val file1 = Source.fromFile(f"memdump/$testName/$hash/mem_$name.csv")
     val file2 = Source.fromFile(f"memdump_C/memdump_$name.csv")
@@ -69,9 +69,9 @@ object MemoryCompare extends App {
     var errAvg = 0.0
 
     //Calculate 2-norm difference
-    val twonormc = norm(C)
-    val twonormdiff = norm(C.zip(SCALA).map(x => x._1-x._2))
-    val errAvg2 = twonormdiff/twonormc*100
+    val twonormc = l2norm(C)
+    val twonormdiff = l2norm(C.zip(SCALA).map(x => x._1-x._2))
+    val l2 = twonormdiff/twonormc
 
     //Calculate absolute differences
     for(i <- C.indices) {
@@ -101,7 +101,17 @@ object MemoryCompare extends App {
 
     file1.close()
     file2.close()
-    (errCnt, errAvg, signCnt, errAvg2)
+    val linf = {
+      var m = Math.abs(SCALA(0)-C(0))
+      for(i <- C.indices) {
+        if(Math.abs(SCALA(i)-C(i)) > m) {
+          println(f"[$i] c=${C(i)}%.5f, scala=${SCALA(i)}%.5f, diff=${Math.abs(SCALA(i)-C(i))}%.5f")
+          m = Math.abs(SCALA(i)-C(i))
+        }
+      }
+      m
+    }
+    (errCnt, errAvg, signCnt, l2, lInfNorm(C.zip(SCALA).map(x => x._1 - x._2)))
   }
 
   /**
@@ -109,12 +119,21 @@ object MemoryCompare extends App {
    * @param V The vector
    * @return THe 2-norm
    */
-  def norm(V: Array[Double]): Double = {
+  def l2norm(V: Array[Double]): Double = {
     var sum = 0.0
     for(v <- V) {
       sum += v*v
     }
     Math.sqrt(sum)
+  }
+
+  /**
+   * Calculates the inf-norm of a vector
+   * @param V The vector
+   * @return The inf-norm
+   */
+  def lInfNorm(V: Array[Double]): Double = {
+    V.map(Math.abs).max
   }
 
   apply()

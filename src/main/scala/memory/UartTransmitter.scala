@@ -8,6 +8,16 @@ import utils.Config._
 import utils.Fixed.FIXED_WIDTH
 import execution.{IdMemIO, RegisterFileType, StypeBaseAddress, StypeLoadStore, StypeMod, WbIdIO}
 
+class UartTransmitterIO extends Bundle {
+  /** UART output data */
+  val txd = Output(Bits(1.W))
+  /** Input instruction from id stage for VEC operations */
+  val vec = Flipped(Decoupled(new AddressGenProducerIO))
+  /** Input data from ID stage for SEL operations */
+  val sel = Flipped(Decoupled(new IJKgeneratorConsumerIO))
+  /** Input write data from id stage*/
+  val wrData = Flipped(Decoupled(new WriteQueueBundle))
+}
 /**
  * UART Transmitter used to transmit data off the FPGA
  * Uses the [[utils.BufferedTx]] implementation of a UART transmitter to transmit data.
@@ -15,14 +25,7 @@ import execution.{IdMemIO, RegisterFileType, StypeBaseAddress, StypeLoadStore, S
  * writing the data being stored onto the UART port
  */
 class UartTransmitter(val clkFreq: Int = 50e6.toInt, val baudRate: Int = 115200) extends Module {
-  val io = IO(new Bundle {
-    /** UART output data */
-    val txd = Output(Bits(1.W))
-    /** Input instruction from id stage */
-    val id = Flipped(Decoupled(new AddressGenProducerIO))
-    /** Input write data from id stage*/
-    val wrData = Flipped(Decoupled(new WriteQueueBundle))
-  })
+  val io = IO(new UartTransmitterIO)
   val uart = Module(new BufferedTx(clkFreq, baudRate))
 
   /** Buffer for storing X-values before transmitting over UART */
@@ -37,20 +40,27 @@ class UartTransmitter(val clkFreq: Int = 50e6.toInt, val baudRate: Int = 115200)
   /** How many values in the buffer that have been transmitted */
   val dataCnt = RegInit(0.U(log2Ceil(NUM_MEMORY_BANKS).W))
 
-  val idle :: load :: transmit :: Nil = Enum(3)
+  val idle :: loadVec :: loadSel :: transmit :: Nil = Enum(4)
   /** State of transmitter */
   val state = RegInit(idle)
 
   // Next state logic
   switch(state) {
     is(idle) {
-      when(io.id.valid && io.id.bits.baseAddr === StypeBaseAddress.UART) {
-        state := load
+      when(io.vec.valid && io.vec.bits.baseAddr === StypeBaseAddress.UART) {
+        state := loadVec
+      } .elsewhen(io.sel.valid && io.sel.bits.baseAddr === StypeBaseAddress.UART) {
+        state := loadSel
       }
     }
-    is(load) {
+    is(loadVec) {
       buffer := io.wrData.bits.wrData
       state := transmit
+    }
+    is(loadSel) {
+      buffer := io.wrData.bits.wrData
+      state := transmit
+      dataCnt := (NUM_MEMORY_BANKS-1).U //We only wish to transmit one value
     }
     is(transmit) {
       when(dataCnt === (NUM_MEMORY_BANKS-1).U && byteCnt === (bytesPerValue-1).U && uart.io.channel.ready) {
@@ -81,8 +91,9 @@ class UartTransmitter(val clkFreq: Int = 50e6.toInt, val baudRate: Int = 115200)
   uart.io.channel.valid := state === transmit
 
   //Signals back to id stage
-  io.id.ready := state === idle
-  io.wrData.ready := (state === idle) || (state === load)
+  io.vec.ready := state === idle
+  io.sel.ready := state === idle
+  io.wrData.ready := (state === idle) || (state === loadSel) || (state === loadVec)
 
   //Output to world
   io.txd := uart.io.txd

@@ -22,3 +22,4 @@ memdump
 memdump_C
 uart.txt
 uart_parsed.csv
+uart_dumps

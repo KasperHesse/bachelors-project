@@ -45,20 +45,28 @@ class TopLevel(IMsize: Int, IMinitFileLocation: String, wordsPerBank: Int, memIn
   control.io.mem <> mem.io.ctrl
 
   //UART/Memory stage arbitration
-  //Valid signals can go into uart without arbitration, as the uart also checks for correct base address
+  //Valid signals and data can go into uart without arbitration, as the uart also checks for correct base address
   uart.io.wrData.bits := decode.io.mem.writeQueue.bits
   uart.io.wrData.valid := decode.io.mem.writeQueue.valid
-  uart.io.id.bits := decode.io.mem.vec.bits
-  uart.io.id.valid := decode.io.mem.vec.valid
-  //Ready signal to vec should be taken from uart when baseaddr is UART
+  uart.io.vec.bits := decode.io.mem.vec.bits
+  uart.io.vec.valid := decode.io.mem.vec.valid
+  uart.io.sel.valid := decode.io.mem.neighbour.valid
+  uart.io.sel.bits := decode.io.mem.neighbour.bits
+
+  //Ready signal into ID should be taken from uart when baseaddr is UART
   when(decode.io.mem.vec.bits.baseAddr === StypeBaseAddress.UART) {
-    decode.io.mem.vec.ready := uart.io.id.ready
+    decode.io.mem.vec.ready := uart.io.vec.ready
+    decode.io.mem.neighbour.ready := uart.io.sel.ready
   } .otherwise {
     decode.io.mem.vec.ready := mem.io.id.vec.ready
+    decode.io.mem.neighbour.ready := mem.io.id.neighbour.ready
   }
-  //Valid signal into write queue in memory should be disabled when vec baseAddr is uart
+  //Valid signal into write queue should be disabled when baseAddr is uart
   //Using regnext of baseAddr since wrData arrives one cc after vec base address
   mem.io.id.writeQueue.valid := decode.io.mem.writeQueue.valid && RegNext(decode.io.mem.vec.bits.baseAddr) =/= StypeBaseAddress.UART
+  //valid signal into mem.vec and mem.neighbour should be false when addressing uart
+  mem.io.id.vec.valid := decode.io.mem.vec.valid && decode.io.mem.vec.bits.baseAddr =/= StypeBaseAddress.UART
+  mem.io.id.neighbour.valid := decode.io.mem.neighbour.valid && decode.io.mem.neighbour.bits.baseAddr =/= StypeBaseAddress.UART
 
   io.timing := timing.io.out
   io.txd := uart.io.txd
@@ -110,23 +118,28 @@ class TopLevelSim(IMsize: Int, IMinitFileLocation: String, wordsPerBank: Int, me
   control.io.mem <> mem.io.ctrl
 
   //UART/Memory stage arbitration
-  //Valid signals can go into uart without arbitration, as the uart also checks for correct base address
+  //Valid signals and data can go into uart without arbitration, as the uart also checks for correct base address
   uart.io.wrData.bits := decode.io.mem.writeQueue.bits
   uart.io.wrData.valid := decode.io.mem.writeQueue.valid
-  uart.io.id.bits := decode.io.mem.vec.bits
-  uart.io.id.valid := decode.io.mem.vec.valid
+  uart.io.vec.bits := decode.io.mem.vec.bits
+  uart.io.vec.valid := decode.io.mem.vec.valid
+  uart.io.sel.valid := decode.io.mem.neighbour.valid
+  uart.io.sel.bits := decode.io.mem.neighbour.bits
 
   //Ready signal into ID should be taken from uart when baseaddr is UART
   when(decode.io.mem.vec.bits.baseAddr === StypeBaseAddress.UART) {
-    decode.io.mem.vec.ready := uart.io.id.ready
+    decode.io.mem.vec.ready := uart.io.vec.ready
+    decode.io.mem.neighbour.ready := uart.io.sel.ready
   } .otherwise {
     decode.io.mem.vec.ready := mem.io.id.vec.ready
+    decode.io.mem.neighbour.ready := mem.io.id.neighbour.ready
   }
-  //Valid signal into write queue should be disabled when vec baseAddr is uart
+  //Valid signal into write queue should be disabled when baseAddr is uart
   //Using regnext of baseAddr since wrData arrives one cc after vec base address
   mem.io.id.writeQueue.valid := decode.io.mem.writeQueue.valid && RegNext(decode.io.mem.vec.bits.baseAddr) =/= StypeBaseAddress.UART
-  //valid signal into mem.vec should be false when addressing uart
+  //valid signal into mem.vec and mem.neighbour should be false when addressing uart
   mem.io.id.vec.valid := decode.io.mem.vec.valid && decode.io.mem.vec.bits.baseAddr =/= StypeBaseAddress.UART
+  mem.io.id.neighbour.valid := decode.io.mem.neighbour.valid && decode.io.mem.neighbour.bits.baseAddr =/= StypeBaseAddress.UART
 
 
   io.exout <> execute.io.wb

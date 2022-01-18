@@ -60,7 +60,7 @@ object SynthesisMemInit {
     for(i <- 0 until NUM_MEMORY_BANKS) {
       val memFile = s"$memInitFileLocation/membank_$i.txt"
       val contents = mem(i).map(double2fixed).map(c => c & ((1L << FIXED_WIDTH)-1)) //Mask to preserve only FIXED_WIDTH lower bits
-      writeMemInitFile(memFile, contents, 16)
+      writeMemInitFile(memFile, contents, 16) //Using 14 as length since FIXED_WIDTH=54 => 54/4=13.5 => 14 hex digits
     }
     wordsPerBank
   }

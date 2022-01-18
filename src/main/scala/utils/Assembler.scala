@@ -384,13 +384,13 @@ object Assembler {
       throw new IllegalArgumentException(s"Cannot perform load operations with Stype modifier $modString")
     } else if (mutable.Seq(DOF, FDOF).contains(mod) && mutable.Seq(X, XPHYS, XNEW, DC, DV).contains(baseAddr)) {
       throw new IllegalArgumentException(s"Cannot perform dof/fdof operations to base address $baseAddrString")
-    } else if (mutable.Seq(ELEM, SEL, FCN, EDN1, EDN2).contains(mod) && !mutable.Seq(X, XPHYS, XNEW, DC, DV, TMP).contains(baseAddr)) {
+    } else if (mutable.Seq(ELEM, SEL, FCN, EDN1, EDN2).contains(mod) && !mutable.Seq(X, XPHYS, XNEW, DC, DV, TMP, UART).contains(baseAddr)) {
       throw new IllegalArgumentException(s"Cannot perform $modString operations to base address $baseAddrString")
     } else if (this.instructionLength == NELEMSTEP && !mutable.Seq(SEL, FCN, EDN1, EDN2).contains(mod)) {
       throw new IllegalArgumentException(s"Cannot perform $modString operations when increment type is 'nelemstep'")
     } else if (this.instructionLength == NELEMDOF && !mutable.Seq(DOF, ELEM, FDOF).contains(mod)) {
       throw new IllegalArgumentException(s"Cannot perform $modString operations when increment type is 'nelemdof'")
-    } else if (mod == VEC && !mutable.Seq(NELEMVEC, NDOF).contains(this.instructionLength)) {
+    } else if (mod == VEC && !mutable.Seq(NELEMVEC, NDOF, SINGLE).contains(this.instructionLength)) {
       throw new IllegalArgumentException(s"Can only perform ld.vec and st.vec operations when increment type is 'nelemvec' or 'ndof'")
     } else if (baseAddr == UART && mod != VEC && baseAddr != UART) {
       throw new IllegalArgumentException(s"Can only access the uart with st.vec operations. Operation was ${tokens(0)}")

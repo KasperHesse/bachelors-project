@@ -1,8 +1,45 @@
 //A simple program to test the UART's data transmission
-pstart nelemvec
-ld.vec v0, XPHYS
+
+pstart single //Can we perform st.vec and st.sel in a single right now?
+estart
+mul.sv v0, s0, v0
+add.iv v0, v0, 3
+eend
+st.vec v0, X
+pend
+
+pstart single
+estart
+mul.sx x0, s0, x0
+add.ix x0, x0, 4
+eend
+st.sel x0, X
+pend
+
+pstart single
+estart
+add.is s1, s0, 5
+add.is s2, s0, 7
+add.is s3, s0, -1
+mul.sx x0, s0, x0 //clear x0
+add.sx x3, s3, x0 //x3 = -1
+add.sx x2, s2, x0 //x2 = 7
+add.sx x1, s1, x0 //x1 = 5
+eend
+st.sel x1, UART
+st.sel x2, UART
+pend
+
+pstart single
 estart
 eend
-st.vec v0, XPHYS
 st.vec v0, UART
 pend
+//
+//pstart nelemvec
+//ld.vec v0, XPHYS
+//estart
+//eend
+//st.vec v0, XPHYS
+//st.vec v0, UART
+//pend

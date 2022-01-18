@@ -1,6 +1,6 @@
 package utils
 
-import utils.Config.{NELX, NELY, NELZ, NUM_MEMORY_BANKS}
+import utils.Config.{ELEMS_PER_VSLOT, NELEMLENGTH, NELX, NELY, NELZ, NUM_MEMORY_BANKS}
 import utils.Fixed._
 
 import java.io.{BufferedWriter, FileWriter}
@@ -39,10 +39,12 @@ object UartOutputParse extends App {
   }
 
 
-  val file = Source.fromFile("uart.txt")
+  val name = "18jan_16h55m_6x6x6"
+  val file = Source.fromFile(s"uart_dumps/$name.txt")
 
   //Get all text, concatenate it into one long line
   val text = file.getLines().toSeq.foldLeft("")((a,b) => a.concat(b))
+  file.close()
 
   //Group each section of 7 bytes, reverse the bytes and concatenate into a hex string
   val textValues = text.split(" ").grouped(7).map(x => x.reverse.foldLeft("")((a, b) => a.concat(b))).toSeq
@@ -50,24 +52,34 @@ object UartOutputParse extends App {
 
   //Convert hex strings to double values
   val values = textValues.map(x => fixed2double(string2fixed(x)))
+  //On each iteration, we output 6 values:
+  //x1: relres
+  //x2: cgIter
+  //x3: compliance
+  //vol
+  //change
+  //loop
+  //We know that at the end we will get NELEMLENGTH xphys values
+  //We slice out the first values, group in sections of 6, write to another vcd file
+  val (stats, xphys) = values.splitAt(values.length-NELEMLENGTH)
 
-  val fw = new BufferedWriter(new FileWriter("uart_parsed.csv"))
-  fw.write("elementIndex_scala,elementIndex_c,value\n")
+  val statFile = new BufferedWriter(new FileWriter(s"uart_dumps/${name}_stats.csv"))
+  statFile.write("loop, relres, cgIter, compliance, vol, change, change2\n")
+  stats.grouped(6).foreach(x => statFile.write(s"${x(5)},${x(0)},${x(1)},${x(2)},${x(3)},${x(4)},${x(4)/(ELEMS_PER_VSLOT*2)}\n"))
+
+  statFile.close()
+
+  val xphysFile = new BufferedWriter(new FileWriter(s"uart_dumps/${name}_xphys.csv"))
+  xphysFile.write("elementIndex_scala,elementIndex_c,value\n")
   for(i <- 0 until NELX) {
     for(k <- 0 until NELZ) {
       for(j <- 0 until NELY) {
         val ei_scala = elementIndex(Array(i,j,k))
         val ei_c = elementIndexCStyle(i,j,k)
-        fw.write(f"${ei_scala},${ei_c},${values(ei_scala)}\n")
+        xphysFile.write(f"${ei_scala},${ei_c},${xphys(ei_scala)}\n")
       }
     }
   }
-  fw.close()
+  xphysFile.close()
 
-  println(f"Number of top3dcg loops: ${values(768)}")
-  println(f"Number of cg iterations in final loop: ${values(384)}")
-  println(f"Final change value: ${values(576)}")
-
-
-  file.close()
 }

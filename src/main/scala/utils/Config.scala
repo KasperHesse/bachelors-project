@@ -17,11 +17,11 @@ object Config {
 
   //Compile-time constants for the grid being operated upon
   /** Number of element in the x-direction */
-  var NELX = 6
+  var NELX = 10
   /** Number of elements in the y-direction */
-  var NELY = 6
+  var NELY = 10
   /** Number of element in the z-direction */
-  var NELZ = 6
+  var NELZ = 10
   /** The greatest of the three element dimensions */
   var GDIM = math.max(NELX, math.max(NELY, NELZ))
 

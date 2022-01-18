@@ -9,15 +9,16 @@ object Top extends App {
   val wordsPerBank = SynthesisMemInit("src/resources/meminit_synth")
 
   //Assemble the program
-  val source = Source.fromFile("src/resources/programs/top.txt")
-  Assembler.writeMemInitFile("src/resources/programs/top.hex.txt", Assembler.assemble(source), 8)
+  val name = "top_10x10x10"
+  val source = Source.fromFile(s"src/resources/programs/$name.txt")
+  Assembler.writeMemInitFile(s"src/resources/programs/$name.hex.txt", Assembler.assemble(source), 8)
   source.close()
 
   utils.Config.INLINE = true
   (new ChiselStage).emitVerilog(
     new TopLevel(
       IMsize=1024,
-      IMinitFileLocation = "../../src/resources/programs/top.hex.txt", //Using ../.. to generate files that Quartus can use without issues
+      IMinitFileLocation = s"../../src/resources/programs/$name.hex.txt", //Using ../.. to generate files that Quartus can use without issues
       wordsPerBank,
       memInitFileLocation = "../../src/resources/meminit_synth",
       clkFreq=50e6.toInt),

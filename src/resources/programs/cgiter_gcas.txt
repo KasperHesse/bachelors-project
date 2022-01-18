@@ -23,6 +23,26 @@ func getComplianceAndSensitivity(DENS, INPUT, CHANGE) = {
     mul.ix x2, x2, 5  //x2 = 25
     mul.ix x2, x2, 4  //x2 = 100
     mul.xx x2, x2, x2 //x2 = 10000, to rescale values after computation
+    mul.ss s3, s0, s3 //clear s3 for obj. function
+    mul.ss s4, s0, s4 //clear s4 for obj. function
+    eend
+    pend
+
+    //Calculate compliance value
+    pstart nelemdof
+    ld.elem x0, DENS
+    ld.dof v0, INPUT
+    estart
+    mul.vv v0, v0, v2 //v0 = v0/100
+    mac.kv v1, v0 //calculate ke*u_local
+    red.vv x1, v0, v1 //calculate clocal=u_local^T*(ke*u_local)
+    mul.xx x3, x0, x0 //x0 = pow(x,2)
+    mul.xx x3, x0, x3 //x0 = pow(x,3)
+    add.sx x3, s2, x3 //x0 = emin+pow(x,3)
+    mul.sx x3, s1, x3 //x0 = (emin+pow(x,3))*(e0-emin)
+    mul.xx x3, x2, x3 //rescale values with 10000
+    red.xx s3, x1, x3 //s3 = sum(clocal*((emin+pow(x,3))*(e0-emin)))
+    add.ss s4, s4, s3 //s4 += sum(clocal...) values
     eend
     pend
 
