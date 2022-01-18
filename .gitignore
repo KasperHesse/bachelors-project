@@ -20,3 +20,5 @@ src/resources/meminit_synth
 src/test/resources
 memdump
 memdump_C
+uart.txt
+uart_parsed.csv
