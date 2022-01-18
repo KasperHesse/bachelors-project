@@ -4,7 +4,6 @@ import chisel3._
 import chisel3.util.{RegEnable, log2Ceil}
 import Config.SIMULATION
 import execution.TimingWrapperIO
-import execution.IdTimingIO
 
 /**
  * A module used to keep track of execution time.
