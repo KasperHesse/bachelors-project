@@ -84,7 +84,7 @@ add.ss s1, s1, s2 //s1 = 0.2000001110. Diff from 0.20... is 1.11e-7
 eend
 pend
 
-pstart double //Init v0,v1 in both threads
+pstart double //Init v0,v1 in both threads to 0.2 and 1, respectively
 estart
 mul.sv v0, s0, v0 //Clear v0
 add.iv v1, v0, 1  //Set v1 = 1

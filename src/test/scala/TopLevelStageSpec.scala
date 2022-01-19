@@ -107,7 +107,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
       val reg = instr.rsrd.litValue.toInt*VREG_SLOT_WIDTH + i
       for(j <- exp.indices) {
         val rdData = memid.wrData(j).peek()
-        assertEquals(rdData, exp(j), instr=instr, extra=s"loadIntoVreg. i=$i, j=$j")
+        assertEquals(rdData, exp(j), instr=instr, rd = reg.U, extra=s"loadIntoVreg. i=$i, j=$j")
         sc.vReg(sc.memThread)(reg)(j) = rdData
       }
       memid.rd.rf.expect(RegisterFileType.VREG)
@@ -532,7 +532,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
               memInitFileLocation: String = "src/resources/meminit_sim"): Unit = {
 
     val source = Source.fromFile(f"src/resources/programs/$filename.txt")
-    Assembler.writeMemInitFile(f"src/resources/programs/$filename.hex.txt", Assembler.assemble(source))
+    Assembler.writeMemInitFile(f"src/resources/programs/$filename.hex.txt", Assembler.assemble(source), 8)
     source.close()
 
     REGINIT_FILE_LOCATION = memInitFileLocation
@@ -598,52 +598,30 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
     }
   }
-//
-//  it should "execute a simple program" in {
-//    testFun("simple", dumpMemory = true)
-//  }
-//
-//  it should "perform applyStateOperator" in {
-//    testFun("applystateoperator", timeout=20000)
-//  }
-//
-//  it should "perform applyDensityFilter" in {
-//    testFun("applydensityfilter", timeout=30000)
-//  }
-//
-//  it should "perform getComplianceAndSensitivity" in {
-//    testFun("getComplianceAndSensitivity", 20000)
-//  }
-//
-//  it should "perform generateMatrixDiagonal" in {
-//    testFun("generateMatrixDiagonal")
-//  }
-//
-//  it should "perform macvv" in {
-//    testFun("macvv", timeout=0)
-//  }
-
-  // ======= PROGRAM FLOW =======
 
   it should "run up to the first ADFG" in {
     testFun("adfg", dumpMemory = true, timeout=0, annos=Seq(VerilatorBackendAnnotation))
   }
 
+  //6x6x6: adfg/bef6db
+  //10x10x10: adfg/b3e8e4
   it should "run into solveStateCG and first ASO" in { //adfg/bef6db
-    testFun("adfg_aso", dumpMemory = true, timeout = 0, memInitName = "adfg/bef6db", annos=Seq(VerilatorBackendAnnotation))
+    testFun("adfg_aso", dumpMemory = true, timeout = 0, memInitName = "adfg/b3e8e4", annos=Seq(VerilatorBackendAnnotation))
   }
 
-  //should use adfg_aso/99d6df
+  //6x6x6: adfg_aso/99d6df
+  //10x10x10: adfg_aso/231b55
   it should "generate matrix diagonal and setup before cg loop" in {
-    testFun("aso_gmd", dumpMemory = true, timeout = 0, memInitName = "adfg_aso/99d6df", annos=Seq(VerilatorBackendAnnotation))
+    testFun("aso_gmd", dumpMemory = true, timeout = 0, memInitName = "adfg_aso/231b55", annos=Seq(VerilatorBackendAnnotation))
   }
 
-  //aso_gmd/03f410 has errors in invD of average size 0.0014 (132x)
-  //aso_gmd/fromcc has invD equal to all 1's and R-values from C code (should be no differences whatsoever)
+  //6x6x6: aso_gmd/03f410. Has errors in invD of average size 0.0014 (132x)
+  //10x10x10: aso_gmd/43f72a. Has errors in invD of average size 0.0005 (L.inf.norm=0.00256)
   it should "perform an iteration of the CG loop" in {
-    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memInitName = "aso_gmd/03f410", annos=Seq(VerilatorBackendAnnotation))
+    testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memInitName = "aso_gmd/43f72a", annos=Seq(VerilatorBackendAnnotation))
   }
 
+  //10x10x10: gmd_cgiter/076ada (1 iteration)
   it should "more iterations of CG loop" in {
     testFun("gmd_cgiter", dumpMemory = true, timeout = 0, memInitName = "gmd_cgiter/2fe4ea", annos=Seq(VerilatorBackendAnnotation))
   }

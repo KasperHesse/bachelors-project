@@ -8,36 +8,39 @@ import scala.io.Source
  */
 object MemoryCompare extends App {
 
-  val testName = "simulator"
-  val hash = "1"
+  val testName = "gmd_cgiter"
+  val hash = "076ada"
   def apply(): Unit = {
-//    val DV = compare("DV")
+    val DV = compare("DV")
 //    val DC = compare("DC")
-//    val INVD = compare("INVD")
-//    val R = compare("R")
-//    val Z = compare("Z")
-//    val P = compare("P")
-//    val Q = compare("Q")
-//    val U = compare("U")
-//    val X = compare("X")
+    val INVD = compare("INVD")
+    val R = compare("R")
+    val F = compare("F")
+    val Z = compare("Z")
+    val P = compare("P")
+    val Q = compare("Q")
+    val U = compare("U")
+    val X = compare("X")
     val XPHYS = compare("XPHYS")
 //    val XNEW = compare("XNEW")
 
     def print(x: (Int, Double, Int, Double, Double), name: String): Unit = {
-      println(f"$name%-6s| ${x._2}%14.8f | ${x._4}%9.5f | ${x._5}%10.5f | ${x._1}%4d | ${x._3}%4d")
+      //         NAME      AVG DELTA       L2 NORM        L.INF.NORM      CNT          SIGNERRORS
+      println(f"$name%-6s| ${x._2}%14.8f | ${x._4}%7.5f | ${x._5}%10.5f | ${x._1}%4d | ${x._3}%4d")
     }
 
-    println("NAME  | Avg. Delta     | L2 Norm   | L.inf.norm | cnt | Signerrors")
-    println("------+----------------+-----------+------------+-----+-----------")
-//    print(DV, "DV")
+    println("NAME  | Avg. Delta     | L2 Norm | L.inf.norm |  cnt | Signerrors")
+    println("------+----------------+---------+------------+------+-----------")
+    print(DV, "DV")
 //    print(DC, "DC")
-//    print(INVD, "INVD")
-//    print(R, "R")
-//    print(Z, "Z")
-//    print(P, "P")
-//    print(Q, "Q")
-//    print(U, "U")
-//    print(X, "X")
+    print(INVD, "INVD")
+    print(R, "R")
+    print(F, "F")
+    print(Z, "Z")
+    print(P, "P")
+    print(Q, "Q")
+    print(U, "U")
+    print(X, "X")
     print(XPHYS, "XPHYS")
 //    print(XNEW, "XNEW")
 
@@ -72,8 +75,9 @@ object MemoryCompare extends App {
     val twonormc = l2norm(C)
     val twonormdiff = l2norm(C.zip(SCALA).map(x => x._1-x._2))
     val l2 = twonormdiff/twonormc
+    val linf = lInfNorm(C.zip(SCALA).map(x => x._1 - x._2))
 
-    //Calculate absolute differences
+
     for(i <- C.indices) {
       val scala = SCALA(i)
       val c = C(i)
@@ -101,17 +105,7 @@ object MemoryCompare extends App {
 
     file1.close()
     file2.close()
-    val linf = {
-      var m = Math.abs(SCALA(0)-C(0))
-      for(i <- C.indices) {
-        if(Math.abs(SCALA(i)-C(i)) > m) {
-          println(f"[$i] c=${C(i)}%.5f, scala=${SCALA(i)}%.5f, diff=${Math.abs(SCALA(i)-C(i))}%.5f")
-          m = Math.abs(SCALA(i)-C(i))
-        }
-      }
-      m
-    }
-    (errCnt, errAvg, signCnt, l2, lInfNorm(C.zip(SCALA).map(x => x._1 - x._2)))
+    (errCnt, errAvg, signCnt, l2, linf)
   }
 
   /**

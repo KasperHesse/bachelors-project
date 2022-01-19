@@ -6,7 +6,7 @@
 //OUTPUT: The output vector: Either R,
 func applyStateOperator(DENS, INPUT, OUTPUT) = {
 
-    pstart double //Setu up e0, emin constants. Being setup twice, but that's OK
+    pstart double //Setup e0, emin constants. Being setup twice, but that's OK
     estart
     add.is s1, s0, 0.0078125
     mul.ss s1, s1, s1 //s1 = 6.1e-5
@@ -54,13 +54,7 @@ pend
 
 //Main loop start
 TOP3DCG:
-pstart single
-estart
-add.is s15, s15, 1 //loop++
-eend
-pend
 
-//Solve state conjugate gradient
 
 //Set up and clear a lot of vectors
 pstart double

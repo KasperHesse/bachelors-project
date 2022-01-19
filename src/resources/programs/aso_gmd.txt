@@ -26,7 +26,7 @@ func generateMatrixDiagonal() = {
     add.ss s3, s3, s5 //s3 = ke[diag] = 0.23504257, diff from actual value is 4.28e-7
 
     mul.sv v0, s0, v0 //Clear v0
-    add.iv v1, v0, 1 //Fixed dof values for diag
+    add.iv v1, v0, 1 //Fixed dof values for diag = 1
     add.sv v2, s3, v0 //ke diagonal value
     eend
     pend
@@ -103,7 +103,6 @@ st.vec v0, R
 pend
 
 generateMatrixDiagonal()
-
 
 pstart ndof //Calculate sum(F[i]*F[i])
 ld.vec v0, F
