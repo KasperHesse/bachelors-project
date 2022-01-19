@@ -79,7 +79,8 @@ object Config {
   var NUM_MEMORY_BANKS = 8
   /** Width of memory addresses */
   var MEM_ADDR_WIDTH = 32 //TODO set this based on x*NELEMSIZE + Y*NDOFSIZE and log2Ceil
-  /** The number of different memory locations addressible from Stype instructions */
+  /** The number of different memory locations addressible from Stype instructions
+   *  Is one less than the actual amount, since the UART base address is not used in the memory stage */
   val NUM_MEMORY_LOCS = 13
   /** Number of data words stored in each memory bank */
   val WORDS_PER_BANK: Int = (8*NDOFSIZE+5*NELEMSIZE)/8

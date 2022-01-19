@@ -56,7 +56,7 @@ class IndexGenerator(val pipe: Boolean = true) extends Module {
   val nz = in.ijk.map(ijk => (ijk.k >> 1).asUInt())
 
   /** Vector holding calculated indices */
-  val indices = VecInit(Seq.fill(NUM_MEMORY_BANKS)(0.U(log2Ceil(NDOF+1).W)))
+  val indices = VecInit(Seq.fill(NUM_MEMORY_BANKS)(0.U(log2Ceil(NDOFLENGTH+1).W)))
   /** Vector holding valid flags for each calculated index */
   val validIndices = VecInit(Seq.fill(NUM_MEMORY_BANKS)(false.B))
 

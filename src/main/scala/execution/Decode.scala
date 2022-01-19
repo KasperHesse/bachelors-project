@@ -57,9 +57,9 @@ class Decode extends Module {
   /** Number of instructions in iBuffer */
   val iCount = RegInit(0.U(log2Ceil(INSTRUCTION_BUFFER_SIZE+1).W))
   /** Progress when accessing vectors / the number of elements that have been loaded so far. */
-  val progress = RegInit(0.U(log2Ceil(NDOF+ELEMS_PER_VSLOT+1).W))
+  val progress = RegInit(0.U(log2Ceil(NDOFLENGTH+1).W))
   /** Total number of operations to issue before instructions are finished / total number of elements to load */
-  val maxProgress = RegInit(0.U(log2Ceil(NDOF+ELEMS_PER_VSLOT+1).W))
+  val maxProgress = RegInit(0.U(log2Ceil(NDOFLENGTH+1).W))
   /** The value by which progress counter should increment on every thread swap */
   val progressIncr = RegInit(0.U(log2Ceil(ELEMS_PER_VSLOT+1).W))
   /** ID of thread which is currently accessing the execute stage */

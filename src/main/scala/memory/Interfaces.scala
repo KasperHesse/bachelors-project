@@ -43,7 +43,7 @@ class AddressGenProducerIO extends Bundle {
   /** The encoded base address of the vector to operate on */
   val baseAddr = Output(StypeBaseAddress())
   /** The indices into this vector that should be read/written */
-  val indices = Output(Vec(NUM_MEMORY_BANKS, UInt(log2Ceil(NDOF+1).W)))
+  val indices = Output(Vec(NUM_MEMORY_BANKS, UInt(log2Ceil(NDOFLENGTH+1).W)))
   /** Valid bits indicating which of the given indices should actually be read/written */
   val validIndices = Output(Vec(NUM_MEMORY_BANKS, Bool()))
 }

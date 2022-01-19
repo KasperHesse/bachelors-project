@@ -89,7 +89,7 @@ class Thread(id: Int) extends Module {
   /** Number of multiply-accumulate cycles to perform before a result is generated in MAC and RED instructions */
   val macLimit = WireDefault(0.U(log2Ceil(NDOFLENGTH/NUM_PROCELEM+1).W))
   /** Maximum memory index that should be accessed when performing ld.vec and st.vec */
-  val maxIndex = RegInit(0.U(log2Ceil(NDOFSIZE+1).W))
+  val maxIndex = RegInit(0.U(log2Ceil(NDOFLENGTH+1).W))
   /** O-type length of currently executing instruction packet */
   val instrLen = RegInit(OtypeLen.SINGLE)
   /** Iteration value associated with all V-register files. Used when processing mac.kv instructions */

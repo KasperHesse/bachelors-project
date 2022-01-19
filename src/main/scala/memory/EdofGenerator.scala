@@ -52,15 +52,15 @@ class EdofGenerator extends Module {
   /** Flag indicating whether the generator is currently processing or not. Also used as output valid bit */
   val processing = RegInit(false.B)
   /** Vector holding index output values */
-  val nIndex = Wire(Vec(8, UInt(log2Ceil(NDOF+1).W)))
+  val nIndex = Wire(Vec(8, UInt(log2Ceil(NDOFLENGTH+1).W)))
   /** Asserted when this module is ready to receive new data */
   val readyInternal = WireDefault(false.B)
   /** Pipeline register holding input values */
   val in = RegEnable(io.in.bits, io.in.valid && readyInternal)
   /** Vector holding the indices being output to address generator */
-  val indices = Wire(Vec(NUM_MEMORY_BANKS, UInt(log2Ceil(NDOF+1).W)))
+  val indices = Wire(Vec(NUM_MEMORY_BANKS, UInt(log2Ceil(NDOFLENGTH+1).W)))
   /** Output registers holding the values to addr. generator */
-  val indicesReg = RegInit(VecInit(Seq.fill(NUM_MEMORY_BANKS)(0.U(log2Ceil(NDOF+1).W))))
+  val indicesReg = RegInit(VecInit(Seq.fill(NUM_MEMORY_BANKS)(0.U(log2Ceil(NDOFLENGTH+1).W))))
   /** vector holding the valid flags for output indices */
   val validIndices = Wire(Vec(NUM_MEMORY_BANKS, Bool()))
 
