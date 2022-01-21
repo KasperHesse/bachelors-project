@@ -56,7 +56,7 @@ object MemoryCompare extends App {
   def compare(name: String, delta: Double = 0.0001): (Int, Double, Int, Double, Double) = {
 
     val file1 = Source.fromFile(f"memdump/$testName/$hash/mem_$name.csv")
-    val file2 = Source.fromFile(f"memdump_C/memdump_$name.csv")
+    val file2 = Source.fromFile(f"memdump_C/memdump_${name}.csv")
 
     val lines1 = file1.getLines().toArray
     val lines2 = file2.getLines().toArray

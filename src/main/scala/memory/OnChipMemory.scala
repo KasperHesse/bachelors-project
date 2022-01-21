@@ -4,6 +4,7 @@ import chisel3._
 import chisel3.util.experimental.loadMemoryFromFile
 import chisel3.util.experimental.loadMemoryFromFileInline
 import chisel3.util._
+import firrtl.annotations.MemoryLoadFileType
 import utils.Assembler
 import utils.Fixed._
 import utils.Config._
@@ -90,9 +91,9 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
         s"$memInitFileLocation/membank_$i.txt"
       }
       if(INLINE) {
-        loadMemoryFromFileInline(membank(i), file)
+        loadMemoryFromFileInline(membank(i), file, MemoryLoadFileType.Binary)
       } else {
-        loadMemoryFromFile(membank(i), file)
+        loadMemoryFromFile(membank(i), file, MemoryLoadFileType.Binary)
       }
     }
   }

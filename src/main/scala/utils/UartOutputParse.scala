@@ -1,6 +1,6 @@
 package utils
 
-import utils.Config.{ELEMS_PER_VSLOT, NELEMLENGTH, NELX, NELY, NELZ, NUM_MEMORY_BANKS}
+import utils.Config._
 import utils.Fixed._
 
 import java.io.{BufferedWriter, FileWriter}
@@ -10,6 +10,99 @@ import scala.io._
  * Helper object for parsing UART data read with Waveforms
  */
 object UartOutputParse extends App {
+
+  val name = "20jan_15h58m_8x10x12"
+
+  def writeDensityVTKfile(V: Seq[Double]): Unit = {
+    val vtu = new BufferedWriter(new FileWriter(s"uart_dumps/${name}.vtu"))
+
+    vtu.write(
+      s"""<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">
+        |<UnstructuredGrid>
+        |<Piece NumberOfPoints="${NY*NX*NZ}" NumberOfCells="$NELEM">
+        |
+        |<Points>
+        |<DataArray type="Float32" NumberOfComponents="3" format="ascii">""".stripMargin)
+    for(i <- 0 until NX) {
+      for(k <- 0 until NZ) {
+        for(j <- 0 until NY) {
+          val ii = i.toDouble
+          val jj = j.toDouble
+          val kk = k.toDouble
+          vtu.write(f"$ii%e $jj%e $kk%e\n")
+        }
+      }
+    }
+    vtu.write(
+      """
+        |</DataArray>
+        |</Points>
+        |
+        |<Cells>
+        |<DataArray type="Int32" Name="connectivity" format="ascii">
+        |""".stripMargin)
+    for(i <- 0 until NELX) {
+      for(k <- 0 until NELZ) {
+        for(j <- 0 until NELY) {
+          val nx_1 = i
+          val nx_2 = i + 1
+          val nz_1 = k
+          val nz_2 = k + 1
+          val ny_1 = j
+          val ny_2 = j + 1
+
+          val a = nx_1 * NY * NZ + nz_1 * NY + ny_2
+          val b = nx_2 * NY * NZ + nz_1 * NY + ny_2
+          val c = nx_2 * NY * NZ + nz_1 * NY + ny_1
+          val d = nx_1 * NY * NZ + nz_1 * NY + ny_1
+          val e = nx_1 * NY * NZ + nz_2 * NY + ny_2
+          val f = nx_2 * NY * NZ + nz_2 * NY + ny_2
+          val g = nx_2 * NY * NZ + nz_2 * NY + ny_1
+          val h = nx_1 * NY * NZ + nz_2 * NY + ny_1
+          vtu.write(s"$a $b $c $d $e $f $g $h\n")
+        }
+      }
+    }
+    vtu.write(
+      """
+        |</DataArray>
+        |<DataArray type="Int32" Name="offsets" format="ascii">
+        |""".stripMargin)
+    for(i <- 1 until NELEM+1) {
+      vtu.write(s"${i*8}\n")
+    }
+    vtu.write(
+      """
+        |</DataArray>
+        |<DataArray type="UInt8" Name="types" format="ascii">
+        |""".stripMargin)
+    for(i <- 0 until NELEM) {
+      vtu.write("12\n")
+    }
+    vtu.write(
+      """
+        |</DataArray>
+        |</Cells>
+        |<CellData>
+        |<DataArray type="Float32" NumberOfComponents="1" Name="density" format="ascii">
+        |""".stripMargin)
+    for(i <- 0 until NELX) {
+      for(k <- 0 until NELZ) {
+        for(j <- 0 until NELY) {
+
+          vtu.write(f"${V(elementIndex(Array(i,j,k)))}%e\n")
+        }
+      }
+    }
+    vtu.write(
+      """
+        |</DataArray>
+        |</CellData>
+        |</Piece>
+        |</UnstructuredGrid>
+        |</VTKFile>""".stripMargin)
+    vtu.close()
+  }
 
   def iterationFromIJK(ijk: Array[Int]): Int = {
     require(ijk.length == 3, "ijk must have exactly 3 elements to calculate the iteration value")
@@ -39,7 +132,7 @@ object UartOutputParse extends App {
   }
 
 
-  val name = "18jan_16h55m_6x6x6"
+
   val file = Source.fromFile(s"uart_dumps/$name.txt")
 
   //Get all text, concatenate it into one long line
@@ -60,7 +153,7 @@ object UartOutputParse extends App {
   //change
   //loop
   //We know that at the end we will get NELEMLENGTH xphys values
-  //We slice out the first values, group in sections of 6, write to another vcd file
+  //We slice out the first values, group in sections of 6, write to another csv file
   val (stats, xphys) = values.splitAt(values.length-NELEMLENGTH)
 
   val statFile = new BufferedWriter(new FileWriter(s"uart_dumps/${name}_stats.csv"))
@@ -81,5 +174,7 @@ object UartOutputParse extends App {
     }
   }
   xphysFile.close()
+
+  writeDensityVTKfile(xphys)
 
 }

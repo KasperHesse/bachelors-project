@@ -2,7 +2,7 @@ package utils
 
 import memory.AddressDecode.mapping
 import execution.StypeBaseAddress._
-import utils.Assembler.writeMemInitFile
+import utils.Assembler.{writeMemInitFile, writeMemInitFileBinary}
 import utils.Config._
 import utils.Fixed._
 
@@ -60,7 +60,7 @@ object SynthesisMemInit {
     for(i <- 0 until NUM_MEMORY_BANKS) {
       val memFile = s"$memInitFileLocation/membank_$i.txt"
       val contents = mem(i).map(double2fixed).map(c => c & ((1L << FIXED_WIDTH)-1)) //Mask to preserve only FIXED_WIDTH lower bits
-      writeMemInitFile(memFile, contents, 16) //Using 14 as length since FIXED_WIDTH=54 => 54/4=13.5 => 14 hex digits
+      writeMemInitFileBinary(memFile, contents) //Using binary files since Quartus throws errors at hex-files not of size 54
     }
     wordsPerBank
   }

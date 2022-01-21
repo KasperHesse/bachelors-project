@@ -1,4 +1,5 @@
 //Function definitions
+//A program for running TO on a 10x10x10 grid
 
 // VEC: The NELEM long vector that ADFG should be applied to. Should be either DV or DC
 func applyDensityFilterGradient(VEC) = {
@@ -123,7 +124,7 @@ func applyDensityFilter(IN, OUT) = {
 }
 
 
-//DENS: The vector containing densities. Always XPHYS
+//DENS: The vector containing densities. Either X or XPHYS
 //INPUT: The input vector being used: Either U, P
 //OUTPUT: The output vector: Either R, Q
 func applyStateOperator(DENS, INPUT, OUTPUT) = {
@@ -690,6 +691,25 @@ pend
 //Call to applyDensityFilterGradient, now on DC
 applyDensityFilterGradient(DC)
 
+//Calculate g and vol, set up values for lagrange loop
+//Get a very close approximation to 0.2 to use as volfrac
+pstart single
+estart
+add.is s1, s0, 0.203125 //Closest imm value to 0.2
+add.is s2, s0, 0.0546875 //Helper value to make 0.203125 more precise
+mul.ss s3, s2, s2 //s2 = 0.0029
+sub.ss s1, s1, s3 //s1 = 0.200134
+add.is s2, s0, 0.109375 //Helper value
+mul.ss s2, s2, s2 //s2 = 0.011962890625
+mul.ss s2, s2, s2 //s2 = 1.431e-4
+sub.ss s1, s1, s2 //s2 = 0.19999116, diff. from 0.20... is 8.83e-6
+add.is s2, s0, 0.0546875 //helper value
+mul.ss s2, s2, s2 //0.0029907
+mul.ss s2, s2, s2 //8.944e-6
+add.ss s4, s1, s2 //s4 = 0.2000001110. Diff from 0.20... is 1.11e-7
+eend
+pend
+
 //Sum values in xphys for g,vol computations
 pstart nelemvec
 ld.vec v0, XPHYS
@@ -698,19 +718,17 @@ mac.iv s1, v0, 1 //s1 = sum(xphys)
 eend
 pend
 
-
-//Calculate g and vol, set up values for lagrange loop
 //NOTE: If grid size is changed from 6x6x6, so too must this code be changed,
 //as the value of "nelem" is coded in here.
 //Likewise for the value of volfrac
 pstart single
 estart
-add.is s3, s0, 6  //s3 = 6
-mul.is s3, s3, 6  //s3 = 36
-mul.is s3, s3, 6  //s3 = 216 = nelem
+add.is s3, s0, 4  //s3 = 6
+mul.is s3, s0, 2  //s3 = 8
+mul.ss s3, s3, s3 //s3 = 64
+mul.ss s3, s3, s3 //s3 = 4096 = nelem
 div.ss s2, s1, s3 //s2 = sum(xphys)/nelem = vol
-add.is s13, s2, -0.2 //s13 = sum(xphys)/nelem - volfrac = g
-
+sub.ss s13, s2, s4 //s13 = sum(xphys)/nelem - volfrac = g
 //Set up constants
 //l1, l2
 add.ss s11, s0, s0   //s11 = l1 = 0
@@ -718,9 +736,9 @@ add.is s12, s0, 7.9  //s12 = 7.9
 mul.is s12, s12, 7.9 //s12 = 62.4
 mul.ss s12, s12, s12 //s12 = 3895
 mul.is s12, s12, 7.9 //s12 = 30770 = l2
-//NOTE: s12 cannot be much higher, since it can be at most 2^15=32768
+//NOTE: s12/l2 cannot be much higher, since it can be at most 2^15=32768
 //move and tolerance
-add.is s10, s0, 0.2  //s10 = move = 0.2
+add.ss s10, s0, s4  //s10 = move = 0.2 (reusing value of volfrac since they're the same)
 add.is s9, s0, 0.03162277 //s9 = 0.031..
 mul.ss s9, s9, s9 //s9 = 0.001
 mul.ss s9, s9, s9 //s9 =~ 1-e6 = tolerance

@@ -65,9 +65,30 @@ object Assembler {
     if(!dir.exists) {
       dir.mkdirs()
     }
+    val zeros = "0" * len
     val writer = new BufferedWriter(new FileWriter(memfile))
     for(instr <- data) {
-      writer.write(("0000000000000000" + instr.toHexString).takeRight(len) + "\n")
+      writer.write((zeros + instr.toHexString).takeRight(len) + "\n")
+    }
+    writer.close()
+    println(s"\tWrote ${data.length} lines to $memfile")
+  }
+
+  /**
+   * Initializes a memory file, generating a binary output file.
+   * @param memfile Relative path to the memory file to initialize. Existing contents are overwritten, a new file is created if none exists
+   * @param data The data to write into that file
+   * @param len The number of figures to print out for each line (if eg value=5 and len=4, it will print 0101)
+   */
+  def writeMemInitFileBinary(memfile: String, data: Array[Long], len: Int = 54): Unit = {
+    val dir = new File(new File(memfile).getParent)
+    if(!dir.exists) {
+      dir.mkdirs()
+    }
+    val zeros = "0" * len
+    val writer = new BufferedWriter(new FileWriter(memfile))
+    for(d <- data) {
+      writer.write((zeros + d.toBinaryString).takeRight(len) + "\n")
     }
     writer.close()
     println(s"\tWrote ${data.length} lines to $memfile")
