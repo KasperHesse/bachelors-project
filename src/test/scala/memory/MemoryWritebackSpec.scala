@@ -3,18 +3,17 @@ package memory
 import chisel3._
 import chisel3.experimental.BundleLiterals._
 import chisel3.util._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Config._
 import utils.Fixed._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import execution.{RegisterBundle, RegisterFileType, StypeBaseAddress, StypeMod}
 import execution.StypeMod._
 import execution.seed
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 
-class MemoryWritebackSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class MemoryWritebackSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Memory writeback stage"
 
   /**

@@ -2,15 +2,14 @@ package memory
 
 import chisel3._
 import chisel3.util._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Config._
 import utils.Fixed._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import execution.StypeBaseAddress
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class OnChipMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class OnChipMemorySpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "On-chip memory"
 
   //We'll attempt to read some values at subsequent locations 0-7, 8-15 etc. Each bank holds 8 words in this test

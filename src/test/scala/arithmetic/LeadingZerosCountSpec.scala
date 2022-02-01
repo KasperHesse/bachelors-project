@@ -3,9 +3,10 @@ package arithmetic
 import chisel3._
 import chisel3.util._
 import chiseltest._
-import org.scalatest.{Matchers, FlatSpec}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class LeadingZerosCountSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class LeadingZerosCountSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "LeadingZerosCounter"
 
   def LZC32(dut: LeadingZerosCounter32Bit, iters: Int): Unit = {
@@ -13,7 +14,7 @@ class LeadingZerosCountSpec extends FlatSpec with ChiselScalatestTester with Mat
     for(i <- 0 until iters) {
       var x = r.nextLong() >>> 32 //Squeeze down to int-size
       var cnt = 0
-      dut.io.in.poke(x.asUInt())
+      dut.io.in.poke(x.asUInt)
       dut.clock.step()
 
       //Calculate answer
@@ -31,7 +32,7 @@ class LeadingZerosCountSpec extends FlatSpec with ChiselScalatestTester with Mat
     for(i <- 0 until iters) {
       var x = r.nextLong() >>> 1 //Squeeze
       var cnt = 0
-      dut.io.in.poke(x.asUInt())
+      dut.io.in.poke(x.asUInt)
       dut.clock.step()
 
       //Calculate answer

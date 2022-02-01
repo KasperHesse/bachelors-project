@@ -2,15 +2,15 @@ package arithmetic
 
 import chisel3._
 import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+
 import execution.Opcode
 import utils.Fixed._
 import execution.Opcode._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.{WriteVcdAnnotation, VerilatorBackendAnnotation}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 
-class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class FixedPointSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Fixed Point Circuitry"
 
   def testAddition(dut: FixedPointALU, iters: Int): Unit = {
@@ -28,7 +28,7 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       val res = fixedAdd(a,b)
 
       //Ugly hack that's necessary due to bit-level errors once FIXED_WIDTH goes above 54
-      assert(math.abs(dut.io.out.res.peek.litValue().toLong - res) < (1 << FIXED_WIDTH-53))
+      assert(math.abs(dut.io.out.res.peek().litValue.toLong - res) < (1 << FIXED_WIDTH-53))
     }
   }
 
@@ -46,7 +46,7 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.clock.step()
       val res = fixedSub(a,b)
       //Ugly hack that's necessary due to bit-level errors once FIXED_WIDTH goes above 54
-      assert(math.abs(dut.io.out.res.peek.litValue().toLong - res) < (1 << FIXED_WIDTH-53))
+      assert(math.abs(dut.io.out.res.peek().litValue.toLong - res) < (1 << FIXED_WIDTH-53))
     }
   }
 
@@ -185,7 +185,7 @@ class FixedPointSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.io.in.valid.poke(true.B)
       dut.clock.step()
 
-      while(!dut.io.out.valid.peek.litToBoolean) {
+      while(!dut.io.out.valid.peek().litToBoolean) {
         dut.clock.step()
       }
       dut.io.out.res.expect(0.S)

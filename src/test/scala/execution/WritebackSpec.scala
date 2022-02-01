@@ -2,21 +2,21 @@ package execution
 
 import chisel3._
 import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+
 import utils.Fixed._
 import chisel3.experimental.BundleLiterals._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import utils.Config._
 import RegisterFileType._
 import Opcode._
 import utils.Config
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class WritebackSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class WritebackSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Writeback stage"
 
   def genDestination(rf: RegisterFileType.Type, rd: Int, subvec: Int): RegisterBundle = {
-    (new RegisterBundle).Lit(_.rf -> rf, _.reg -> rd.U, _.subvec -> subvec.U, _.rfUint -> rf.litValue().U)
+    (new RegisterBundle).Lit(_.rf -> rf, _.reg -> rd.U, _.subvec -> subvec.U, _.rfUint -> rf.litValue.U)
   }
 
   def testVreg(dut: Writeback): Unit = {
@@ -70,7 +70,7 @@ class WritebackSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       }
       dut.clock.step()
     }
-    while(!dut.io.id.we.peek.litToBoolean) {
+    while(!dut.io.id.we.peek().litToBoolean) {
       dut.clock.step()
     }
     for(i <- results.indices) {

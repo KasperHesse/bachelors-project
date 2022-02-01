@@ -1,17 +1,16 @@
 package memory
 import chisel3._
 import chisel3.util._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Config._
 import utils.Fixed._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import execution.StypeMod._
 import execution.{StypeMod, seed}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 
-class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class EdofGeneratorSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "EDOF generator"
 
   /**
@@ -98,7 +97,7 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
       val ijk = Array(0,0,0,0)
       val instr = genIJKinput(IJK=Some(ijk), pad=false, mod=FDOF)
       dut.io.in.enqueue(instr)
-      while(!dut.io.addrGen.valid.peek.litToBoolean) {
+      while(!dut.io.addrGen.valid.peek().litToBoolean) {
         dut.clock.step()
       }
       //Expect lower 4 dof's to be valid, upper 4 should not be valid
@@ -124,7 +123,7 @@ class EdofGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matcher
       }
       val instr = genIJKinput(IJK=Some(ijk), pad=false, mod=FDOF)
       dut.io.in.enqueue(instr)
-      while(!dut.io.addrGen.valid.peek.litToBoolean) {
+      while(!dut.io.addrGen.valid.peek().litToBoolean) {
         dut.clock.step()
       }
       for(i <- 0 until 3) {

@@ -3,19 +3,19 @@ package stages
 import chisel3._
 import chisel3.util.log2Ceil
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import execution.RegisterFileType._
 import execution.StypeBaseAddress._
 import execution.StypeLoadStore._
 import execution.StypeMod._
 import execution._
 import memory._
-import org.scalatest.{FlatSpec, Matchers}
+
 import utils.Config._
 import utils.Fixed._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class DecodeMemorySpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Decode and memory stages"
 
   val wordsPerBank = 1024
@@ -69,7 +69,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
         rdData(i) = mem(bank)(index)
       }
     }
-    rdData
+    rdData.toIndexedSeq
   }
 
   /**
@@ -84,7 +84,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
    */
   def performExpectLoad(expected: Seq[Seq[Long]], rd: Int, wb: WbIdIO, clock: Clock): Unit = {
     for(i <- expected.indices) {
-      while(!wb.we.peek.litToBoolean) { //Step up to next result
+      while(!wb.we.peek().litToBoolean) { //Step up to next result
         clock.step()
       }
       val exp = expected(i)
@@ -119,7 +119,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       val instrs = wrapLoadStoreInstructions(Array(instr))
 
       loadInstructions(dut.io.in, dut.clock, instrs)
-      while(!dut.io.memWb.we.peek.litToBoolean) {
+      while(!dut.io.memWb.we.peek().litToBoolean) {
         dut.clock.step()
       }
       dut.io.memWb.wrData(0).expect(expData(0).S)
@@ -165,7 +165,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       //Simply step through this instruction, we won't bother observing the transaction
       loadInstructions(dut.io.in, dut.clock, p1)
       dut.clock.step()
-      while(dut.io.idStateUint.peek.litValue != DecodeState.sIdle.litValue()) {
+      while(dut.io.idStateUint.peek().litValue != DecodeState.sIdle.litValue) {
         dut.clock.step()
       }
 
@@ -221,7 +221,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       //Simply step through this instruction, we won't bother observing the transaction
       loadInstructions(dut.io.in, dut.clock, p1)
       dut.clock.step()
-      while(dut.io.idStateUint.peek.litValue != DecodeState.sIdle.litValue()) {
+      while(dut.io.idStateUint.peek().litValue != DecodeState.sIdle.litValue) {
         dut.clock.step()
       }
 
@@ -268,7 +268,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       val instrs = wrapLoadStoreInstructions(Array(instr))
 
       loadInstructions(dut.io.in, dut.clock, instrs)
-      while(!dut.io.memWb.we.peek.litToBoolean) {
+      while(!dut.io.memWb.we.peek().litToBoolean) {
         dut.clock.step()
       }
       for(i <- expData.indices) {
@@ -302,7 +302,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       val packet = wrapLoadStoreInstructions(Array(dof, elem))
 
       val ijk = genIJKmultiple(start=Some(Array(0,0,0,0)))
-      val edof = ijk.map(e => getEdof(e(0), e(1), e(2)))
+      val edof = ijk.map(e => getEdof(e(0), e(1), e(2)).toIndexedSeq)
       val expDof = edof.map(e => determineExpectedLoadData(e, baseAddr))
       val expElem = determineExpectedLoadData(ijk.map(elementIndex), baseAddr)
 
@@ -335,7 +335,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
     test(new DecodeMemory(wordsPerBank, memInitFileLocation)).withAnnotations(annos) { dut =>
       dut.clock.setTimeout(150)
       val ijk = genIJKmultiple(start = Some(Array(0, 0, 0, 0)))
-      val edof = ijk.map(i => getEdof(i(0), i(1), i(2)))
+      val edof = ijk.map(i => getEdof(i(0), i(1), i(2)).toIndexedSeq)
       val ldInstr = Array(StypeInstruction(rsrd = 0, mod = DOF, baseAddr = F, ls = LOAD), StypeInstruction(rsrd = 1, mod = DOF, baseAddr = U, ls = LOAD))
       val stInstr = Array(StypeInstruction(rsrd = 0, mod = DOF, baseAddr = U, ls = STORE), StypeInstruction(rsrd = 1, mod = DOF, baseAddr = F, ls = STORE))
 
@@ -349,7 +349,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       //Simply step through this instruction, we won't bother observing the transaction
       loadInstructions(dut.io.in, dut.clock, p1)
       dut.clock.step()
-      while (dut.io.idStateUint.peek.litValue != DecodeState.sIdle.litValue()) {
+      while (dut.io.idStateUint.peek().litValue != DecodeState.sIdle.litValue) {
         dut.clock.step()
       }
 
@@ -403,7 +403,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
     test(new DecodeMemory(wordsPerBank, memInitFileLocation)).withAnnotations(annos) { dut =>
       dut.clock.setTimeout(250)
       val ijk = genIJKmultiple(start = Some(Array(0, 0, 0, 0)))
-      val edof = ijk.map(i => getEdof(i(0), i(1), i(2)))
+      val edof = ijk.map(i => getEdof(i(0), i(1), i(2)).toIndexedSeq)
       val ldInstr = Array(StypeInstruction(rsrd = 0, mod = DOF, baseAddr = F, ls = LOAD), StypeInstruction(rsrd = 1, mod = DOF, baseAddr = U, ls = LOAD))
       val stInstr = Array(StypeInstruction(rsrd = 0, mod = FDOF, baseAddr = U, ls = STORE), StypeInstruction(rsrd = 1, mod = FDOF, baseAddr = F, ls = STORE))
 
@@ -438,7 +438,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       //Simply step through this instruction, we won't bother observing the transaction
       loadInstructions(dut.io.in, dut.clock, p1)
       dut.clock.step()
-      while (dut.io.idStateUint.peek.litValue != DecodeState.sIdle.litValue()) {
+      while (dut.io.idStateUint.peek().litValue != DecodeState.sIdle.litValue) {
         dut.clock.step()
       }
 
@@ -577,7 +577,7 @@ class DecodeMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers
       //Simply step through this instruction, we won't bother observing the transaction
       loadInstructions(dut.io.in, dut.clock, p1)
       dut.clock.step()
-      while(dut.io.idStateUint.peek.litValue != DecodeState.sIdle.litValue()) {
+      while(dut.io.idStateUint.peek().litValue != DecodeState.sIdle.litValue) {
         dut.clock.step()
       }
 

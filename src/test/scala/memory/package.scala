@@ -82,7 +82,7 @@ package object memory {
    * @param inp A sequence of IJKgeneratorConsumerIO objects which all have their i,j,k-value set
    * @return A sequence of Array[Int], the array at position (x) holding the 24 edof values for the input at position (x)
    */
-  def getEdof(inp: Seq[IJKgeneratorConsumerIO]): Seq[Array[Int]] = {
+  def getEdof(inp: Seq[IJKgeneratorConsumerIO]): Seq[Seq[Int]] = {
     inp.map(a => getEdof(a.ijk.i.litValue.toInt, a.ijk.j.litValue.toInt, a.ijk.k.litValue.toInt))
   }
 

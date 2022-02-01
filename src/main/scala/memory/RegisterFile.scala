@@ -9,7 +9,7 @@ import utils.Config._
 class VectorRegisterFileIO(width: Int, depth: Int, masksize: Int) extends Bundle {
   val in = Input(new VectorRegisterFileInput(width, depth, masksize))
   val out = Output(new VectorRegisterFileOutput)
-  override def cloneType = (new VectorRegisterFileIO(width, depth, masksize)).asInstanceOf[this.type]
+//  override def cloneType = (new VectorRegisterFileIO(width, depth, masksize)).asInstanceOf[this.type]
 
   class VectorRegisterFileInput(width: Int, depth: Int, masksize: Int) extends Bundle {
     /** Write enable bit */
@@ -29,7 +29,7 @@ class VectorRegisterFileIO(width: Int, depth: Int, masksize: Int) extends Bundle
     /** Write data, goes into the register specified by rd. Is available for read on the following clock cycle */
     val wrData = Vec(masksize, SInt(FIXED_WIDTH.W))
 
-    override def cloneType = (new VectorRegisterFileInput(width, depth, masksize)).asInstanceOf[this.type]
+//    override def cloneType = (new VectorRegisterFileInput(width, depth, masksize)).asInstanceOf[this.type]
   }
 
   class VectorRegisterFileOutput extends Bundle {

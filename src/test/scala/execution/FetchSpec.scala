@@ -8,8 +8,10 @@ import utils.Fixed._
 
 import scala.io.Source
 import utils.Config._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class FetchSpec  extends FlatSpec with ChiselScalatestTester with Matchers  {
+class FetchSpec  extends AnyFlatSpec with ChiselScalatestTester with Matchers  {
 
   "Fetch stage" should "load a hex memory file" in {
     val memfile = "src/test/resources/meminit/mem1.txt"

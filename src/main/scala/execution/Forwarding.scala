@@ -31,7 +31,7 @@ class Forwarding extends Module {
   val rs1swap = rs1swaps.reduce((a,b) => a|b)
 
   //Generate a select signal for choosing the corresponding output
-  val rs1sel = OHToUInt(rs1swaps.asUInt())
+  val rs1sel = OHToUInt(rs1swaps.asUInt)
 
 
   //Do it again
@@ -41,7 +41,7 @@ class Forwarding extends Module {
     rs2swaps(i) := (io.ex.rs2.rf === rd.rf && io.ex.rs2.reg === rd.reg && io.ex.rs2.subvec === rd.subvec && io.wb.rdValids(i))
   }
   val rs2swap = rs2swaps.reduce((a,b) => a|b)
-  val rs2sel = OHToUInt(rs2swaps.asUInt())
+  val rs2sel = OHToUInt(rs2swaps.asUInt)
 
 
   //Set output values

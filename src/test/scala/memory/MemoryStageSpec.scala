@@ -4,18 +4,18 @@ import chisel3._
 import chisel3.experimental.BundleLiterals._
 import chisel3.util._
 import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+
 import utils.Config._
 import utils.Fixed._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import execution.{RegisterBundle, RegisterFileType, StypeBaseAddress, StypeLoadStore, StypeMod, seed}
 import execution.StypeMod._
 import execution.StypeBaseAddress._
 import execution.RegisterFileType._
 import utils.DefaultMemInit
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
+class MemoryStageSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers{
   behavior of "Memory stage"
 
   val wordsPerBank = WORDS_PER_BANK
@@ -51,7 +51,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
    */
   def pokeWriteQueue(wq: DecoupledIO[WriteQueueBundle], clock: Clock, wrData: Seq[Long], mod: StypeMod.Type, iter: Int): Unit = {
     require(wrData.length <= 8, "Cannot poke than more 8 pieces of data onto the write queue at the same time")
-    while(!wq.ready.peek.litToBoolean) {
+    while(!wq.ready.peek().litToBoolean) {
       clock.step()
     }
     for(i <- wrData.indices) {
@@ -75,7 +75,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
    */
   def enqueueVec(vec: DecoupledIO[AddressGenProducerIO], clock: Clock, indices: Seq[Long], baseAddr: StypeBaseAddress.Type): Unit = {
     require(indices.length == 8, "Must poke 8 indices onto vector port")
-    while(!vec.ready.peek.litToBoolean) {
+    while(!vec.ready.peek().litToBoolean) {
       clock.step()
     }
     for(i <- indices.indices) {
@@ -144,7 +144,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         rdData(i) = mem(bank)(index)
       }
     }
-    rdData
+    rdData.toIndexedSeq
   }
 
   /**
@@ -188,14 +188,14 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     while (readCnt < readMax  && iter < iterMax) {
       pokeVec(dut, indices.slice(pokeCnt * NUM_MEMORY_BANKS, (pokeCnt + 1) * NUM_MEMORY_BANKS), baseAddr)
       pokeReadQueue(dut, rd, 0, VEC)
-      if (dut.io.id.vec.ready.peek.litToBoolean && pokeCnt < pokeMax) {
+      if (dut.io.id.vec.ready.peek().litToBoolean && pokeCnt < pokeMax) {
         pokeCnt += 1
       } else {
         dut.io.id.readQueue.valid.poke(false.B)
         dut.io.id.vec.valid.poke(false.B)
       }
       dut.clock.step()
-      if(dut.io.wb.we.peek.litToBoolean) {
+      if(dut.io.wb.we.peek().litToBoolean) {
         expectData(dut, expData, rd)
         readCnt += 1
       }
@@ -237,7 +237,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
    */
   def waitAndExpect(dut: MemoryStage, expData: Seq[Long], rd: RegisterBundle): Unit = {
     fork {
-      while(!dut.io.wb.we.peek.litToBoolean) {
+      while(!dut.io.wb.we.peek().litToBoolean) {
         dut.clock.step()
       }
       expectData(dut, expData, rd)
@@ -276,7 +276,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       } .fork {
         dut.io.id.readQueue.enqueueSeq(rdq)
       }
-      (expData, takeNth(rdq, 3)).zipped.foreach((e,r) => waitAndExpect(dut, e, r.rd))
+      expData.lazyZip(takeNth(rdq, 3)).foreach((e,r) => waitAndExpect(dut, e, r.rd))
     }
   }
 
@@ -304,8 +304,8 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         for(wd <- wrData) {
           pokeWriteQueue(dut.io.id.writeQueue, dut.clock, wd, VEC, iter=0)
         }
-      }.join
-      while(dut.io.ctrl.wqCount.peek().litValue() > 0) {
+      }.join()
+      while(dut.io.ctrl.wqCount.peek().litValue > 0) {
         dut.clock.step()
       }
 
@@ -318,7 +318,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       } .fork {
         dut.io.id.readQueue.enqueueSeq(rdq)
       }
-      (expData, takeNth(rdq, 3)).zipped.foreach((e,r) => waitAndExpect(dut, e, r.rd))
+      expData.lazyZip(takeNth(rdq, 3)).foreach((e,r) => waitAndExpect(dut, e, r.rd))
     }
   }
 
@@ -338,7 +338,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       while(pokeCnt < VREG_DEPTH/NUM_MEMORY_BANKS) {
         pokeVec(dut, indices.slice(pokeCnt * NUM_MEMORY_BANKS, (pokeCnt + 1) * NUM_MEMORY_BANKS), baseAddr)
         pokeReadQueue(dut, rd, 0, VEC)
-        if(dut.io.id.vec.ready.peek.litToBoolean) {
+        if(dut.io.id.vec.ready.peek().litToBoolean) {
           pokeCnt += 1
         } else {
           print(s"vec was not ready ...\n")
@@ -347,7 +347,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         dut.clock.step()
       }
       dut.io.id.vec.valid.poke(false.B)
-      while(!dut.io.wb.we.peek.litToBoolean) {
+      while(!dut.io.wb.we.peek().litToBoolean) {
         dut.clock.step()
       }
       val expData = calculateExpectedData(indices, baseAddr)
@@ -380,7 +380,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       fork {
         dut.io.id.readQueue.enqueueSeq(rdDof)
       }
-      (expDof, takeNth(rdDof, 3)).zipped.foreach((e, r) => waitAndExpect(dut, e, r.rd))
+      expDof.lazyZip(takeNth(rdDof, 3)).foreach((e,r) => waitAndExpect(dut, e, r.rd))
     }
   }
 
@@ -408,8 +408,8 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         for(wd <- wrData) {
           pokeWriteQueue(dut.io.id.writeQueue, dut.clock, wd, mod=DOF, iter=0)
         }
-      }.join
-      while(dut.io.ctrl.wqCount.peek.litValue() > 0) {
+      }.join()
+      while(dut.io.ctrl.wqCount.peek().litValue > 0) {
         dut.clock.step()
       }
 
@@ -420,7 +420,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       } .fork {
         dut.io.id.readQueue.enqueueSeq(rdq)
       }
-      (expData, takeNth(rdq, 3)).zipped.foreach((e, r) => waitAndExpect(dut, e, r.rd))
+      expData.lazyZip(takeNth(rdq, 3)).foreach((e,r) => waitAndExpect(dut, e, r.rd))
     }
   }
 
@@ -462,8 +462,8 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         for(wd <- wrData) {
           pokeWriteQueue(dut.io.id.writeQueue, dut.clock, wd, FDOF, 0)
         }
-      }.join
-      while(dut.io.ctrl.wqCount.peek.litValue() > 0) {
+      }.join()
+      while(dut.io.ctrl.wqCount.peek().litValue > 0) {
         dut.clock.step()
       }
       //read
@@ -473,7 +473,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       } .fork {
         dut.io.id.readQueue.enqueueSeq(rdq)
       }
-      (expData, takeNth(rdq, 3)).zipped.foreach((e,r) => waitAndExpect(dut, e, r.rd))
+      expData.lazyZip(takeNth(rdq, 3)).foreach((e,r) => waitAndExpect(dut, e, r.rd))
     }
   }
 
@@ -528,8 +528,8 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         for(i <- wrData.indices) { //Only the data written at index (0) is actually used
           pokeWriteQueue(wq=dut.io.id.writeQueue, clock=dut.clock, Seq(wrData(i)), mod=ELEM, iter=ijk(i)(3))
         }
-      }.join
-      while(dut.io.ctrl.wqCount.peek.litValue() > 0) {
+      }.join()
+      while(dut.io.ctrl.wqCount.peek().litValue > 0) {
         dut.clock.step()
       }
       //Read data from memory
@@ -590,8 +590,8 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         dut.io.id.neighbour.enqueue(instr)
       } .fork {
         pokeWriteQueue(wq=dut.io.id.writeQueue, clock=dut.clock, wrData=Seq(1), mod=SEL, iter=ijk(3))
-      }.join
-      while(dut.io.ctrl.wqCount.peek.litValue > 0) {
+      }.join()
+      while(dut.io.ctrl.wqCount.peek().litValue > 0) {
         dut.clock.step()
       }
       dut.io.id.ls.poke(StypeLoadStore.LOAD)
@@ -745,7 +745,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       fork {
         dut.io.id.readQueue.enqueueSeq(Seq(rdDof, rdElem).flatten)
       }
-      (expDof, takeNth(rdDof, 3)).zipped.foreach((e, r) => waitAndExpect(dut, e, r.rd))
+      expDof.lazyZip(takeNth(rdDof, 3)).foreach((e,r) => waitAndExpect(dut, e, r.rd))
       waitAndExpect(dut, expElem, rdElem(0).rd)
     }
   }
@@ -780,7 +780,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         dut.io.id.readQueue.enqueueSeq(Seq(rdElem, rdDof).flatten)
       }
       waitAndExpect(dut, expElem, rdElem(0).rd)
-      (expDof, takeNth(rdDof, 3)).zipped.foreach((e, r) => waitAndExpect(dut, e, r.rd))
+      expDof.lazyZip(takeNth(rdDof, 3)).foreach((e,r) => waitAndExpect(dut, e, r.rd))
     }
   }
 
@@ -806,7 +806,7 @@ class MemoryStageSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       fork {
         dut.io.id.readQueue.enqueueSeq(rdDof)
       }
-      (expDof, takeNth(rdDof, 3)).zipped.foreach((e, r) => waitAndExpect(dut, e, r.rd))
+      expDof.lazyZip(takeNth(rdDof, 3)).foreach((e,r) => waitAndExpect(dut, e, r.rd))
     }
   }
 }

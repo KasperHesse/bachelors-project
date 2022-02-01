@@ -1,19 +1,18 @@
 package execution
 
 import chisel3._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import chisel3.experimental.BundleLiterals._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import memory.{IJKBundle, genIJKmultiple}
 import execution.RegisterFileType._
 import execution.StypeBaseAddress._
 import execution.StypeMod._
 import execution.StypeLoadStore._
 import utils.Config.{ELEMS_PER_VSLOT, NUM_MEMORY_BANKS, SUBVECTORS_PER_VREG, VREG_SLOT_WIDTH}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class ThreadMemoryAccessSpec extends FlatSpec with ChiselScalatestTester with Matchers{
+class ThreadMemoryAccessSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers{
   behavior of "Thread Memory Access Module"
 
   def expectNeighbour(dut: ThreadMemoryAccess, baseAddr: StypeBaseAddress.Type, ijk: Array[Int], mod: StypeMod.Type, pad: Boolean, valid: Boolean = true): Unit = {

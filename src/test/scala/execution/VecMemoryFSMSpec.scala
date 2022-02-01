@@ -1,23 +1,21 @@
 package execution
 
-import chiseltest.ChiselScalatestTester
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest.ChiselScalatestTester
 
 import chisel3._
 import chisel3.experimental.BundleLiterals._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import execution.ThreadState._
 import StypeLoadStore._
 import StypeMod._
 import InstructionFMT._
-import chiseltest.internal.WriteVcdAnnotation
-import chiseltest.experimental.TestOptionBuilder._
 import memory.{IJKBundle, genIJK, genIJKmultiple, nextIJK}
 import utils.Fixed._
 import utils.Config._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class VecMemoryFSMSpec extends FlatSpec with ChiselScalatestTester with Matchers{
+class VecMemoryFSMSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers{
   behavior of "Vector memory access FSM"
 
   def expectIndices(dut: VecMemoryFSM, baseIndex: Int): Unit = {

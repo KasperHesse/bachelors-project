@@ -2,7 +2,7 @@ package utils
 
 import chisel3._
 import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+
 import Config._
 import execution.{BtypeInstruction, OtypeInstruction, OtypeLen, RtypeInstruction, StypeInstruction}
 import execution.Opcode._
@@ -14,8 +14,10 @@ import execution.BranchComp._
 import Fixed._
 
 import scala.collection.mutable
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class AssemblerSpec extends FlatSpec with Matchers {
+class AssemblerSpec extends AnyFlatSpec with Matchers {
   behavior of "Assembler"
 
   val rand = scala.util.Random
@@ -236,7 +238,6 @@ class AssemblerSpec extends FlatSpec with Matchers {
       case e: Exception => {
         if (e.getMessage.contains("Duplicate label")) assert(true) else assert(false, "Did not catch duplicate label")
       }
-      case _: Exception => assert(false, "Did not catch duplicate label")
     }
   }
 
@@ -508,7 +509,7 @@ class AssemblerSpec extends FlatSpec with Matchers {
       StypeInstruction(0, VEC, TMP)
     )
 
-    (lines,instrs).zipped.foreach((line,instr) =>
+    lines.lazyZip(instrs).foreach((line,instr) =>
     {
       val parsed = Assembler.parseStype(Assembler.splitInstruction(line))
       val i = instr.toUInt().litValue.toInt
@@ -704,7 +705,7 @@ class AssemblerSpec extends FlatSpec with Matchers {
 
     val p1 = Assembler.assemble(program)
     val p2 = Assembler.assemble(expected)
-    (p1, p2).zipped.foreach((x,y) => assert(x == y))
+    p1.lazyZip(p2).foreach((x,y) => assert(x == y))
   }
 
 

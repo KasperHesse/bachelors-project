@@ -57,9 +57,9 @@ class NeighbourGenerator extends Module {
     require(-1 <= dk && dk <= 1, "dj must be between -1 and 1")
     require(-1 <= dj && dj <= 1, "dk must be between -1 and 1")
     require(0 <= index && index < NUM_MEMORY_BANKS, s"index must be between 0 and ${NUM_MEMORY_BANKS-1}")
-    ijk(index).i := (in.ijk.i.asSInt() + di.S).asUInt()
-    ijk(index).j := (in.ijk.j.asSInt() + dj.S).asUInt()
-    ijk(index).k := (in.ijk.k.asSInt() + dk.S).asUInt()
+    ijk(index).i := (in.ijk.i.asSInt() + di.S).asUInt
+    ijk(index).j := (in.ijk.j.asSInt() + dj.S).asUInt
+    ijk(index).k := (in.ijk.k.asSInt() + dk.S).asUInt
     validIjk(index) := !in.pad //When pad is true, ijk is always invalid
     //Index generator will perform checks to verify if values are outside boundaries of design domain
   }

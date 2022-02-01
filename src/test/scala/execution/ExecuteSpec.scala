@@ -1,16 +1,15 @@
 package execution
 
 import chisel3._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Config._
 import utils.Config
 import utils.Fixed._
 import chisel3.experimental.BundleLiterals._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
+class ExecuteSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers{
   behavior of "Execution stage"
 
 
@@ -75,9 +74,9 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
     while(i < 200 && resultCnt < 1) {
 //      dut.io.ctrl.count.expect(1.U)
       i += 1
-      if(dut.io.wb.valid.peek.litToBoolean) {
+      if(dut.io.wb.valid.peek().litToBoolean) {
         for(j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(j)) - fixed2double(dut.io.wb.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(j)) - fixed2double(dut.io.wb.res(j).peek())) < 1E-4)
         }
         resultCnt += 1
         dut.io.wb.dest.expect(dest)
@@ -128,9 +127,9 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
       }
       i += 1
 
-      if(dut.io.wb.valid.peek.litToBoolean) {
+      if(dut.io.wb.valid.peek().litToBoolean) {
         for(j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(resultCnt)(j)) - fixed2double(dut.io.wb.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(resultCnt)(j)) - fixed2double(dut.io.wb.res(j).peek())) < 1E-4)
         }
         dut.io.wb.dest.expect(destinations(resultCnt))
         resultCnt += 1
@@ -190,9 +189,9 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
 //        dut.io.id.valid.poke(false.B)
       }
       i += 1
-      if (dut.io.wb.valid.peek.litToBoolean) {
+      if (dut.io.wb.valid.peek().litToBoolean) {
         for (j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(j)) - fixed2double(dut.io.wb.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(j)) - fixed2double(dut.io.wb.res(j).peek())) < 1E-4)
         }
         dut.io.wb.dest.expect(dest)
         resultCnt += 1
@@ -251,9 +250,9 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
         dut.io.ctrl.stall.poke(true.B)
       }
       i += 1
-      if(dut.io.wb.valid.peek.litToBoolean) {
+      if(dut.io.wb.valid.peek().litToBoolean) {
         for(j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(resultCnt)(j)) - fixed2double(dut.io.wb.res(j).peek)) < 1E-4)
+          assert(math.abs(fixed2double(results(resultCnt)(j)) - fixed2double(dut.io.wb.res(j).peek())) < 1E-4)
         }
         dut.io.wb.dest.expect(dest(resultCnt))
         resultCnt += 1
@@ -360,7 +359,7 @@ class ExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers{
           r += 1
         }
 
-        if(dut.io.wb.valid.peek.litToBoolean) {
+        if(dut.io.wb.valid.peek().litToBoolean) {
           if (resCnt == 0) { //Result of add
             dut.io.wb.res(0).expect(double2fixed(8).S)
             dut.io.wb.res(1).expect(double2fixed(8).S)

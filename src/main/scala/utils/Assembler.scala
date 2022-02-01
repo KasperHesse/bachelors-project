@@ -717,8 +717,8 @@ class AssemblerFunctionCall(name: String, args: mutable.Seq[String], functionStr
    */
   def invoke(replArgs: mutable.Seq[String]): String = {
     require(this.args.length == replArgs.length, f"Function $name was called with ${replArgs.length} arguments (${replArgs.mkString(",")}), requires ${this.args.length} (${this.args.mkString(",")})")
-    val map = (args, replArgs).zipped.toMap //Create mapping from original strings to their replacements
-    map.foldLeft(functionString)((str, repl) => str.replaceAllLiterally(repl._1, repl._2)) //Apply all replacement to function call, returning modified version
+    val map = args.lazyZip(replArgs).toMap  //Create mapping from original strings to their replacements
+    map.foldLeft(functionString)((str, repl) => str.replace(repl._1, repl._2)) //Apply all replacement to function call, returning modified version
   }
 
   def invoke(replArgs: String): String = {

@@ -2,14 +2,13 @@ package stages
 
 import chisel3._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import execution.StypeBaseAddress
-import execution.StypeBaseAddress._
-import org.scalatest.{FlatSpec, Matchers}
+import execution.StypeBaseAddress._
 import utils.Config._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class AddrGenMemSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class AddrGenMemSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
 
   def pokeAddr(dut: AddrGenMem, index: Int, addrOffset: Int, valid: Boolean = true): Unit = {
     dut.io.in.bits.indices(index).poke(addrOffset.U)
@@ -38,10 +37,10 @@ class AddrGenMemSpec extends FlatSpec with ChiselScalatestTester with Matchers {
           pokeAddr(dut, i, i + (writeCnt*8))
         }
         dut.clock.step()
-        if(dut.io.in.ready.peek.litToBoolean) {
+        if(dut.io.in.ready.peek().litToBoolean) {
           writeCnt += 1
         }
-        if(dut.io.out.valid.peek.litToBoolean) {
+        if(dut.io.out.valid.peek().litToBoolean) {
           for(i <- 0 until NUM_MEMORY_BANKS) {
             expectValue(dut, i, i + readCnt*8)
           }
@@ -70,10 +69,10 @@ class AddrGenMemSpec extends FlatSpec with ChiselScalatestTester with Matchers {
           pokeAddr(dut, i, (NUM_MEMORY_BANKS-1-i) + (writeCnt*8)) //Indices are written at (0) := 7, (1) := 6 etc
         }
         dut.clock.step()
-        if(dut.io.in.ready.peek.litToBoolean) {
+        if(dut.io.in.ready.peek().litToBoolean) {
           writeCnt += 1
         }
-        if(dut.io.out.valid.peek.litToBoolean) {
+        if(dut.io.out.valid.peek().litToBoolean) {
           for(i <- 0 until NUM_MEMORY_BANKS) {
             expectValue(dut, i, i + readCnt*8) //But they are still read out at the correct locations
           }

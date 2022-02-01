@@ -2,20 +2,19 @@ package execution
 
 import chisel3._
 import chisel3.experimental.BundleLiterals._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import execution.ThreadState._
 import StypeLoadStore._
 import StypeMod._
 import InstructionFMT._
-import chiseltest.internal.WriteVcdAnnotation
-import chiseltest.experimental.TestOptionBuilder._
 import memory.{IJKBundle, genIJK, genIJKmultiple, nextIJK}
 import utils.Fixed._
 import utils.Config._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 
-class IJKGeneratorFSMSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class IJKGeneratorFSMSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Memory Access FSM"
 
   def expectIJK(ijk: IJKBundle, i: Int, j: Int, k: Int): Unit = {
@@ -31,7 +30,7 @@ class IJKGeneratorFSMSpec extends FlatSpec with ChiselScalatestTester with Match
   }
 
   def peekIJK(dut: IJKGeneratorFSM): Array[Int] = {
-    Array(dut.io.ijkOut.ijk.i.peek.litValue.toInt, dut.io.ijkOut.ijk.j.peek.litValue.toInt, dut.io.ijkOut.ijk.k.peek.litValue.toInt)
+    Array(dut.io.ijkOut.ijk.i.peek().litValue.toInt, dut.io.ijkOut.ijk.j.peek().litValue.toInt, dut.io.ijkOut.ijk.k.peek().litValue.toInt)
   }
 
   def pokeIJK(dut: IJKGeneratorFSM, i: Int, j: Int, k: Int, iter: Int): Unit = {

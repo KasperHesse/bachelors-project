@@ -1,13 +1,12 @@
 package test
 import chisel3._
 import chisel3.util._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Fixed._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class QueueTestSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class QueueTestSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Queues"
 
   def testQueue(dut: QueueTest): Unit = {

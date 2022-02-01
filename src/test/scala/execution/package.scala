@@ -6,7 +6,7 @@ import utils.{Assembler, Config}
 import utils.Config._
 import utils.Fixed._
 import execution.Opcode._
-import org.scalatest.{FlatSpec, Matchers}
+
 
 package object execution {
   /**
@@ -117,7 +117,7 @@ package object execution {
     }
     if (ol == ADD.litValue) {
       fixedAdd(A, b)
-    } else if (ol == SUB.litValue()) {
+    } else if (ol == SUB.litValue) {
       fixedSub(A, b)
     } else if (ol == MUL.litValue) {
       fixedMul(A, b)
@@ -175,9 +175,9 @@ package object execution {
       fixed2double(a) == fixed2double(b)
     } else if(comp.litValue == NEQ.litValue) {
       fixed2double(a) != fixed2double(b)
-    } else if (comp.litValue() == GEQ.litValue()) {
+    } else if (comp.litValue == GEQ.litValue) {
       fixed2double(a) >= fixed2double(b)
-    } else if (comp.litValue() == LT.litValue()) {
+    } else if (comp.litValue == LT.litValue) {
       fixed2double(a) < fixed2double(b)
     } else {
       throw new IllegalArgumentException("Unable to perform comparison")
@@ -380,7 +380,7 @@ package object execution {
    */
   def updateVREG(instr: RtypeInstruction, results: Array[SInt], rdDUT: UInt, vReg: Array[Array[SInt]]): Unit = {
     val rd = instr.rd.litValue.toInt
-    //    val rdOffset = dut.io.wb.rd.reg.peek.litValue.toInt % VREG_SLOT_WIDTH
+    //    val rdOffset = dut.io.wb.rd.reg.peek().litValue.toInt % VREG_SLOT_WIDTH
     val rdOffset = rdDUT.litValue.toInt % VREG_SLOT_WIDTH
     for (j <- 0 until VREG_DEPTH) {
       vReg(rd * VREG_SLOT_WIDTH + rdOffset)(j) = results(j)

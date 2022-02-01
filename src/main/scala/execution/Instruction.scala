@@ -66,12 +66,12 @@ object RtypeInstruction {
   def apply(v: RtypeInstruction): UInt = {
     var r: Long = 0
     r |= (v.op.litValue.toInt)
-    r |= (v.fmt.litValue().toInt << FMT_OFFSET)
+    r |= (v.fmt.litValue.toInt << FMT_OFFSET)
     r |= (v.mod.litValue.toInt << MOD_OFFSET)
     r |= (v.immflag.litValue.toInt << IMMFLAG_OFFSET)
-    r |= (v.rd.litValue().toInt << RD_OFFSET)
-    r |= (v.rs1.litValue().toLong << RS1_OFFSET)
-    r |= (v.rs2.litValue().toInt << RS2_OFFSET)
+    r |= (v.rd.litValue.toInt << RD_OFFSET)
+    r |= (v.rs1.litValue.toLong << RS1_OFFSET)
+    r |= (v.rs2.litValue.toInt << RS2_OFFSET)
     r |= (v.immfrac.litValue.toLong << FRAC_OFFSET)
     r.U(32.W)
   }
@@ -91,48 +91,48 @@ object RtypeInstruction {
     val immfrac = v(27,21)
     val rs1 = v(31,28)
 
-    val fmt = v(7,6).litValue().toInt
+    val fmt = v(7,6).litValue.toInt
     if(fmt != InstructionFMT.RTYPE.litValue.toInt) {
       throw new IllegalArgumentException(s"Instruction format ($fmt) did not match R-type format")
     }
 
-    val op: Opcode.Type = if(opval.litValue == ADD.litValue()) {
+    val op: Opcode.Type = if(opval.litValue == ADD.litValue) {
       ADD
-    } else if (opval.litValue == SUB.litValue()) {
+    } else if (opval.litValue == SUB.litValue) {
       SUB
-    } else if (opval.litValue == MUL.litValue()) {
+    } else if (opval.litValue == MUL.litValue) {
       MUL
-    } else if (opval.litValue == DIV.litValue()) {
+    } else if (opval.litValue == DIV.litValue) {
       DIV
-    } else if (opval.litValue == MAC.litValue()) {
+    } else if (opval.litValue == MAC.litValue) {
       MAC
-    } else if (opval.litValue == MAX.litValue()) {
+    } else if (opval.litValue == MAX.litValue) {
       MAX
-    } else if (opval.litValue == MIN.litValue()) {
+    } else if (opval.litValue == MIN.litValue) {
       MIN
-    } else if (opval.litValue == ABS.litValue()) {
+    } else if (opval.litValue == ABS.litValue) {
       ABS
-    } else if (opval.litValue == NEZ.litValue()) {
+    } else if (opval.litValue == NEZ.litValue) {
       NEZ
-    } else if(opval.litValue == RED.litValue()) {
+    } else if(opval.litValue == RED.litValue) {
       RED
     } else {
       throw new IllegalArgumentException("Unable to decode op")
     }
 
-    val mod = if(modval.litValue == VV.litValue()) {
+    val mod = if(modval.litValue == VV.litValue) {
       VV
-    } else if (modval.litValue == XV.litValue()) {
+    } else if (modval.litValue == XV.litValue) {
       XV
-    } else if (modval.litValue() == SV.litValue()) {
+    } else if (modval.litValue == SV.litValue) {
       SV
-    } else if (modval.litValue() == SS.litValue()) {
+    } else if (modval.litValue == SS.litValue) {
       SS
-    } else if (modval.litValue() == KV.litValue()) {
+    } else if (modval.litValue == KV.litValue) {
       KV
-    } else if (modval.litValue() == XX.litValue()) {
+    } else if (modval.litValue == XX.litValue) {
       XX
-    } else if(modval.litValue() == SX.litValue()) {
+    } else if(modval.litValue == SX.litValue) {
       SX
     } else {
 //      print("ERR: Unable to decode mod")
@@ -179,11 +179,11 @@ object StypeInstruction {
   /** Converts an S-type instruction to it's UInt representation */
   def apply(v: StypeInstruction): UInt = {
     var s = 0
-    s |= (v.baseAddr.litValue().toInt)
-    s |= (v.fmt.litValue().toInt << FMT_OFFSET)
-    s |= (v.mod.litValue().toInt << MOD_OFFSET)
+    s |= (v.baseAddr.litValue.toInt)
+    s |= (v.fmt.litValue.toInt << FMT_OFFSET)
+    s |= (v.mod.litValue.toInt << MOD_OFFSET)
     s |= (v.ls.litValue.toInt << LS_OFFSET)
-    s |= (v.rsrd.litValue().toInt << RSRD_OFFSET)
+    s |= (v.rsrd.litValue.toInt << RSRD_OFFSET)
     s.U(32.W)
   }
 
@@ -277,7 +277,7 @@ class OtypeInstruction extends Bundle with Instruction {
   }
 }
 
-object OtypeInstruction extends Bundle {
+object OtypeInstruction {
   val SE_OFFSET = 12
   val MOD_OFFSET = 8
   val LEN_OFFSET = 0
@@ -298,9 +298,9 @@ object OtypeInstruction extends Bundle {
    */
   def apply(v: OtypeInstruction): UInt = {
     var o = 0
-    o |= (v.len.litValue().toInt << LEN_OFFSET)
-    o |= (v.fmt.litValue().toInt << FMT_OFFSET)
-    o |= (v.mod.litValue().toInt << MOD_OFFSET)
+    o |= (v.len.litValue.toInt << LEN_OFFSET)
+    o |= (v.fmt.litValue.toInt << FMT_OFFSET)
+    o |= (v.mod.litValue.toInt << MOD_OFFSET)
     o |= (v.se.litValue.toInt << SE_OFFSET)
 
     o.U(32.W)
@@ -311,7 +311,7 @@ object OtypeInstruction extends Bundle {
     val modval = v(11,8).litValue.toInt
     val lenval = v(5,0).litValue.toInt
 
-    val fmt = v(7,6).litValue().toInt
+    val fmt = v(7,6).litValue.toInt
     if(fmt != InstructionFMT.OTYPE.litValue.toInt) {
       throw new IllegalArgumentException(s"Instruction format ($fmt) did not match O-type format (${InstructionFMT.OTYPE.litValue.toInt})")
     }
@@ -391,9 +391,9 @@ object BtypeInstruction {
    */
   def apply(v: BtypeInstruction): UInt = {
     var b: Long = 0
-    b |= (v.comp.litValue().toInt)
+    b |= (v.comp.litValue.toInt)
     b |= (v.fmt.litValue.toInt << 6)
-    b |= (v.targetl.litValue().toInt << 8)
+    b |= (v.targetl.litValue.toInt << 8)
     b |= (v.rs1.litValue.toInt << 17)
     b |= (v.rs2.litValue.toInt << 21)
     b |= (v.targeth.litValue.toLong << 25)
@@ -412,7 +412,7 @@ object BtypeInstruction {
     val rs1 = v(20,17)
     val rs2 = v(24,21)
 
-    val fmt = v(7,6).litValue().toInt
+    val fmt = v(7,6).litValue.toInt
     if(fmt != InstructionFMT.BTYPE.litValue.toInt) {
       throw new IllegalArgumentException(s"Instruction format ($fmt) did not match B-type format")
     }

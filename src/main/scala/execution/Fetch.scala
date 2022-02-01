@@ -37,13 +37,13 @@ class Fetch(memsize: Int = 1024, memfile: String = "") extends Module {
     PCnext := PC
   }
   PC := PCnext
-  val instr: UInt = imem((PCnext >> 2).asUInt())
+  val instr: UInt = imem((PCnext >> 2).asUInt)
 
 
   if(SIMULATION) {
     require(memfile.nonEmpty, "Cannot simulate with empty memory init file")
     val src = Source.fromFile(memfile)
-    require(src.getLines.length <= memsize, s"Memory file (${src.getLines.length}) too large for memory size ($memsize)")
+    require(src.getLines().length <= memsize, s"Memory file (${src.getLines().length}) too large for memory size ($memsize)")
     src.close()
   }
   if(INLINE) loadMemoryFromFileInline(imem, memfile) else loadMemoryFromFile(imem, memfile)

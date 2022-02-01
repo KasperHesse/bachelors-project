@@ -1,13 +1,12 @@
 package execution
 
 import chisel3._
-import chisel3.tester.experimental.TestOptionBuilder.ChiselScalatestOptionBuilder
-import chiseltest._
-import chiseltest.internal.WriteVcdAnnotation
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Config.NUM_PROCELEM
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class KEMatrixSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class KEMatrixSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "KE Matrix"
 
   it should "output values" in {

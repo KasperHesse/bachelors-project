@@ -5,15 +5,17 @@ import execution._
 import memory.{AddressDecode, elementIndex, getEdof, iterationFromIJK}
 import utils.Config._
 import utils.Fixed._
-import org.scalatest.{FlatSpec, Matchers}
+
 
 import java.io.File
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 /**
  * A helper class containing a number of commonly used functions shared across multiple simulations
  */
-package object common extends FlatSpec with Matchers { //Must extend flatspec & matchers to have assertEquals defined here
+package object common extends AnyFlatSpec with Matchers { //Must extend flatspec & matchers to have assertEquals defined here
   /**
    * Verifies that the branch outcome of the DUT matches the simulation's expected branch outcome
    * @param dut The DUT
@@ -39,7 +41,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    * @param extra Additional data to be logged in case of a miscompare
    */
   def assertEquals(a: SInt, b: SInt, delta: Double = 0.01, instr: Bundle = null, rd: UInt = 9001.U, extra: String = ""): Unit = {
-    val clue = s"[a(chisel)=$a (${fixed2double(a)}), b(simulator)=$b (${fixed2double(b)})]\nInstruction: ${if (instr != null) instr else "Not given"}\nRd: ${if (rd.litValue() != 9001) rd.litValue else "Not given"}\nExtra: $extra"
+    val clue = s"[a(chisel)=$a (${fixed2double(a)}), b(simulator)=$b (${fixed2double(b)})]\nInstruction: ${if (instr != null) instr else "Not given"}\nRd: ${if (rd.litValue != 9001) rd.litValue else "Not given"}\nExtra: $extra"
 
     org.scalatest.Assertions.assert(math.abs(fixed2double((a.litValue-b.litValue).toLong)) < delta, clue)
   }
@@ -71,15 +73,15 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     iBuffer.store.clear()
     iBuffer.pstart = OtypeInstruction(idctrl.instr.peek())
     do {
-      instr = idctrl.instr.peek
+      instr = idctrl.instr.peek()
       fmt = InstructionFMT(instr(7, 6).litValue.toInt)
       if (fmt.litValue == InstructionFMT.OTYPE.litValue) {
         //Do nothing
-      } else if (fmt.litValue == InstructionFMT.RTYPE.litValue()) {
+      } else if (fmt.litValue == InstructionFMT.RTYPE.litValue) {
         iBuffer.exec += RtypeInstruction(instr)
-      } else if (fmt.litValue == InstructionFMT.STYPE.litValue()) {
+      } else if (fmt.litValue == InstructionFMT.STYPE.litValue) {
         val s = StypeInstruction(instr)
-        if(s.ls.litValue == StypeLoadStore.LOAD.litValue()) {
+        if(s.ls.litValue == StypeLoadStore.LOAD.litValue) {
           iBuffer.load += s
         } else {
           iBuffer.store += s
@@ -90,7 +92,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       i += 1
       clock.step()
       //Continue until we get pend instruction
-    } while(instr.litValue != OtypeInstruction(OtypeSE.END, OtypeMod.PACKET).toUInt().litValue())
+    } while(instr.litValue != OtypeInstruction(OtypeSE.END, OtypeMod.PACKET).toUInt().litValue)
   }
 
 
@@ -102,8 +104,8 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    */
   def handleMACSVandMACVV(idex: IdExIO, sc: SimulationContext): Unit = {
     val isMACinstruction = idex.valid.peek().litToBoolean &&
-      idex.opUInt.peek.litValue == Opcode.MAC.litValue() &&
-      idex.dest.rfUint.peek.litValue == RegisterFileType.SREG.litValue
+      idex.opUInt.peek().litValue == Opcode.MAC.litValue &&
+      idex.dest.rfUint.peek().litValue == RegisterFileType.SREG.litValue
     val macLimit = ELEMS_PER_VSLOT / NUM_PROCELEM //Number of elements added to each result register on each MAC iteration
     /*
       When a mac is noticed on the output, the actual values arrive one clock cycle later since the reg file is a syncreadmem
@@ -114,8 +116,8 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
      */
     if((isMACinstruction && !sc.firstMAC) || (0 < sc.macCnt && sc.macCnt < macLimit)) {
       for(i <- 0 until NUM_PROCELEM) {
-        val a = if(sc.macUseImm) sc.macImmValue else idex.a(i).peek
-        val b = idex.b(i).peek
+        val a = if(sc.macUseImm) sc.macImmValue else idex.a(i).peek()
+        val b = idex.b(i).peek()
         sc.MACresults(i) = fixedAdd(sc.MACresults(i), fixedMul(a,b))
       }
       sc.macCnt += 1
@@ -125,7 +127,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       //The immediate flag is one clock cycle ahead of what we can see in the simulator
       //For any mac instruction, the imm flag will always be the same, so we sample the imm
       //flag at the start of the instruction
-      sc.macUseImm = idex.useImm.peek.litToBoolean
+      sc.macUseImm = idex.useImm.peek().litToBoolean
       sc.macImmValue = idex.imm.peek()
     } else if (!isMACinstruction && sc.macCnt >= macLimit) {
       sc.firstMAC = true
@@ -148,13 +150,13 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     if(rf == VREG.litValue) {
       //KV, VV, XV and SV-instructions generate multiple results. We need to observe all of those results
       for(i <- 0 until VREG_SLOT_WIDTH) {
-        while(!wbid.we.peek.litToBoolean) {
+        while(!wbid.we.peek().litToBoolean) {
           //We still need to perform MAC instructions bookkeeping
           clock.step()
           handleMACSVandMACVV(idex, sc)
         }
         expectVREG(wbid, instr, sc)
-        updateVREG(instr, sc.results, wbid.rd.reg.peek, sc.vReg(sc.execThread))
+        updateVREG(instr, sc.results, wbid.rd.reg.peek(), sc.vReg(sc.execThread))
         if (i < VREG_SLOT_WIDTH-1) {
           clock.step()
           handleMACSVandMACVV(idex, sc)
@@ -223,22 +225,22 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    */
   def expectVREG(wbid: WbIdIO, instr: RtypeInstruction, sc: SimulationContext): Unit = {
     val mod = instr.mod.litValue
-    if(instr.op.litValue() == MAC.litValue && mod == RtypeMod.KV.litValue) {
-      calculateKVresult(instr, sc.results, wbid.rd.reg.peek, sc.vReg(sc.execThread), Some(sc))
+    if(instr.op.litValue == MAC.litValue && mod == RtypeMod.KV.litValue) {
+      calculateKVresult(instr, sc.results, wbid.rd.reg.peek(), sc.vReg(sc.execThread), Some(sc))
     } else if(mod == RtypeMod.VV.litValue) {
-      calculateVVresult(instr, sc.results, wbid.rd.reg.peek, sc.vReg(sc.execThread))
+      calculateVVresult(instr, sc.results, wbid.rd.reg.peek(), sc.vReg(sc.execThread))
     } else if (mod == RtypeMod.XV.litValue) {
-      calculateXVresult(instr, sc.results, wbid.rd.reg.peek, sc.xReg(sc.execThread), sc.vReg(sc.execThread))
+      calculateXVresult(instr, sc.results, wbid.rd.reg.peek(), sc.xReg(sc.execThread), sc.vReg(sc.execThread))
     } else if (mod == RtypeMod.SV.litValue) {
-      calculateSVresult(instr, sc.results, wbid.rd.reg.peek, sc.sReg, sc.vReg(sc.execThread))
+      calculateSVresult(instr, sc.results, wbid.rd.reg.peek(), sc.sReg, sc.vReg(sc.execThread))
     } else {
       throw new IllegalArgumentException("Unknown Rtype modifier")
     }
     wbid.rd.rf.expect(RegisterFileType.VREG)
 
     for(i <- 0 until VREG_DEPTH) {
-      assertEquals(wbid.wrData(i).peek, sc.results(i), instr=instr, rd=wbid.rd.reg.peek(), extra = f"expectVreg: i=$i")
-      sc.results(i) = wbid.wrData(i).peek //to avoid any incremental changes we store the calculated values
+      assertEquals(wbid.wrData(i).peek(), sc.results(i), instr=instr, rd=wbid.rd.reg.peek(), extra = f"expectVreg: i=$i")
+      sc.results(i) = wbid.wrData(i).peek() //to avoid any incremental changes we store the calculated values
     }
   }
 
@@ -262,8 +264,8 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     wbid.rd.rf.expect(RegisterFileType.XREG)
     wbid.rd.subvec.expect(0.U)
     for (i <- 0 until NUM_PROCELEM) {
-      assertEquals(wbid.wrData(i).peek, sc.results(i), instr=instr, rd=wbid.rd.reg.peek(), extra=f"expectXreg: i=$i")
-      sc.results(i) = wbid.wrData(i).peek
+      assertEquals(wbid.wrData(i).peek(), sc.results(i), instr=instr, rd=wbid.rd.reg.peek(), extra=f"expectXreg: i=$i")
+      sc.results(i) = wbid.wrData(i).peek()
     }
     wbid.wrData(NUM_PROCELEM).expect(0.S)
   }
@@ -287,13 +289,13 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
     } else {
       throw new IllegalArgumentException("R-type mod not recognized")
     }
-    assertEquals(wbid.wrData(0).peek, sc.results(0), instr=instr, rd=wbid.rd.reg.peek(), extra="expectSreg")
+    assertEquals(wbid.wrData(0).peek(), sc.results(0), instr=instr, rd=wbid.rd.reg.peek(), extra="expectSreg")
     wbid.rd.rf.expect(RegisterFileType.SREG)
     wbid.rd.reg.expect(instr.rd)
     wbid.rd.subvec.expect(0.U)
 
     for(i <- 0 until NUM_PROCELEM) {
-      sc.results(i) = wbid.wrData(i).peek
+      sc.results(i) = wbid.wrData(i).peek()
     }
     wbid.wrData(NUM_PROCELEM).expect(0.S)
   }
@@ -479,7 +481,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
    */
   def updateVREG(instr: RtypeInstruction, results: Array[SInt], rdDUT: UInt, vReg: Array[Array[SInt]]): Unit = {
     val rd = instr.rd.litValue.toInt
-    //    val rdOffset = dut.io.wb.rd.reg.peek.litValue.toInt % VREG_SLOT_WIDTH
+    //    val rdOffset = dut.io.wb.rd.reg.peek().litValue.toInt % VREG_SLOT_WIDTH
     val rdOffset = rdDUT.litValue.toInt % VREG_SLOT_WIDTH
     for (j <- 0 until VREG_DEPTH) {
       vReg(rd * VREG_SLOT_WIDTH + rdOffset)(j) = results(j)
@@ -792,7 +794,7 @@ package object common extends FlatSpec with Matchers { //Must extend flatspec & 
       val time = openFile("timing", "0")
       time.write(f"ms: ${timing.ms.peek().litValue.toInt}\n")
       time.write(f" s: ${timing.s.peek().litValue.toInt}\n")
-      time.write(f" m: ${timing.m.peek().litValue().toInt}\n")
+      time.write(f" m: ${timing.m.peek().litValue.toInt}\n")
       time.close()
     }
 

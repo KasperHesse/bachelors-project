@@ -63,7 +63,7 @@ class MemoryWriteback extends Module {
   fcn(5) = VecInit(Seq(1.U, 4.U, 7.U))
   fcn(6) = VecInit(Seq(2.U, 4.U, 7.U))
   fcn(7) = VecInit(Seq(3.U, 5.U, 6.U))
-  val fcnLookup = VecInit(fcn)
+  val fcnLookup = VecInit(fcn.toIndexedSeq)
 
   //Lookup table mapping current iteration to the indices of edge neighbours
   val edn = Array.ofDim[Vec[UInt]](8)
@@ -75,7 +75,7 @@ class MemoryWriteback extends Module {
   edn(5) = VecInit(Seq(0.U, 3.U, 6.U))
   edn(6) = VecInit(Seq(0.U, 3.U, 5.U))
   edn(7) = VecInit(Seq(1.U, 2.U, 4.U))
-  val ednLookup = VecInit(edn)
+  val ednLookup = VecInit(edn.toIndexedSeq)
 
   //Next state logic
   switch(state) {

@@ -30,8 +30,8 @@ class OnChipMemTest[T <: Data](onchip: Boolean = false, dataType: T = SInt(8.W))
   X := Mux(Xtick, 0.U, X + 1.U)
   Y := Mux(Xtick, Mux(Ytick, 0.U, Y + 1.U), Y)
 
-  val rdAddr1 = ((io.rdAddr1 << 1).asUInt() + Y)(3,1)
-  val rdAddr2 = ((io.rdAddr2 << 1).asUInt() + Y)(3,1)
+  val rdAddr1 = ((io.rdAddr1 << 1).asUInt + Y)(3,1)
+  val rdAddr2 = ((io.rdAddr2 << 1).asUInt + Y)(3,1)
 
   //V1: Module which acts as a wrapper around the register file. Does not work (but sometimes it does?)
   val mem = Module(new OCRegFile(dataType))

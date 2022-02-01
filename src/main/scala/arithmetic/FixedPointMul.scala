@@ -109,8 +109,8 @@ class FixedMulKaratsuba extends FixedPointMul {
 
   val prod = (z2 << (FIXED_WIDTH)).asUInt + (z1 << FIXED_WIDTH/2).asUInt + z0.asUInt
 
-  val prod2 = (prod >> FRAC_WIDTH).asUInt()
-  val lastBit = Cat(0.S(1.W), prod(FRAC_WIDTH-1)).asUInt()
+  val prod2 = (prod >> FRAC_WIDTH).asUInt
+  val lastBit = Cat(0.S(1.W), prod(FRAC_WIDTH-1)).asUInt
   val res = prod2 + lastBit
 
   io.out.res := Mux(a_sign ^ b_sign, (~res).asSInt + 1.S, res.asSInt)

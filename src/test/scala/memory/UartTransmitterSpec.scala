@@ -2,14 +2,13 @@ package memory
 
 import chisel3._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder.ChiselScalatestOptionBuilder
-import chiseltest.internal.WriteVcdAnnotation
-import execution.StypeBaseAddress
-import org.scalatest.{FlatSpec, Matchers}
+import execution.StypeBaseAddress
 import utils.Config.NUM_MEMORY_BANKS
 import utils.Fixed.FIXED_WIDTH
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class UartTransmitterSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class UartTransmitterSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Uart Transmitter"
 
   it should "transmit some data and generate vcd" in {

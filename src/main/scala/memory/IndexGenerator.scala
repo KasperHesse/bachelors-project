@@ -51,9 +51,9 @@ class IndexGenerator(val pipe: Boolean = true) extends Module {
     nzLookup.foreach(vec => vec(nz) := (nz*NELYH).U)
   }
 
-  val nx = in.ijk.map(ijk => (ijk.i >> 1).asUInt())
-  val ny = in.ijk.map(ijk => (ijk.j >> 1).asUInt())
-  val nz = in.ijk.map(ijk => (ijk.k >> 1).asUInt())
+  val nx = in.ijk.map(ijk => (ijk.i >> 1).asUInt)
+  val ny = in.ijk.map(ijk => (ijk.j >> 1).asUInt)
+  val nz = in.ijk.map(ijk => (ijk.k >> 1).asUInt)
 
   /** Vector holding calculated indices */
   val indices = VecInit(Seq.fill(NUM_MEMORY_BANKS)(0.U(log2Ceil(NDOFLENGTH+1).W)))
@@ -65,8 +65,8 @@ class IndexGenerator(val pipe: Boolean = true) extends Module {
   for(x <- 0 until NUM_INPUT_PORTS) {
     val row = nxLookup(x)(nx(x)) + nzLookup(x)(nz(x)) + ny(x)
 
-    val a = (in.ijk(x).i(0) << 2).asUInt()
-    val b = (in.ijk(x).k(0) << 1).asUInt()
+    val a = (in.ijk(x).i(0) << 2).asUInt
+    val b = (in.ijk(x).k(0) << 1).asUInt
     val c = in.ijk(x).j(0)
     val bank = a | b | c
     //Rows signify which element block is being accessed

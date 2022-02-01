@@ -13,7 +13,7 @@ object EdofGeneration extends App {
 
   val edof1 = edofGeneration(0,2,3)
   val edof2 = edofGen2(0,2,3)
-  (edof1,edof2).zipped.foreach((a,b) => println(a == b))
+  edof1.lazyZip(edof2).foreach((a,b) => println(a == b))
 //  edofGeneration(0,2,3).foreach(a => println(f"$a%4d (${a % 8})"))
   //24-26
   //3-5

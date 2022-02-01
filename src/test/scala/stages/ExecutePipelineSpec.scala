@@ -2,20 +2,20 @@ package stages
 
 import chisel3._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import common.{InstructionBuffer, calculateKVresult, fillInstructionBuffer}
 import execution.BranchComp._
 import execution.Opcode.{ADD, MAC, MUL, SUB}
 import execution._
-import org.scalatest.{FlatSpec, Matchers}
+
 import utils.Assembler
 import utils.Config._
 import utils.Fixed._
 
 import scala.collection.mutable.ListBuffer
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class ExecutePipelineSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
 
   behavior of "Execute pipeline"
 
@@ -98,21 +98,21 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
    */
   def expectVREG(wbout: WbIdIO, instr: RtypeInstruction, results: Array[SInt]): Unit = {
     val mod = instr.mod.litValue
-    if(instr.op.litValue() == MAC.litValue && mod == RtypeMod.KV.litValue) {
-      calculateKVresult(instr, results, wbout.rd.reg.peek, vReg(execThread))
+    if(instr.op.litValue == MAC.litValue && mod == RtypeMod.KV.litValue) {
+      calculateKVresult(instr, results, wbout.rd.reg.peek(), vReg(execThread))
     } else if(mod == RtypeMod.VV.litValue) {
-      calculateVVresult(instr, results, wbout.rd.reg.peek, vReg(execThread))
+      calculateVVresult(instr, results, wbout.rd.reg.peek(), vReg(execThread))
     } else if (mod == RtypeMod.XV.litValue) {
-      calculateXVresult(instr, results, wbout.rd.reg.peek, xReg(execThread), vReg(execThread))
+      calculateXVresult(instr, results, wbout.rd.reg.peek(), xReg(execThread), vReg(execThread))
     } else if (mod == RtypeMod.SV.litValue) {
-      calculateSVresult(instr, results, wbout.rd.reg.peek, sReg, vReg(execThread))
+      calculateSVresult(instr, results, wbout.rd.reg.peek(), sReg, vReg(execThread))
     } else {
       throw new IllegalArgumentException("Unknown Rtype modifier")
     }
     wbout.rd.rf.expect(RegisterFileType.VREG)
-    assertEquals(wbout.wrData(0).peek, results(0))
+    assertEquals(wbout.wrData(0).peek(), results(0))
     for(i <- 0 until VREG_DEPTH) {
-      results(i) = wbout.wrData(i).peek //to avoid any incremental changes we store the calculated values
+      results(i) = wbout.wrData(i).peek() //to avoid any incremental changes we store the calculated values
     }
   }
 
@@ -135,9 +135,9 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     }
     wb.rd.rf.expect(RegisterFileType.XREG)
     wb.rd.subvec.expect(0.U)
-    assertEquals(wb.wrData(0).peek, results(0))
+    assertEquals(wb.wrData(0).peek(), results(0))
     for (i <- 0 until NUM_PROCELEM) {
-      results(i) = wb.wrData(i).peek
+      results(i) = wb.wrData(i).peek()
     }
     wb.wrData(NUM_PROCELEM).expect(0.S)
   }
@@ -164,9 +164,9 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     wbout.rd.rf.expect(RegisterFileType.SREG)
     wbout.rd.reg.expect(instr.rd)
     wbout.rd.subvec.expect(0.U)
-    assertEquals(wbout.wrData(0).peek, results(0))
+    assertEquals(wbout.wrData(0).peek(), results(0))
     for(i <- 0 until NUM_PROCELEM) {
-      results(i) = wbout.wrData(i).peek
+      results(i) = wbout.wrData(i).peek()
     }
     wbout.wrData(NUM_PROCELEM).expect(0.S)
   }
@@ -186,13 +186,13 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
     if(rf == VREG.litValue) {
       //KV, VV, XV and SV-instructions generate multiple results. We need to observe all of those results
       for(i <- 0 until VREG_SLOT_WIDTH) {
-        while(!wbout.we.peek.litToBoolean) {
+        while(!wbout.we.peek().litToBoolean) {
           //We still need to perform MAC instructions bookkeeping
           clock.step()
           handleMACSVandMACVV(idout, MACresults)
         }
         expectVREG(wbout, instr, results)
-        updateVREG(instr, results, wbout.rd.reg.peek, vReg(execThread))
+        updateVREG(instr, results, wbout.rd.reg.peek(), vReg(execThread))
         if (i < VREG_SLOT_WIDTH-1) {
           clock.step()
           handleMACSVandMACVV(idout, MACresults)
@@ -217,8 +217,8 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
    */
   def handleMACSVandMACVV(idout: IdExIO, MACresults: Array[SInt]): Unit = {
     val isMACinstruction = idout.valid.peek().litToBoolean &&
-      idout.opUInt.peek.litValue == Opcode.MAC.litValue() &&
-      idout.dest.rfUint.peek.litValue == RegisterFileType.SREG.litValue
+      idout.opUInt.peek().litValue == Opcode.MAC.litValue &&
+      idout.dest.rfUint.peek().litValue == RegisterFileType.SREG.litValue
     val macLimit = ELEMS_PER_VSLOT / NUM_PROCELEM //Number of elements added to each result register on each MAC iteration
     /*
       When a mac is noticed on the output, the actual values arrive one clock cycle later since the reg file is a syncreadmem
@@ -229,8 +229,8 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
      */
     if((isMACinstruction && !firstMAC) || (0 < macCnt && macCnt < macLimit)) {
       for(i <- 0 until NUM_PROCELEM) {
-        val a = idout.a(i).peek
-        val b = if(idout.useImm.peek.litToBoolean) idout.imm.peek else idout.b(i).peek
+        val a = idout.a(i).peek()
+        val b = if(idout.useImm.peek().litToBoolean) idout.imm.peek() else idout.b(i).peek()
         MACresults(i) = fixedAdd(MACresults(i), fixedMul(a,b))
       }
       macCnt += 1
@@ -274,7 +274,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
 
     //We need a special check to ensure correct functionality if only instruction is of type mac.vv/mac.sv
     if(iBuffer.exec.length == 1 && iBuffer.exec(0).op.litValue == MAC.litValue &&
-      (iBuffer.exec(0).mod.litValue == RtypeMod.SV.litValue || iBuffer.exec(0).mod.litValue() == RtypeMod.VV.litValue)) {
+      (iBuffer.exec(0).mod.litValue == RtypeMod.SV.litValue || iBuffer.exec(0).mod.litValue == RtypeMod.VV.litValue)) {
       maxProgress = 1
       progressIncr = 1
     }
@@ -325,13 +325,13 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
 //    iBuffer.exec.clear()
 //    iBuffer.store.clear()
 //    do {
-//      instr = idctrl.instr.peek
+//      instr = idctrl.instr.peek()
 //      fmt = InstructionFMT(instr(7, 6).litValue.toInt)
 //      if (fmt.litValue == InstructionFMT.OTYPE.litValue) {
 //        //Do nothing
-//      } else if (fmt.litValue == InstructionFMT.RTYPE.litValue()) {
+//      } else if (fmt.litValue == InstructionFMT.RTYPE.litValue) {
 //        iBuffer.exec += RtypeInstruction(instr)
-//      } else if (fmt.litValue == InstructionFMT.STYPE.litValue()) {
+//      } else if (fmt.litValue == InstructionFMT.STYPE.litValue) {
 //        iBuffer.store += StypeInstruction(instr)
 //      } else {
 //        throw new IllegalArgumentException("Unable to decode format")
@@ -339,7 +339,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
 //      i += 1
 //      clock.step()
 //      //Continue until we get iend instruction
-//    } while(instr.litValue != OtypeInstruction(OtypeSE.END, OtypeMod.PACKET).toUInt().litValue())
+//    } while(instr.litValue != OtypeInstruction(OtypeSE.END, OtypeMod.PACKET).toUInt().litValue)
 //  }
 
   /**
@@ -349,7 +349,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
   def testFun(dut: ExecutePipeline): Unit = {
     setGlobals(dut.decode)
     dut.clock.step() //1 cycle to get instruction into decode stage
-    assert(dut.io.idctrl.instr.peek.litValue != 0, "Peeked instruction with value 0, did not init memory correctly")
+    assert(dut.io.idctrl.instr.peek().litValue != 0, "Peeked instruction with value 0, did not init memory correctly")
     while (dut.io.idctrl.instr.peek().litValue != 0) {
       //Always snoop on instruction at decode stage
       val instr = dut.io.idctrl.instr.peek()
@@ -363,7 +363,7 @@ class ExecutePipelineSpec extends FlatSpec with ChiselScalatestTester with Match
         fillInstructionBuffer(dut.io.idctrl, dut.clock, iBuffer)
         performExecution(dut.io.wbout, dut.io.idout, dut.clock, iBuffer)
         //Wait until all threads are idle
-        while (dut.io.idctrl.stateUint.peek.litValue != DecodeState.sIdle.litValue()) {
+        while (dut.io.idctrl.stateUint.peek().litValue != DecodeState.sIdle.litValue) {
           dut.clock.step()
         }
       }

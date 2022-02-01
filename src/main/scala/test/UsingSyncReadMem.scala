@@ -24,10 +24,10 @@ class UsingSyncReadMem extends Module {
   val rdDataReg = RegEnable(rdData, validOp)
 
   for(i <- 0 until 2) {
-    rdData(i) := mem(i).read((io.addr(i) >> 2).asUInt())
+    rdData(i) := mem(i).read((io.addr(i) >> 2).asUInt)
     we(i) := io.we(i) && io.en
     when(we(i)) {
-      mem(i).write((io.addr(i) >> 2).asUInt(), io.wrData(i))
+      mem(i).write((io.addr(i) >> 2).asUInt, io.wrData(i))
     }
     loadMemoryFromFile(mem(i), "src/test/scala/memory/membankinit/membank_" + i + ".txt")
   }

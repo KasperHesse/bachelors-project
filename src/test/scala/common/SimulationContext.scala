@@ -80,7 +80,7 @@ class SimulationContext {
           s"${memInitFileLocation}/membank_$bank.txt"
         }
         val src = Source.fromFile(file)
-        for(line <- src.getLines.zipWithIndex) {
+        for(line <- src.getLines().zipWithIndex) {
           mem(bank)(line._2) = utils.Fixed.string2fixed(line._1)
         }
       }
@@ -93,22 +93,22 @@ class SimulationContext {
    */
   def packetSetup(): Unit = {
     import OtypeLen._
-    if(iBuffer.pstart.len.litValue() == SINGLE.litValue) {
+    if(iBuffer.pstart.len.litValue == SINGLE.litValue) {
       maxProgress = 1
       progressIncr = 1
-    } else if (iBuffer.pstart.len.litValue() == DOUBLE.litValue()) {
+    } else if (iBuffer.pstart.len.litValue == DOUBLE.litValue) {
       maxProgress = 2
       progressIncr = 1
       MAClength = NDOFLENGTH
-    } else if (iBuffer.pstart.len.litValue() == NELEMVEC.litValue) {
+    } else if (iBuffer.pstart.len.litValue == NELEMVEC.litValue) {
       maxProgress = NELEMLENGTH
       progressIncr = ELEMS_PER_VSLOT
       MAClength = NELEMLENGTH
-    } else if (iBuffer.pstart.len.litValue() == NELEMSTEP.litValue()) {
+    } else if (iBuffer.pstart.len.litValue == NELEMSTEP.litValue) {
       maxProgress = NELEM
       progressIncr = 1
       MAClength = 1
-    } else if (iBuffer.pstart.len.litValue() == NDOF.litValue()) {
+    } else if (iBuffer.pstart.len.litValue == NDOF.litValue) {
       maxProgress = NDOFLENGTH
       progressIncr = ELEMS_PER_VSLOT
       MAClength = NDOFLENGTH
@@ -197,7 +197,7 @@ class SimulationContext {
   def increaseMemoryBase(): Unit = {
     this.vecBaseIndex(this.memThread) = this.vecBaseIndex(this.execThread) + ELEMS_PER_VSLOT //Vec progress always increments by this amount
 
-    if(this.iBuffer.pstart.len.litValue() == OtypeLen.NELEMSTEP.litValue) { //On nelemstep, we just move to the very next ijk value
+    if(this.iBuffer.pstart.len.litValue == OtypeLen.NELEMSTEP.litValue) { //On nelemstep, we just move to the very next ijk value
       this.ijkBase(this.memThread) = nextIJK(this.ijkBase(this.execThread))
     } else { //On all others, we move forward by XREG_DEPTH ijk values compared to execThread
       this.ijkBase(this.memThread) = genIJKmultiple(start=Some(this.ijkBase(this.execThread)), XREG_DEPTH+1).last
@@ -237,7 +237,7 @@ object MemoryContainerTest extends App {
         s"${memInitFileLocation}/membank_$bank.txt"
       }
       val src = Source.fromFile(file)
-      for(line <- src.getLines.zipWithIndex) {
+      for(line <- src.getLines().zipWithIndex) {
         val x = utils.Fixed.string2fixed(line._1)
         val y = fixed2long(x)
         println(f"$x%-30s\t\t$y%2d")

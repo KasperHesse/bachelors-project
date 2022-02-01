@@ -1,17 +1,16 @@
-package vector
+package execution
 
 import chisel3._
 import chisel3.util._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Fixed._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import execution.{MatrixProcessingUnit, Opcode}
 import execution.Opcode._
 import utils.Config.simulationConfig
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class MatrixProcessingUnitSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Matrix processing unit"
 
   /**
@@ -52,7 +51,7 @@ class MatrixProcessingUnitSpec extends FlatSpec with ChiselScalatestTester with 
       if(dut.io.out.valid.peek().litToBoolean) {
         //Using assert instead of expect due to rounding errors when dividing.
         for(j <- 0 until nelem) {
-          assert(math.abs(fixed2double(results(j)(resultCnt)) - fixed2double(dut.io.out.res(j).peek)) < 1E-5)
+          assert(math.abs(fixed2double(results(j)(resultCnt)) - fixed2double(dut.io.out.res(j).peek())) < 1E-5)
         }
         resultCnt += 1
       }

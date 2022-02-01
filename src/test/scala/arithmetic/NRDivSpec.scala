@@ -3,13 +3,13 @@ package arithmetic
 import chisel3._
 import chisel3.util._
 import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 import utils.Fixed._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import utils.Config._
 
-class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class NRDivSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Newton-Raphson division module"
 
   /**
@@ -85,7 +85,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.io.in.numer.poke(numer.S)
       dut.io.in.denom.poke(denom.S)
       dut.clock.step()
-      if((dut.io.out.numer.peek.litValue().toLong != np) || (dut.io.out.denom.peek.litValue().toLong != dp)) {
+      if((dut.io.out.numer.peek().litValue.toLong != np) || (dut.io.out.denom.peek().litValue.toLong != dp)) {
         print(s"denom=$denom (${fixed2double(denom)}), numer=$numer (${fixed2double(numer)})\n")
         print(s"dp=$dp (${fixed2double(dp)}), out.denom=${dut.io.out.denom.peek()}\n")
         print(s"np=$np (${fixed2double(np)}), out.numer=${dut.io.out.numer.peek()}\n")
@@ -111,7 +111,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.io.in.valid.poke(true.B)
       dut.clock.step()
       dut.io.in.valid.poke(false.B)
-      while(!dut.io.out.valid.peek.litToBoolean) {
+      while(!dut.io.out.valid.peek().litToBoolean) {
         dut.clock.step()
       }
 
@@ -141,7 +141,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.io.in.valid.poke(true.B)
       dut.clock.step()
       dut.io.in.valid.poke(false.B)
-      while(!dut.io.out.valid.peek.litToBoolean) {
+      while(!dut.io.out.valid.peek().litToBoolean) {
         dut.clock.step()
       }
 //      dut.clock.step(4)
@@ -224,7 +224,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.clock.step()
       if(dut.io.out.valid.peek().litToBoolean) {
         val orig = ys(resultCnt)/xs(resultCnt)
-        val got = fixed2double(dut.io.out.res.peek.litValue.toLong)
+        val got = fixed2double(dut.io.out.res.peek().litValue.toLong)
         val diff = math.abs(orig-got)
 
         maxdiff = math.max(maxdiff,diff)
@@ -274,7 +274,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       }
       dut.clock.step()
       if(dut.io.out.valid.peek().litToBoolean) {
-        assert(math.abs(results(resultCnt) - fixed2double(dut.io.out.res.peek)) < 1E-2)
+        assert(math.abs(results(resultCnt) - fixed2double(dut.io.out.res.peek())) < 1E-2)
         resultCnt += 1
       } else if(i > 10) {
       }
@@ -335,10 +335,10 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.io.in.denom.poke(op2.S)
       print(s"op1=${op1}(${fixed2double(op1)}), op2=${op2}(${fixed2double(op2)})\n")
       dut.io.in.valid.poke(true.B)
-      while(!dut.io.out.valid.peek.litToBoolean) {
+      while(!dut.io.out.valid.peek().litToBoolean) {
         dut.clock.step()
       }
-      print(s"Got: ${dut.io.out.res.peek} / ${fixed2double(dut.io.out.res.peek)}\n")
+      print(s"Got: ${dut.io.out.res.peek()} / ${fixed2double(dut.io.out.res.peek())}\n")
       nrDiv(op1, op2)
     }
   }
@@ -351,7 +351,7 @@ class NRDivSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.io.in.numer.poke(op1)
       dut.io.in.denom.poke(op2)
       dut.io.in.valid.poke(true.B)
-      while(!dut.io.out.valid.peek.litToBoolean) {
+      while(!dut.io.out.valid.peek().litToBoolean) {
         dut.clock.step()
       }
       println(s"res: ${fixed2double(dut.io.out.res.peek())}, expected ${fixed2double(fixedDiv(op1,op2))}")

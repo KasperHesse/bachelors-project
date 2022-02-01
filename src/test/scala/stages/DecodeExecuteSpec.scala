@@ -2,15 +2,15 @@ package stages
 
 import chisel3._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import execution.Opcode._
 import execution._
-import org.scalatest.{FlatSpec, Matchers}
+
 import utils.Config._
 import utils.Fixed._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class DecodeExecuteSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Decode execute stages"
 
   var MAClength: Int = _
@@ -27,7 +27,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val op: Opcode.Type = instr.op
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
-    val rd = instr.rd.litValue().toInt
+    val rd = instr.rd.litValue.toInt
 
     if(op.litValue == MAC.litValue) {
       //Example: Each register is 16(VECTOR_REGISTER_DEPTH) elements deep, and 4(NUM_PROCELEM) elements are processed on each clock cycle.
@@ -64,7 +64,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
           val op1 = vReg(s + rs1 * VREG_SLOT_WIDTH)(i)
           val op2 = vReg(s + rs2 * VREG_SLOT_WIDTH)(i)
           val res = calculateRes(instr, op1, op2)
-          assert(math.abs(fixed2double((dut.io.out.res(0).peek.litValue - res.litValue).toLong)) < 1e-2)
+          assert(math.abs(fixed2double((dut.io.out.res(0).peek().litValue - res.litValue).toLong)) < 1e-2)
           dut.io.out.dest.reg.expect((rd*VREG_SLOT_WIDTH+s).U)
           dut.io.out.dest.subvec.expect((i / NUM_PROCELEM).U)
           dut.clock.step()
@@ -76,7 +76,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
   def expectXVvalues(dut: DecodeExecute, instr: RtypeInstruction): Unit = {
     val rs1 = instr.rs1.litValue.toInt
     val rs2 = instr.rs2.litValue.toInt
-    val rd = instr.rd.litValue().toInt
+    val rd = instr.rd.litValue.toInt
     val subvecsPerVreg = VREG_DEPTH/NUM_PROCELEM
     val vReg = dut.decode.threads(0).vRegFile.arr
     val xReg = dut.decode.threads(0).xRegFile.arr
@@ -88,7 +88,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
           val op2 = vReg(s+rs2*VREG_SLOT_WIDTH)(i*NUM_PROCELEM+j)
           val res = calculateRes(instr, op1, op2)
-          assert(math.abs(fixed2double(dut.io.out.res(j).peek) - fixed2double(res)) < 1e-2)
+          assert(math.abs(fixed2double(dut.io.out.res(j).peek()) - fixed2double(res)) < 1e-2)
           dut.io.out.dest.reg.expect((rd*VREG_SLOT_WIDTH + s).U)
           dut.io.out.dest.subvec.expect(i.U)
         }
@@ -108,7 +108,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       val op1 = xReg(rs1)(i)
       val op2 = xReg(rs2)(i)
       val res = calculateRes(instr, op1, op2)
-      assert(math.abs(fixed2double((dut.io.out.res(i).peek.litValue - res.litValue).toLong)) < 1e-2)
+      assert(math.abs(fixed2double((dut.io.out.res(i).peek().litValue - res.litValue).toLong)) < 1e-2)
       dut.io.out.dest.reg.expect(rd)
       dut.io.out.dest.subvec.expect(0.U)
       dut.io.out.dest.rf.expect(RegisterFileType.XREG)
@@ -151,7 +151,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
           for (j <- 0 until NUM_PROCELEM) {
             val b = vReg(s + rs2 * VREG_SLOT_WIDTH)(i * NUM_PROCELEM + j)
             val res = calculateRes(instr, a, b)
-            assert(math.abs(fixed2double((dut.io.out.res(j).peek.litValue - res.litValue).toLong)) < 1e-2)
+            assert(math.abs(fixed2double((dut.io.out.res(j).peek().litValue - res.litValue).toLong)) < 1e-2)
             dut.io.out.dest.rf.expect(RegisterFileType.VREG)
             dut.io.out.dest.reg.expect((s + rd * VREG_SLOT_WIDTH).U)
             dut.io.out.dest.subvec.expect(i.U)
@@ -173,7 +173,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       val op1 = sReg(rs1)
       val op2 = xReg(rs2)(i)
       val res = calculateRes(instr, op1, op2)
-      assert(math.abs(fixed2double((dut.io.out.res(i).peek.litValue - res.litValue).toLong)) < 1e-2)
+      assert(math.abs(fixed2double((dut.io.out.res(i).peek().litValue - res.litValue).toLong)) < 1e-2)
       dut.io.out.dest.reg.expect(rd)
       dut.io.out.dest.subvec.expect(0.U)
       dut.io.out.dest.rf.expect(RegisterFileType.XREG)
@@ -192,7 +192,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       val op1 = sReg(rs1)
       val op2 = sReg(rs2)
       val res = calculateRes(instr, op1, op2)
-      assert(math.abs(fixed2double((dut.io.out.res(i).peek.litValue - res.litValue).toLong)) < 1e-2)
+      assert(math.abs(fixed2double((dut.io.out.res(i).peek().litValue - res.litValue).toLong)) < 1e-2)
       dut.io.out.dest.reg.expect(rd)
       dut.io.out.dest.subvec.expect(0.U)
       dut.io.out.dest.rf.expect(RegisterFileType.SREG)
@@ -212,7 +212,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     var resMax = KE_SIZE //KE_SIZE/NUM_PROCELEM (eg 24/8=3) outputs per. matrix-vector product
     //Multiplied by VREG_SLOT_WIDTH outputs per slot. Since VREG_SLOT_WIDTH==NUM_PROCELEM, we get KE_SIZE total results
     while (i < 600 && resCnt < resMax) {
-      if (dut.io.out.valid.peek.litToBoolean) {
+      if (dut.io.out.valid.peek().litToBoolean) {
         //Slices of KE-matrix that goes into this result
         val slices = KE.slice((resCnt % smpr) * KE_SIZE, ((resCnt % smpr) + 1) * KE_SIZE)
         //B-values used for this result
@@ -249,17 +249,17 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
 //    print(s"Expecting for mod ${instr.mod}\n")
     if(mod == RtypeMod.VV.litValue) {
       expectVVvalues(dut, instr)
-    } else if (mod == RtypeMod.XV.litValue()) {
+    } else if (mod == RtypeMod.XV.litValue) {
       expectXVvalues(dut, instr)
-    } else if (mod == RtypeMod.XX.litValue()) {
+    } else if (mod == RtypeMod.XX.litValue) {
       expectXXvalues(dut, instr)
-    } else if (mod == RtypeMod.SV.litValue()) {
+    } else if (mod == RtypeMod.SV.litValue) {
       expectSVvalues(dut, instr)
-    } else if (mod == RtypeMod.SX.litValue()) {
+    } else if (mod == RtypeMod.SX.litValue) {
       expectSXvalues(dut, instr)
-    } else if (mod == RtypeMod.SS.litValue()) {
+    } else if (mod == RtypeMod.SS.litValue) {
       expectSSvalues(dut, instr)
-    } else if(mod == RtypeMod.KV.litValue()) {
+    } else if(mod == RtypeMod.KV.litValue) {
       expectKVvalues(dut, instr)
     } else {
         throw new IllegalArgumentException("Unknown Rtype modifier")
@@ -292,7 +292,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     } else if (len.litValue == NDOF.litValue) {
       maxProgress = NDOFLENGTH
       progressIncr = ELEMS_PER_VSLOT
-    } else if (len.litValue() == NELEMVEC.litValue()) {
+    } else if (len.litValue == NELEMVEC.litValue) {
       maxProgress = NELEMLENGTH
       progressIncr = ELEMS_PER_VSLOT
     } else {
@@ -305,7 +305,7 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       var resCnt = 0 //How many instructions of the current packet have been processed
       print(s"resCnt(${instrs.length}): ")
       while(resCnt < instrs.length && i < 300) {
-        if(dut.io.out.valid.peek.litToBoolean) {
+        if(dut.io.out.valid.peek().litToBoolean) {
           //MAC.VV instructions only output on the final cycle of that packet. Skip them while working towards the final outputs
           if(instrs(resCnt).op.litValue == MAC.litValue && instrs(resCnt).mod.litValue == RtypeMod.VV.litValue && progress != (maxProgress-progressIncr)) {
             resCnt += 1
@@ -325,8 +325,8 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
     dut.clock.step(6)
     assert(progress == maxProgress)
     dut.io.exctrl.empty.expect(true.B)
-    dut.io.idctrl.threadCtrl(0).stateUint.expect(ThreadState.sIdle.litValue().U)
-    dut.io.idctrl.threadCtrl(1).stateUint.expect(ThreadState.sIdle.litValue().U)
+    dut.io.idctrl.threadCtrl(0).stateUint.expect(ThreadState.sIdle.litValue.U)
+    dut.io.idctrl.threadCtrl(1).stateUint.expect(ThreadState.sIdle.litValue.U)
   }
 
   /**
@@ -446,10 +446,10 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
       var fc = 0
       var i = 0
-      var execThread = dut.io.idctrl.execThread.peek.litValue.toInt
+      var execThread = dut.io.idctrl.execThread.peek().litValue.toInt
       while(i < 100 && fc < 2) {
-        execThread = dut.io.idctrl.execThread.peek.litValue.toInt
-        if(dut.io.idctrl.threadCtrl(execThread).finalCycle.peek.litToBoolean) {fc += 1}
+        execThread = dut.io.idctrl.execThread.peek().litValue.toInt
+        if(dut.io.idctrl.threadCtrl(execThread).finalCycle.peek().litToBoolean) {fc += 1}
         dut.clock.step()
         i += 1
       }
@@ -457,8 +457,8 @@ class DecodeExecuteSpec extends FlatSpec with ChiselScalatestTester with Matcher
       fc = 0
       i = 0
       while(i < 20 && fc < 1) {
-        execThread = dut.io.idctrl.execThread.peek.litValue.toInt
-        if(dut.io.execStall.peek.litToBoolean) {
+        execThread = dut.io.idctrl.execThread.peek().litValue.toInt
+        if(dut.io.execStall.peek().litToBoolean) {
           fc = 1
         }
         i += 1

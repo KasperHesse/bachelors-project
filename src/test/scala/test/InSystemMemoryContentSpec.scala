@@ -1,12 +1,11 @@
 package test
 
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import chisel3._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class InSystemMemoryContentSpec extends FlatSpec with ChiselScalatestTester with Matchers  {
+class InSystemMemoryContentSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers  {
   it should "generate vcd" in {
     test(new InSystemMemoryContent(8)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       dut.clock.step(200)

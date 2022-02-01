@@ -2,14 +2,13 @@ package stages
 
 import chisel3._
 import chiseltest._
-import chiseltest.internal.WriteVcdAnnotation
-import chiseltest.experimental.TestOptionBuilder._
-import execution.{OtypeInstruction, OtypeLen, OtypeMod, OtypeSE}
-import org.scalatest.{FlatSpec, Matchers}
+import execution.{OtypeInstruction, OtypeLen, OtypeMod, OtypeSE}
 import utils.Assembler
 import utils.Config.{SIMULATION, simulationConfig}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class DecodeTimingSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class DecodeTimingSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Decode and timing stages"
 
   it should "output a vcd file" in {

@@ -102,7 +102,7 @@ class Thread(id: Int) extends Module {
   /** LUT to determine maximum index to access for ld.vec and st.vec operations */
    //If eg. NDOFSIZE != NDOFLENGTH, the system will start loading/storing values from the next vector in memory.
    //To avoid this, when index >= maxIndex, the vector index generator will make the indices invalid, causing it to load 0's and not perform stores from/to memory
-  val maxIndexDecode = VecInit(Array(
+  val maxIndexDecode = VecInit(Seq(
     NDOFSIZE.U, //len == NDOF.
     1.U, //len is invalid
     ELEMS_PER_VSLOT.U, //len == SINGLE
@@ -259,10 +259,10 @@ class Thread(id: Int) extends Module {
 
   /** Debug values */
   //TODO Remove these
-  io.stateOutUint := state.asUInt()
-  io.ctrl.stateUint := state.asUInt()
-  io.ex.dest.rfUint := dest.rf.asUInt()
-  io.ex.opUInt := op.asUInt()
+  io.stateOutUint := state.asUInt
+  io.ctrl.stateUint := state.asUInt
+  io.ex.dest.rfUint := dest.rf.asUInt
+  io.ex.opUInt := op.asUInt
 
 
   // --- LOGIC ---
@@ -275,7 +275,7 @@ class Thread(id: Int) extends Module {
       IP := 0.U
       when(Oinst.mod === OtypeMod.PACKET && Oinst.se === OtypeSE.START && Oinst.fmt === InstructionFMT.OTYPE && io.start) {
         IP := 1.U
-        maxIndex := maxIndexDecode(Oinst.len.asUInt())
+        maxIndex := maxIndexDecode(Oinst.len.asUInt)
         instrLen := Oinst.len
         if(id == 0) {
           state := sLoad

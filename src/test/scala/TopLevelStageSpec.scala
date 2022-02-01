@@ -1,11 +1,9 @@
 import chiseltest.ChiselScalatestTester
-import org.scalatest.{FlatSpec, Matchers}
+
 import chisel3._
 import chisel3.util.log2Ceil
 import common._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.{VerilatorBackendAnnotation, WriteVcdAnnotation}
 import execution.Opcode.MAC
 import execution._
 import firrtl.AnnotationSeq
@@ -16,8 +14,10 @@ import utils.Fixed._
 
 import java.io.{BufferedWriter, FileWriter, Writer}
 import scala.io.Source
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class TopLevelStageSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Top Level"
 
   val LOGGING = false
@@ -63,7 +63,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
         rdData(i) = 0.S
       }
     }
-    rdData
+    rdData.toIndexedSeq
   }
 
   /**
@@ -101,7 +101,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    */
   def loadIntoVreg(memid: WbIdIO, clock: Clock, instr: StypeInstruction, expected: Seq[Seq[SInt]], sc: SimulationContext): Unit = {
     for(i <- expected.indices) {
-      while(!memid.we.peek.litToBoolean) { clock.step() }
+      while(!memid.we.peek().litToBoolean) { clock.step() }
 
       val exp = expected(i)
       val reg = instr.rsrd.litValue.toInt*VREG_SLOT_WIDTH + i
@@ -125,7 +125,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    * @param sc The simulation context used for this simulation
    */
   def loadIntoXreg(memid: WbIdIO, clock: Clock, instr: StypeInstruction, expected: Seq[SInt], sc: SimulationContext): Unit = {
-    while(!memid.we.peek.litToBoolean) { clock.step() }
+    while(!memid.we.peek().litToBoolean) { clock.step() }
 
     val reg = instr.rsrd.litValue.toInt
     for(j <- expected.indices) {
@@ -220,7 +220,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val indices = Seq(elementIndex(ijk))
 
     while(!idmem.writeQueue.valid.peek().litToBoolean) { clock.step() }
-    val wrData: SInt = idmem.writeQueue.bits.wrData(0).peek
+    val wrData: SInt = idmem.writeQueue.bits.wrData(0).peek()
     storeData(indices, clock, instr.baseAddr, sc, Seq(wrData))
   }
 
@@ -252,7 +252,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
 
     for(ind <- indices) {
       while(!idmem.writeQueue.valid.peek().litToBoolean) { clock.step() }
-      val wrData = idmem.writeQueue.bits.wrData(0).peek
+      val wrData = idmem.writeQueue.bits.wrData(0).peek()
       storeData(Seq(ind), clock, instr.baseAddr, sc, Seq(wrData))
     }
   }
@@ -266,7 +266,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
   def performLoadDof(memid: WbIdIO, clock: Clock, sc: SimulationContext, instr: StypeInstruction): Unit = {
     val ijk = genIJKmultiple(start=Some(sc.ijkBase(sc.memThread))) //Generate all ijk tuples accessed
     val edof = ijk.map(e => getEdof(e(0), e(1), e(2))) //And the corresponding memory locations
-    val expectedData = edof.map(e => determineExpectedLoadData(e, instr.baseAddr, sc))
+    val expectedData = edof.map(e => determineExpectedLoadData(e.toIndexedSeq, instr.baseAddr, sc))
     loadIntoVreg(memid, clock, instr, expectedData, sc)
 
     //Extract iteration values from ijk values, for use in mac.kv instructions
@@ -289,11 +289,11 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val wrData = Array.ofDim[SInt](NUM_MEMORY_BANKS)
 
     for(ind <- indices) {
-      while(!idmem.writeQueue.valid.peek.litToBoolean) { clock.step() }
+      while(!idmem.writeQueue.valid.peek().litToBoolean) { clock.step() }
       for(i <- wrData.indices) {
-        wrData(i) = idmem.writeQueue.bits.wrData(i).peek
+        wrData(i) = idmem.writeQueue.bits.wrData(i).peek()
       }
-      storeData(ind, clock, instr.baseAddr, sc, wrData)
+      storeData(ind, clock, instr.baseAddr, sc, wrData.toIndexedSeq)
     }
   }
 
@@ -310,11 +310,11 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val indices = ijk.flatMap(e => getFdof(e(0), e(1), e(2))).grouped(NUM_MEMORY_BANKS)
     val wrData = Array.ofDim[SInt](NUM_MEMORY_BANKS)
     for(ind <- indices) {
-      while(!idmem.writeQueue.valid.peek.litToBoolean) { clock.step() }
+      while(!idmem.writeQueue.valid.peek().litToBoolean) { clock.step() }
       for(i <- wrData.indices) {
-        wrData(i) = idmem.writeQueue.bits.wrData(i).peek
+        wrData(i) = idmem.writeQueue.bits.wrData(i).peek()
       }
-      storeData(ind, clock, instr.baseAddr, sc, wrData)
+      storeData(ind, clock, instr.baseAddr, sc, wrData.toIndexedSeq)
     }
   }
 
@@ -348,11 +348,11 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
     val indices = Seq.tabulate(VREG_DEPTH)(n => Seq.range(baseIndex+n*NUM_MEMORY_BANKS, baseIndex+(n+1)*NUM_MEMORY_BANKS)) //All indices to access
     val wrData = Array.ofDim[SInt](NUM_MEMORY_BANKS)
     for(ind <- indices) { //For each set of indices, get data and store it
-      while(!idmem.writeQueue.valid.peek.litToBoolean) { clock.step() }
+      while(!idmem.writeQueue.valid.peek().litToBoolean) { clock.step() }
       for (i <- wrData.indices) {
-        wrData(i) = idmem.writeQueue.bits.wrData(i).peek
+        wrData(i) = idmem.writeQueue.bits.wrData(i).peek()
       }
-      storeData(ind, clock, instr.baseAddr, sc, wrData)
+      storeData(ind, clock, instr.baseAddr, sc, wrData.toIndexedSeq)
     }
   }
 
@@ -365,7 +365,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
    */
   def handleMemoryLoadOperations(memid: WbIdIO, clock: Clock, sc: SimulationContext): Unit = {
     for(li <- sc.iBuffer.load) {
-      while(!memid.we.peek.litToBoolean) {
+      while(!memid.we.peek().litToBoolean) {
         clock.step()
       }
 
@@ -383,9 +383,9 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
         performLoadEdn1(memid, clock, sc, li)
       } else if (li.mod.litValue == StypeMod.EDN2.litValue) {
         performLoadEdn2(memid, clock, sc, li)
-      } else if (li.mod.litValue == StypeMod.FCN.litValue()) {
+      } else if (li.mod.litValue == StypeMod.FCN.litValue) {
         performLoadFcn(memid, clock, sc, li)
-      } else if (li.mod.litValue() == StypeMod.SEL.litValue()) {
+      } else if (li.mod.litValue == StypeMod.SEL.litValue) {
         performLoadSel(memid, clock, sc, li)
       } else {
         throw new IllegalArgumentException(f"Unable to decode S-type load instruction. Mod was ${li.mod}")
@@ -406,7 +406,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
       handleMACSVandMACVV(idex, sc)
 
       //Using if(we) instead of while(!we) to ensure that we always clock once after observing a result
-      if(wbid.we.peek.litToBoolean) {
+      if(wbid.we.peek().litToBoolean) {
 
         //MAC.VV, MAC.SV instructions only generate actual output on the final cycle of that packet.
         // Skip them while working towards the final output
@@ -436,20 +436,20 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
   def handleMemoryStoreOperations(idmem: IdMemIO, clock: Clock, sc: SimulationContext): Unit = {
     //Wait until an operation is started on one of the three channels
     for(si <- sc.iBuffer.store) {
-      while(!idmem.writeQueue.valid.peek.litToBoolean) {
+      while(!idmem.writeQueue.valid.peek().litToBoolean) {
         clock.step()
       }
 
       log(f"${sc.memThread} Storing instruction $si")
       if(si.mod.litValue == StypeMod.VEC.litValue) {
         performStoreVec(idmem, clock, sc, si)
-      } else if (si.mod.litValue() == StypeMod.DOF.litValue) {
+      } else if (si.mod.litValue == StypeMod.DOF.litValue) {
         performStoreDof(idmem, clock, sc, si)
-      } else if (si.mod.litValue() == StypeMod.FDOF.litValue) {
+      } else if (si.mod.litValue == StypeMod.FDOF.litValue) {
         performStoreFdof(idmem, clock, sc, si)
-      }else if (si.mod.litValue() == StypeMod.ELEM.litValue) {
+      }else if (si.mod.litValue == StypeMod.ELEM.litValue) {
         performStoreElem(idmem, clock, sc ,si)
-      } else if (si.mod.litValue() == StypeMod.SEL.litValue()) {
+      } else if (si.mod.litValue == StypeMod.SEL.litValue) {
         performStoreSel(idmem, clock, sc, si)
       } else {
         throw new IllegalArgumentException(s"Unable to decode S-type store instruction. Mod was ${si.mod}")
@@ -563,15 +563,15 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
       sc.initialize(dut.decode, "src/resources/meminit_sim")
       dut.clock.setTimeout(timeout)
       dut.clock.step() //1 cycle to get first instruction into decode stage
-      assert(dut.io.idctrl.instr.peek.litValue != 0, "Peeked instruction with value 0, did not init memory correctly")
+      assert(dut.io.idctrl.instr.peek().litValue != 0, "Peeked instruction with value 0, did not init memory correctly")
 
-      while(dut.io.idctrl.instr.peek.litValue != 0) { //When instr==0, execution is finished
+      while(dut.io.idctrl.instr.peek().litValue != 0) { //When instr==0, execution is finished
         //NOTE: Does not take into account branch instructions right now
         val instr = dut.io.idctrl.instr.peek()
         val fmt = InstructionFMT(instr(7,6).litValue.toInt)
-        if(fmt.litValue == InstructionFMT.BTYPE.litValue()) { //Take branch
+        if(fmt.litValue == InstructionFMT.BTYPE.litValue) { //Take branch
           verifyBranchOutcome(dut.io.idctrl, dut.clock, BtypeInstruction(instr), sc.sReg)
-        } else if (fmt.litValue == InstructionFMT.OTYPE.litValue() && OtypeInstruction(instr).mod.litValue === OtypeMod.TIME.litValue) {
+        } else if (fmt.litValue == InstructionFMT.OTYPE.litValue && OtypeInstruction(instr).mod.litValue === OtypeMod.TIME.litValue) {
           //Ignore time instructions in simulator, just step past
           dut.clock.step()
         } else {
@@ -588,7 +588,7 @@ class TopLevelStageSpec extends FlatSpec with ChiselScalatestTester with Matcher
           performExecution(dut, sc)
 
           //Wait until all threads are idle
-          while(dut.io.idctrl.stateUint.peek.litValue() != DecodeState.sIdle.litValue()) {
+          while(dut.io.idctrl.stateUint.peek().litValue != DecodeState.sIdle.litValue) {
             dut.clock.step()
           }
         }

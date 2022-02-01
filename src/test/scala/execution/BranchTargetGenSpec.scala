@@ -1,12 +1,13 @@
 package execution
 
 import chisel3._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Config._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 
-class BranchTargetGenSpec extends FlatSpec with ChiselScalatestTester with Matchers  {
+class BranchTargetGenSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers  {
   "Branch target generator" should "generate a branch target" in {
     simulationConfig()
     test(new BranchTargetGenerator) { dut =>
@@ -17,7 +18,7 @@ class BranchTargetGenSpec extends FlatSpec with ChiselScalatestTester with Match
         val pc = 200
         dut.io.pc.poke(pc.U)
         dut.io.instr.poke(instr)
-        print(f"pc: $pc, offset: $offset%6d\t\t expect: ${pc+offset}%6d, got: ${dut.io.target.peek.litValue.toInt}%6d\n")
+        print(f"pc: $pc, offset: $offset%6d\t\t expect: ${pc+offset}%6d, got: ${dut.io.target.peek().litValue.toInt}%6d\n")
         dut.io.target.expect((pc+offset).U)
       }
     }

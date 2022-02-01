@@ -2,12 +2,10 @@ package execution
 
 import chisel3._
 import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+
 import utils.Fixed._
 import chisel3.experimental.BundleLiterals._
 import chisel3.util.DecoupledIO
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import utils.Config
 import utils.Config._
 import Opcode._
@@ -17,8 +15,10 @@ import execution.StypeBaseAddress._
 import execution.StypeLoadStore._
 import memory.{IJKBundle, IJKgeneratorConsumerIO, ReadQueueBundle, genIJKmultiple}
 import execution.RegisterFileType._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class ThreadSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
 
   def expectVVvalues(dut: Thread, inst: RtypeInstruction): Unit = {
     val vReg = dut.vRegFile.arr
@@ -78,9 +78,9 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val mod = i.mod.litValue
     if(mod == RtypeMod.VV.litValue) {
       expectVVvalues(dut, i)
-    } else if (mod == RtypeMod.XV.litValue()) {
+    } else if (mod == RtypeMod.XV.litValue) {
       expectXVvalues(dut, i)
-    } else if (mod == RtypeMod.XX.litValue()) {
+    } else if (mod == RtypeMod.XX.litValue) {
       expectXXvalues(dut, i)
     } else {
       throw new IllegalArgumentException("Unknown Rtype modifier")
@@ -130,19 +130,19 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     var resCnt: Int = 0
 
     while(!fin && i < 300) {
-      val ip = dut.io.ip.peek.litValue.toInt
+      val ip = dut.io.ip.peek().litValue.toInt
       dut.io.instr.poke(instrs(ip).toUInt())
 
       //Assign stateIn to speed through load and store stages
-      if(dut.io.stateOutUint.peek.litValue == sLoad.litValue) {
+      if(dut.io.stateOutUint.peek().litValue == sLoad.litValue) {
         dut.io.threadIn.state.poke(sEend)
         dut.io.start.poke(false.B)
-      } else if (dut.io.stateOutUint.peek.litValue == sExec.litValue) {
+      } else if (dut.io.stateOutUint.peek().litValue == sExec.litValue) {
         dut.io.threadIn.state.poke(sEstart)
       }
 
       //Assert 'fin' once end state has been reached
-      if(dut.io.stateOutUint.peek.litValue == sPend.litValue && resCnt >= numRes) {
+      if(dut.io.stateOutUint.peek().litValue == sPend.litValue && resCnt >= numRes) {
         fin = true
       }
       dut.io.fin.poke(fin.B)
@@ -150,7 +150,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       //Expect output values. Start doing this on the first clock cycle of each instruction
       //Currently pretty ugly, but that's what we have to work with, I guess
       //We need the final check since IP is kept constant for one cycle before moving to sLoad, and we should not expect in that cycle
-      if(dut.io.stateOutUint.peek.litValue == sExec.litValue && dut.io.ctrl.firstCycle.peek.litToBoolean && dut.io.ex.valid.peek.litToBoolean) {
+      if(dut.io.stateOutUint.peek().litValue == sExec.litValue && dut.io.ctrl.firstCycle.peek().litToBoolean && dut.io.ex.valid.peek().litToBoolean) {
         expectValues(dut, instrs(ip).toUInt())
         resCnt += 1
       } else {
@@ -206,17 +206,17 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       dut.io.instr.poke(istart.toUInt())
       dut.clock.step()
 
-      assert(dut.io.stateOutUint.peek.litValue == sWait1.litValue)
+      assert(dut.io.stateOutUint.peek().litValue == sWait1.litValue)
       dut.io.threadIn.state.poke(sEstart)
       dut.clock.step()
 
-      assert(dut.io.stateOutUint.peek().litValue() == sWait2.litValue)
+      assert(dut.io.stateOutUint.peek().litValue == sWait2.litValue)
       dut.clock.step(5)
-      assert(dut.io.stateOutUint.peek().litValue() == sWait2.litValue)
+      assert(dut.io.stateOutUint.peek().litValue == sWait2.litValue)
       dut.io.threadIn.state.poke(sEend)
       dut.clock.step()
 
-      assert(dut.io.stateOutUint.peek.litValue() == sIdle.litValue())
+      assert(dut.io.stateOutUint.peek().litValue == sIdle.litValue)
     }
   }
 
@@ -274,12 +274,12 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       while(!fin & i < 50) {
         fork {
           //Poke the wanted instruction
-          val ip = dut.io.ip.peek.litValue.toInt
+          val ip = dut.io.ip.peek().litValue.toInt
           val instr = instrs(ip)
           dut.io.instr.poke(instr.toUInt())
 
           //Observe outputs
-          if(dut.io.mem.neighbour.valid.peek.litToBoolean) {
+          if(dut.io.mem.neighbour.valid.peek().litToBoolean) {
             for(i <- IJK.indices) {
               val ijk = IJK(i)
               expectIJK(dut.io.mem.neighbour, elem.baseAddr, ijk, elem.mod, pad=false)
@@ -295,7 +295,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
           }
           dut.clock.step()
           i += 1
-        }.join
+        }.join()
       }
       assert(fin)
     }
@@ -320,12 +320,12 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       while(!fin & i < 50) {
         fork {
           //Poke the wanted instruction
-          val ip = dut.io.ip.peek.litValue.toInt
+          val ip = dut.io.ip.peek().litValue.toInt
           val instr = instrs(ip)
           dut.io.instr.poke(instr.toUInt())
 
           //Observe outputs
-          if(dut.io.mem.edof.valid.peek.litToBoolean) {
+          if(dut.io.mem.edof.valid.peek().litToBoolean) {
             for(i <- 0 until IJK.length*SUBVECTORS_PER_VREG) {
               val j = i/SUBVECTORS_PER_VREG
               val ijk = IJK(j)
@@ -347,7 +347,7 @@ class ThreadSpec extends FlatSpec with ChiselScalatestTester with Matchers {
           }
           dut.clock.step()
           i += 1
-        }.join
+        }.join()
       }
       assert(fin)
     }

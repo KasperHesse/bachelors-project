@@ -1,13 +1,14 @@
 package execution
 
 import chisel3._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Fixed._
 import utils.Config._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 
-class ImmGenSpec extends FlatSpec with ChiselScalatestTester with Matchers  {
+class ImmGenSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers  {
   "ImmGen" should "sign extend an immediate" in {
     simulationConfig()
     test(new ImmediateGenerator) { dut =>

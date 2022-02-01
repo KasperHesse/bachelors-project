@@ -17,8 +17,8 @@ object NRDiv extends App {
     val sign2 = numer < 0
 
     //Run the thing. Note that it doesn't work that well with negative operands, so we need to invert them if negative
-    val dp = denom / math.pow(2, (exp1 - 1023) + 1) * (if (sign1) -1 else 1)
-    val np = numer / math.pow(2, (exp1 - 1023) + 1) * (if (sign2) -1 else 1)
+    val dp = denom / math.pow(2, ((exp1 - 1023) + 1).toDouble) * (if (sign1) -1 else 1)
+    val np = numer / math.pow(2, ((exp1 - 1023) + 1).toDouble) * (if (sign2) -1 else 1)
     var X = 48 / 17 - 32 / 17 * dp; //Magic constants
     for (i <- 0 until 4) {
       X = X + X * (1 - dp * X)

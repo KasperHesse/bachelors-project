@@ -3,15 +3,14 @@ package memory
 import chisel3._
 import chisel3.util._
 import chisel3.experimental.BundleLiterals._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Fixed._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import execution.StypeMod
 import utils.Config.{NUM_MEMORY_BANKS, NELX, NELY, NELZ}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class IndexGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class IndexGeneratorSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Index generator"
 
   val NELXH = (NELX+1)/2

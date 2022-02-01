@@ -4,11 +4,10 @@ import chisel3._
 
 
 import chiseltest._
-import chiseltest.internal.WriteVcdAnnotation
-import chiseltest.experimental.TestOptionBuilder._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class MemInitWithVecMemorySpec extends FlatSpec with ChiselScalatestTester with Matchers  {
+class MemInitWithVecMemorySpec extends AnyFlatSpec with ChiselScalatestTester with Matchers  {
   behavior of "Fake vector memory"
 
   it should "store and read the same data" in {

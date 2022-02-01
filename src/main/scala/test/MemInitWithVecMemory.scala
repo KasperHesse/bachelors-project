@@ -21,7 +21,7 @@ class MemInitWithVecMemory(width: Int, depth: Int, bits: Int) extends Module {
 
   val mem = SyncReadMem(width, SInt((depth*bits).W))
   val rdData = mem.read(io.rdAddr)
-  val wrData = io.wrData.asUInt().asSInt() //asUInt to cast down from vec, then asSInt to cast to correct data type
+  val wrData = io.wrData.asUInt.asSInt() //asUInt to cast down from vec, then asSInt to cast to correct data type
   for(i <- 0 until depth) {
     io.rdData(i) := rdData((i+1)*bits-1, i*bits).asSInt()
   }

@@ -1,14 +1,13 @@
 package execution
 
 import chisel3._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Fixed._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import execution.Opcode._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class ProcessingElementSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Processing elements"
 
   /**
@@ -40,7 +39,7 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
       dut.clock.step()
       if(dut.io.out.valid.peek().litToBoolean) {
         //Using assert instead of expect due to rounding errors when dividing.
-        assert(math.abs(fixed2double(results(resultCnt)) - fixed2double(dut.io.out.res.peek)) < 1E-4)
+        assert(math.abs(fixed2double(results(resultCnt)) - fixed2double(dut.io.out.res.peek())) < 1E-4)
         resultCnt += 1
       }
       i += 1
@@ -130,7 +129,7 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
 
     //Pokey pokey
     var i = 0
-    while(!dut.io.out.valid.peek.litToBoolean && i < 50) {
+    while(!dut.io.out.valid.peek().litToBoolean && i < 50) {
       if(i < iters) {
         dut.io.in.a.poke(as(i).S)
         dut.io.in.b.poke(bs(i).S)
@@ -184,7 +183,7 @@ class ProcessingElementSpec extends FlatSpec with ChiselScalatestTester with Mat
       }
       dut.clock.step()
       i += 1
-      if(dut.io.out.valid.peek.litToBoolean) {
+      if(dut.io.out.valid.peek().litToBoolean) {
         dut.io.out.res.expect(results(resultCnt).S)
         resultCnt += 1
       }

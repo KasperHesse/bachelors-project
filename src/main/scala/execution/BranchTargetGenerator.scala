@@ -25,6 +25,6 @@ class BranchTargetGenerator extends Module {
   val top = Mux(sign, ((1 << 14) -1).U(14.W), 0.U(14.W))
   val bot = 0.U(2.W)
   val offset = Cat(Seq(top, io.instr.targeth, io.instr.targetl, bot)).asSInt()
-  val target = (io.pc.asSInt() + offset).asUInt()
+  val target = (io.pc.asSInt() + offset).asUInt
   io.target := target
 }

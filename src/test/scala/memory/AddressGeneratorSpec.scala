@@ -3,14 +3,14 @@ package memory
 import chisel3._
 import chisel3.util._
 import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+
 import utils.Config._
 import utils.Fixed._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import execution.StypeBaseAddress
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class AddressGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers  {
+class AddressGeneratorSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers  {
   behavior of "Address Generator"
 
 
@@ -36,7 +36,7 @@ class AddressGeneratorSpec extends FlatSpec with ChiselScalatestTester with Matc
         pokeIndex(dut, i, addr(i), valid(i))
       }
       dut.io.in.bits.baseAddr.poke(StypeBaseAddress.X)
-      val baseAddr = AddressDecode.mapping(StypeBaseAddress.X.litValue().toInt)
+      val baseAddr = AddressDecode.mapping(StypeBaseAddress.X.litValue.toInt)
       dut.io.mem.ready.poke(true.B)
       dut.io.in.valid.poke(true.B)
       dut.clock.step(1)

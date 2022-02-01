@@ -121,7 +121,7 @@ class NRDivStage1 extends Module {
   val neg = denom(FIXED_WIDTH-1)
 
   //LZC expect 64-bit values. We'll left-shift value up to look like a 64-bit value such that the output is usable
-  lzc.io.in := Mux(neg, ((~denom).asSInt() + 1.S).asUInt(), denom.asUInt()) << (64 - FIXED_WIDTH)
+  lzc.io.in := Mux(neg, ((~denom).asSInt() + 1.S).asUInt, denom.asUInt) << (64 - FIXED_WIDTH)
 
   //Registers for middle of stage
   val denomReg = RegNext(denom)
@@ -155,7 +155,7 @@ class NRDivStage1 extends Module {
   //We right shift the numerator to view some of the bits
   //if eg. left-shift amount is 5, we wish to inspect the 6 MSB. This is found by shifting right with (FIXED_WIDTH-1)-diffAbs
 
-  val shiftedMSB = (numerReg >> (FIXED_WIDTH-1).U(DIFF_WIDTH.W)-diffAbs).asUInt()
+  val shiftedMSB = (numerReg >> (FIXED_WIDTH-1).U(DIFF_WIDTH.W)-diffAbs).asUInt
   when(numerReg(FIXED_WIDTH-1) === 0.U && shiftDir && shiftedMSB =/= 0.U) { //numer is positive, we've left-shifted and some 1's were shifted out
     io.out.numer := ((1L << FIXED_WIDTH-1) - 1).S(FIXED_WIDTH.W)
     io.out.denom := double2fixed(1).S(FIXED_WIDTH.W)

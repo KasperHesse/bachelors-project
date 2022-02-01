@@ -2,16 +2,16 @@ package stages
 
 import chisel3._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import common.calculateKVresult
 import execution.Opcode.{ADD, DIV, MAC, RED}
 import execution._
-import org.scalatest.{FlatSpec, Matchers}
+
 import utils.Config._
 import utils.Fixed._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class DecExWbSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
 
   var sReg: Array[SInt] = _
   var xReg: Array[Array[SInt]] = _
@@ -49,7 +49,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
    * @param instr The instruction to wait on
    */
   def waitForResult(dut: DecExWb, instr: RtypeInstruction): Unit = {
-    while(!dut.io.wb.we.peek.litToBoolean){
+    while(!dut.io.wb.we.peek().litToBoolean){
       dut.clock.step()
     }
   }
@@ -143,21 +143,21 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
    */
   def expectVREG(dut: DecExWb, instr: RtypeInstruction, results: Array[SInt]): Unit = {
     val mod = instr.mod.litValue
-    if(instr.op.litValue() == MAC.litValue && mod == RtypeMod.KV.litValue) {
-      calculateKVresult(instr, results, dut.io.wb.rd.reg.peek, vReg)
+    if(instr.op.litValue == MAC.litValue && mod == RtypeMod.KV.litValue) {
+      calculateKVresult(instr, results, dut.io.wb.rd.reg.peek(), vReg)
     } else if(mod == RtypeMod.VV.litValue) {
-      calculateVVresult(instr, results, dut.io.wb.rd.reg.peek, vReg)
+      calculateVVresult(instr, results, dut.io.wb.rd.reg.peek(), vReg)
     } else if (mod == RtypeMod.XV.litValue) {
-      calculateXVresult(instr, results, dut.io.wb.rd.reg.peek, xReg, vReg)
+      calculateXVresult(instr, results, dut.io.wb.rd.reg.peek(), xReg, vReg)
     } else if (mod == RtypeMod.SV.litValue) {
-      calculateSVresult(instr, results, dut.io.wb.rd.reg.peek, sReg, vReg)
+      calculateSVresult(instr, results, dut.io.wb.rd.reg.peek(), sReg, vReg)
     } else {
       throw new IllegalArgumentException("Unknown Rtype modifier")
     }
     dut.io.wb.rd.rf.expect(RegisterFileType.VREG)
     for(i <- 0 until VREG_DEPTH) {
-      assert(math.abs(fixed2double((dut.io.wb.wrData(i).peek.litValue - results(i).litValue).toLong)) < 1e-2)
-      results(i) = dut.io.wb.wrData(i).peek //to avoid any incremental changes
+      assert(math.abs(fixed2double((dut.io.wb.wrData(i).peek().litValue - results(i).litValue).toLong)) < 1e-2)
+      results(i) = dut.io.wb.wrData(i).peek() //to avoid any incremental changes
     }
   }
 
@@ -181,9 +181,9 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     dut.io.wb.rd.rf.expect(RegisterFileType.XREG)
     dut.io.wb.rd.subvec.expect(0.U)
     for (i <- 0 until NUM_PROCELEM) {
-      assertEquals(dut.io.wb.wrData(i).peek, results(i))
-//      assert(math.abs(fixed2double((dut.io.wb.wrData(i).peek.litValue - results(i).litValue).toLong)) < 1e-2)
-      results(i) = dut.io.wb.wrData(i).peek
+      assertEquals(dut.io.wb.wrData(i).peek(), results(i))
+//      assert(math.abs(fixed2double((dut.io.wb.wrData(i).peek().litValue - results(i).litValue).toLong)) < 1e-2)
+      results(i) = dut.io.wb.wrData(i).peek()
     }
     for (i <- NUM_PROCELEM until VREG_DEPTH) {
       dut.io.wb.wrData(i).expect(0.S)
@@ -211,9 +211,9 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     }
     dut.io.wb.rd.rf.expect(RegisterFileType.SREG)
     dut.io.wb.rd.subvec.expect(0.U)
-    assertEquals(dut.io.wb.wrData(0).peek, results(0))
+    assertEquals(dut.io.wb.wrData(0).peek(), results(0))
     for(i <- 0 until NUM_PROCELEM) {
-      results(i) = dut.io.wb.wrData(i).peek
+      results(i) = dut.io.wb.wrData(i).peek()
     }
   }
 
@@ -232,7 +232,7 @@ class DecExWbSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       for(i <- 0 until VREG_SLOT_WIDTH) { //We need to update all vreg slots
         waitForResult(dut, instr)
         expectVREG(dut, instr, results)
-        updateVREG(instr, results, dut.io.wb.rd.reg.peek, vReg)
+        updateVREG(instr, results, dut.io.wb.rd.reg.peek(), vReg)
         if (i < VREG_SLOT_WIDTH-1) dut.clock.step() //Don't step after final result, this happens in test()
       }
     } else if (rf == XREG.litValue) {

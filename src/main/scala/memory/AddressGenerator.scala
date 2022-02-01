@@ -50,7 +50,7 @@ class AddressGenerator(pipe: Boolean = false) extends Module {
   val addresses = Wire(Vec(NUM_MEMORY_BANKS, UInt(MEM_ADDR_WIDTH.W)))
 
   /** Decoded base address */
-  val baseAddr = addrDecode(in.baseAddr.asUInt())
+  val baseAddr = addrDecode(in.baseAddr.asUInt)
 
 
   // --- LOGIC ---

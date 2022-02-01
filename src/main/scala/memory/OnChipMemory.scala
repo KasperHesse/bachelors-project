@@ -58,12 +58,12 @@ class OnChipMemory(val wordsPerBank: Int, val memInitFileLocation: String = "src
   // are all represented as address 'x' in their respective banks. The lower 3 bits are thus used to select the relevant banks
   for(i <- membank.indices) {
     //Set up read accessors. If address it not valid, we replace the read data with 0's
-    rdData(i) := membank(i).read((io.addrGen.bits.addr(i) >> log2Ceil(NUM_MEMORY_BANKS)).asUInt(), validOp)
+    rdData(i) := membank(i).read((io.addrGen.bits.addr(i) >> log2Ceil(NUM_MEMORY_BANKS)).asUInt, validOp)
 
     //Set up write accessors. Only write if address is valid
     we(i) := io.we && io.addrGen.bits.validAddress(i) && io.addrGen.valid
     when(we(i)) {
-      val wrAddr = (io.addrGen.bits.addr(i) >> log2Ceil(NUM_MEMORY_BANKS)).asUInt()
+      val wrAddr = (io.addrGen.bits.addr(i) >> log2Ceil(NUM_MEMORY_BANKS)).asUInt
       val wrData = io.writeQueue.bits.wrData(i)
       membank(i).write(wrAddr, wrData)
     }

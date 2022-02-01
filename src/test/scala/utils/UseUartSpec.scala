@@ -1,12 +1,11 @@
 package utils
 
 import chisel3._
-import chisel3.tester.experimental.TestOptionBuilder._
 import chiseltest._
-import chiseltest.internal.WriteVcdAnnotation
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class UseUartSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class UseUartSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "UseUart"
 
   it should "transmit some binary data" in {

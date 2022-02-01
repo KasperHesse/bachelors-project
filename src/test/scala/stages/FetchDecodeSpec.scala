@@ -2,14 +2,13 @@ package stages
 
 import chisel3._
 import chiseltest._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
-import execution._
-import org.scalatest.{FlatSpec, Matchers}
+import execution._
 import utils.Config._
 import utils.Assembler
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class FetchDecodeSpec  extends FlatSpec with ChiselScalatestTester with Matchers {
+class FetchDecodeSpec  extends AnyFlatSpec with ChiselScalatestTester with Matchers {
 
   "Fetch/Decode" should "decode instructions and take branches" in {
     simulationConfig()

@@ -1,17 +1,16 @@
 package execution
 
 import chisel3._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Fixed._
 import chisel3.experimental.BundleLiterals._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import utils.Config._
 import Opcode._
 import utils.Config
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class ForwardingSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class ForwardingSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Forwarding unit"
 
   it should "work" in {

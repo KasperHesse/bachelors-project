@@ -85,7 +85,7 @@ class ThreadMemoryAccess(sim: Boolean = false) extends Module {
   // --- LOGIC ---
   //Generate logic to create correct read queue bundles
   readQueue.rd.rf := Mux(Sinstr.mod === StypeMod.VEC || Sinstr.mod === StypeMod.DOF, VREG, XREG)
-  readQueue.rd.rfUint := readQueue.rd.rf.asUInt() //TODO debug signal, remove this
+  readQueue.rd.rfUint := readQueue.rd.rf.asUInt //TODO debug signal, remove this
   readQueue.iter := ijk.io.ijkOut.iteration
   readQueue.mod := Sinstr.mod
   readQueue.rd.subvec := 0.U

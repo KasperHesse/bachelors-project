@@ -2,16 +2,16 @@ package execution
 
 import chisel3._
 import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+
 import utils.Fixed._
 import chisel3.experimental.BundleLiterals._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
 import utils.Config
 import utils.Config._
 import Opcode._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class DecodeSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "Decode stage"
 
   //This test. Load in a simple set of VV instructions, test whether outputs are asserted correctly
@@ -41,7 +41,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val KE = KEMatrix.getKEMatrix(0)
     val vReg = dut.threads(0).vRegFile.arr
     val rs1 = inst.rs1.litValue.toInt
-    val rd = inst.rd.litValue().toInt
+    val rd = inst.rd.litValue.toInt
 
     //smpr rows, KE_SIZE results on each row
     //results on each row are split into groups of NUM_PROCELEM
@@ -162,17 +162,17 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val mod = instr.mod.litValue
     if(mod == RtypeMod.VV.litValue) {
       expectVVvalues(dut, instr)
-    } else if (mod == RtypeMod.XV.litValue()) {
+    } else if (mod == RtypeMod.XV.litValue) {
       expectXVvalues(dut, instr)
-    } else if (mod == RtypeMod.XX.litValue()) {
+    } else if (mod == RtypeMod.XX.litValue) {
       expectXXvalues(dut, instr)
-    } else if(mod == RtypeMod.SV.litValue()) {
+    } else if(mod == RtypeMod.SV.litValue) {
       expectSVvalues(dut, instr)
-    } else if(mod == RtypeMod.SX.litValue()) {
+    } else if(mod == RtypeMod.SX.litValue) {
       expectSXvalues(dut, instr)
-    } else if (mod == RtypeMod.SS.litValue()) {
+    } else if (mod == RtypeMod.SS.litValue) {
       expectSSvalues(dut, instr)
-    } else if (mod == RtypeMod.KV.litValue()) {
+    } else if (mod == RtypeMod.KV.litValue) {
       expectKVvalues(dut, instr)
     } else {
       throw new IllegalArgumentException("Unknown Rtype modifier")
@@ -244,7 +244,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val instrs = genAndPokeRtype(dut, mod)
     //Step until outputs are available
     for(inst <- instrs) {
-      while(!dut.io.ex.valid.peek.litToBoolean) {
+      while(!dut.io.ex.valid.peek().litToBoolean) {
         dut.clock.step()
       }
 //      dut.clock.step() //One more for output to be present
@@ -264,11 +264,11 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       val ops = wrapInstructions(instrs)
       loadInstructions(ops, dut)
       //Step until outputs are available
-      while(dut.io.ctrl.threadCtrl(0).stateUint.peek.litValue() != ThreadState.sExec.litValue()) {
+      while(dut.io.ctrl.threadCtrl(0).stateUint.peek().litValue != ThreadState.sExec.litValue) {
         dut.clock.step()
       }
       for(inst <- instrs) {
-        while(!dut.io.ex.valid.peek.litToBoolean) {
+        while(!dut.io.ex.valid.peek().litToBoolean) {
           dut.clock.step()
         }
         //One more step to allow for data to be output
@@ -334,7 +334,7 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     test(new Decode).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       val instrs = genAndPoke(dut)
       //Step until outputs are available
-      while(dut.io.ctrl.threadCtrl(0).stateUint.peek.litValue() != ThreadState.sExec.litValue()) {
+      while(dut.io.ctrl.threadCtrl(0).stateUint.peek().litValue != ThreadState.sExec.litValue) {
         dut.clock.step()
       }
       for(inst <- instrs) {
@@ -353,8 +353,8 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
       var i = 0
       while(i < iters) {
         //Step until outputs are available
-        while ((dut.io.ctrl.threadCtrl(0).stateUint.peek.litValue() != ThreadState.sExec.litValue())
-        .&& (dut.io.ctrl.threadCtrl(1).stateUint.peek.litValue != ThreadState.sExec.litValue) ) {
+        while ((dut.io.ctrl.threadCtrl(0).stateUint.peek().litValue != ThreadState.sExec.litValue)
+        .&& (dut.io.ctrl.threadCtrl(1).stateUint.peek().litValue != ThreadState.sExec.litValue) ) {
           dut.clock.step()
         }
         for (inst <- instrs) {
@@ -389,11 +389,11 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
     val taken: Boolean = if(comp.litValue == EQUAL.litValue) {
       sReg(rs1).litValue == sReg(rs2).litValue
     } else if (comp.litValue == NEQ.litValue) {
-      sReg(rs1).litValue() != sReg(rs2).litValue()
+      sReg(rs1).litValue != sReg(rs2).litValue
     } else if (comp.litValue == LT.litValue) {
-      sReg(rs1).litValue() < sReg(rs2).litValue()
+      sReg(rs1).litValue < sReg(rs2).litValue
     } else if (comp.litValue == GEQ.litValue) {
-      sReg(rs1).litValue() >= sReg(rs2).litValue
+      sReg(rs1).litValue >= sReg(rs2).litValue
     } else {
       throw new IllegalArgumentException("Unable to decode comp value")
     }
@@ -440,8 +440,8 @@ class DecodeSpec extends FlatSpec with ChiselScalatestTester with Matchers {
         val taken = compInt match {
           case 0 => sReg(rs1).litValue == sReg(rs2).litValue
           case 1 => sReg(rs1).litValue != sReg(rs2).litValue
-          case 2 => sReg(rs1).litValue <  sReg(rs2).litValue()
-          case 3 => sReg(rs1).litValue >= sReg(rs2).litValue()
+          case 2 => sReg(rs1).litValue <  sReg(rs2).litValue
+          case 3 => sReg(rs1).litValue >= sReg(rs2).litValue
         }
         val offset = rand.nextInt(8) * 4 * {if(rand.nextBoolean()) 1 else -1}
 

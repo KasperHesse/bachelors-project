@@ -119,7 +119,7 @@ object Fixed {
   }
 
   def fixedAdd(x: SInt, y: SInt): SInt = {
-    fixedAdd(x.litValue().toLong, y.litValue.toLong).S(FIXED_WIDTH.W)
+    fixedAdd(x.litValue.toLong, y.litValue.toLong).S(FIXED_WIDTH.W)
   }
 
   /**
@@ -158,7 +158,7 @@ object Fixed {
    * @return a-b, within the limits of the addition hardware
    */
   def fixedSub(x: SInt, y: SInt): SInt = {
-    fixedSub(x.litValue().toLong, y.litValue.toLong).S(FIXED_WIDTH.W)
+    fixedSub(x.litValue.toLong, y.litValue.toLong).S(FIXED_WIDTH.W)
   }
 
   /**
@@ -203,7 +203,7 @@ object Fixed {
    * @return a*b, within in the limits of the hardware
    */
   def fixedMul(x: SInt, y: SInt): SInt = {
-    fixedMul(x.litValue().toLong, y.litValue.toLong).S(FIXED_WIDTH.W)
+    fixedMul(x.litValue.toLong, y.litValue.toLong).S(FIXED_WIDTH.W)
   }
 
   /**
@@ -301,7 +301,7 @@ object Fixed {
   }
 
   def fixedMin(a: SInt, b: SInt): SInt = {
-    fixedMin(a.litValue().toLong, b.litValue().toLong).S(FIXED_WIDTH.W)
+    fixedMin(a.litValue.toLong, b.litValue.toLong).S(FIXED_WIDTH.W)
   }
 
   /**

@@ -2,13 +2,12 @@ package memory
 
 import chisel3._
 import chisel3.util._
-import chiseltest._
-import org.scalatest.{FlatSpec, Matchers}
+import chiseltest._
 import utils.Fixed._
-import chiseltest.experimental.TestOptionBuilder._
-import chiseltest.internal.WriteVcdAnnotation
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers {
+class IJKgeneratorSpec extends AnyFlatSpec with ChiselScalatestTester with Matchers {
   behavior of "IJK generator"
 
   def expectIJK(dut: IJKgenerator, i: Int, j: Int, k: Int): Unit = {
@@ -32,7 +31,7 @@ class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers
   it should "saturate once invalid" in {
     test(new IJKgenerator).withAnnotations(Seq(WriteVcdAnnotation)) {dut =>
       dut.io.ctrl.next.poke(true.B)
-      while(dut.io.ctrl.pad.peek.litToBoolean) {
+      while(dut.io.ctrl.pad.peek().litToBoolean) {
         dut.clock.step()
       }
       expectIJK(dut, 0,0,0)
@@ -80,7 +79,7 @@ class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers
       dut.io.out.iteration.expect(7.U)
       dut.io.ctrl.load.poke(false.B)
       dut.io.ctrl.next.poke(true.B)
-      while(dut.io.ctrl.pad.peek.litToBoolean) {
+      while(dut.io.ctrl.pad.peek().litToBoolean) {
         dut.clock.step()
       }
       dut.io.ctrl.next.poke(false.B)
@@ -130,7 +129,7 @@ class IJKgeneratorSpec extends FlatSpec with ChiselScalatestTester with Matchers
   it should "reset when toggled" in {
     test(new IJKgenerator) {dut =>
       dut.io.ctrl.next.poke(true.B)
-      while(!dut.io.ctrl.pad.peek.litToBoolean) {
+      while(!dut.io.ctrl.pad.peek().litToBoolean) {
         dut.clock.step()
       }
       dut.io.out.ijk.i.expect(0.U)
